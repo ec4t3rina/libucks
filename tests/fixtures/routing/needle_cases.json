@@ -1,0 +1,505 @@
+{
+  "description": "Needle-in-a-haystack routing fixture. 20 software domains × 5 probe + 5 adversarial queries. Centroids are computed at test time from centroid_texts via EmbeddingService.",
+  "domains": [
+    {
+      "domain_id": "d_auth",
+      "domain_label": "JWT authentication and session tokens",
+      "centroid_texts": [
+        "JWT token generation, validation, and expiry using PyJWT library",
+        "Bearer token authentication middleware verifying HMAC signatures",
+        "User login flow: validate credentials, issue access token and refresh token",
+        "Session cookie management, token revocation, and logout endpoint",
+        "OAuth2 password grant flow with scope-based authorization claims"
+      ],
+      "probe_queries": [
+        "How does JWT token validation work in the middleware?",
+        "Where is the user login endpoint and how does it issue tokens?",
+        "How are refresh tokens rotated and revoked on logout?",
+        "What HMAC algorithm is used to sign the bearer tokens?",
+        "How does the session cookie get set after successful authentication?"
+      ],
+      "adversarial_queries": [
+        "How does the API verify the identity of an incoming request?",
+        "Where are user passwords hashed and compared during sign-in?",
+        "How does the system handle expired access credentials?",
+        "What happens when a user sends an invalid authorization header?",
+        "How is the current logged-in user retrieved inside a request handler?"
+      ]
+    },
+    {
+      "domain_id": "d_orm",
+      "domain_label": "SQLAlchemy ORM models and database relationships",
+      "centroid_texts": [
+        "SQLAlchemy declarative Base, Column types, and relationship() foreign keys",
+        "ORM model definitions: User, Order, Product with one-to-many and many-to-many",
+        "SQLAlchemy session management, lazy loading, and eager loading with joinedload",
+        "Database query building with filter(), order_by(), limit(), and offset()",
+        "Composite indexes, unique constraints, and check constraints in ORM models"
+      ],
+      "probe_queries": [
+        "How is the User model defined with its foreign key relationships?",
+        "What SQLAlchemy session strategy is used for lazy vs eager loading?",
+        "How do I add a composite index to an ORM model?",
+        "Where are the many-to-many association tables declared?",
+        "How does the query filter users by their active status?"
+      ],
+      "adversarial_queries": [
+        "How does SQLAlchemy load model instances from database tables using session queries?",
+        "Where is the database connection pool configured?",
+        "How does the app handle duplicate key violations when inserting rows?",
+        "What tables are defined in the persistence layer?",
+        "How are one-to-many relationships traversed in queries?"
+      ]
+    },
+    {
+      "domain_id": "d_routes",
+      "domain_label": "FastAPI HTTP route handlers and request parsing",
+      "centroid_texts": [
+        "FastAPI router, path parameters, query parameters, and response models",
+        "HTTP POST and GET endpoint definitions with Pydantic request body validation",
+        "Dependency injection in FastAPI: Depends(), request headers, path operations",
+        "HTTP status codes, error responses, and HTTPException in route handlers",
+        "API versioning with router prefix, tags, and OpenAPI schema generation"
+      ],
+      "probe_queries": [
+        "How is the POST /users endpoint defined and what does it validate?",
+        "Where are query parameters parsed and validated in the route handlers?",
+        "How does FastAPI inject dependencies into route functions?",
+        "What response model is returned by the GET /items/{id} endpoint?",
+        "How are HTTP 422 validation errors returned to the client?"
+      ],
+      "adversarial_queries": [
+        "How does the API handle an incoming HTTP request?",
+        "Where is request body deserialization handled?",
+        "How are URL path segments extracted for processing?",
+        "What happens when a required request parameter is missing?",
+        "How is the API documentation schema generated from the code?"
+      ]
+    },
+    {
+      "domain_id": "d_react",
+      "domain_label": "React UI component rendering and state management",
+      "centroid_texts": [
+        "React functional components, JSX rendering, props drilling, and children",
+        "useState, useEffect, useCallback hooks for component state and side effects",
+        "Redux store, actions, reducers, and useSelector/useDispatch hooks",
+        "React component lifecycle: mount, update, unmount cleanup in useEffect",
+        "Conditional rendering, list rendering with map() and key props in React"
+      ],
+      "probe_queries": [
+        "How does the UserCard component receive and render its props?",
+        "Where is the useState hook used to manage form input state?",
+        "How does the Redux store update when an action is dispatched?",
+        "What does the useEffect cleanup function do on component unmount?",
+        "How are list items rendered with unique key props in the component?"
+      ],
+      "adversarial_queries": [
+        "How is dynamic content displayed in the browser interface?",
+        "Where is the application's global state managed?",
+        "How does a button click trigger a data fetch and re-render?",
+        "What happens to subscriptions when a component is removed from the DOM?",
+        "How are child components passed data from their parent?"
+      ]
+    },
+    {
+      "domain_id": "d_cache",
+      "domain_label": "Redis caching layer and cache invalidation",
+      "centroid_texts": [
+        "Redis SET, GET, DEL with TTL expiry for application-level caching",
+        "Cache-aside pattern: read-through and write-through with Redis client",
+        "Cache key namespacing, cache stampede prevention with distributed locks",
+        "Redis pipeline batching, connection pooling, and serialization with pickle/JSON",
+        "Cache invalidation strategies: event-based purge, TTL sweep, and LRU eviction"
+      ],
+      "probe_queries": [
+        "How is the Redis cache populated and what TTL is set on each key?",
+        "Where does the cache-aside pattern fetch from the source on a cache miss?",
+        "How are cache keys namespaced to prevent collisions between services?",
+        "What serialization format is used when storing objects in Redis?",
+        "How is the cache invalidated when the underlying database record changes?"
+      ],
+      "adversarial_queries": [
+        "How does the system avoid hitting the database on every request?",
+        "Where is frequently accessed data stored to reduce latency?",
+        "How does the app handle a cold cache when the service restarts?",
+        "What happens when a cached value becomes stale after an update?",
+        "How is in-memory data storage managed for high-traffic endpoints?"
+      ]
+    },
+    {
+      "domain_id": "d_celery",
+      "domain_label": "Celery background task queue and async job workers",
+      "centroid_texts": [
+        "Celery task definitions with @app.task decorator, delay() and apply_async()",
+        "Celery beat periodic tasks, crontab schedule, and task routing to queues",
+        "Celery worker process management, concurrency, prefetch, and task retries",
+        "Task result backend: storing and retrieving Celery task results from Redis",
+        "Celery chord, chain, and group primitives for task workflow composition"
+      ],
+      "probe_queries": [
+        "How is the send_email Celery task defined and invoked asynchronously?",
+        "Where is the periodic task schedule configured in Celery beat?",
+        "How does the worker retry a failed task with exponential backoff?",
+        "What result backend stores the return value of a completed Celery task?",
+        "How is a chord used to aggregate results from a group of parallel tasks?"
+      ],
+      "adversarial_queries": [
+        "How does the application offload slow operations to background Celery workers?",
+        "Where are jobs enqueued for deferred processing outside the request cycle?",
+        "How does the system ensure a background job is retried after failure?",
+        "What happens when a worker process crashes mid-task?",
+        "How are scheduled recurring jobs defined and registered in the system?"
+      ]
+    },
+    {
+      "domain_id": "d_s3",
+      "domain_label": "AWS S3 file upload and blob storage operations",
+      "centroid_texts": [
+        "AWS S3 bucket operations: PutObject, GetObject, DeleteObject with boto3",
+        "Presigned URL generation for direct browser-to-S3 multipart file uploads",
+        "S3 bucket policy, IAM role permissions, and server-side encryption at rest",
+        "S3 object metadata, content-type headers, and versioning configuration",
+        "S3 event notifications triggering Lambda on object creation or deletion"
+      ],
+      "probe_queries": [
+        "How is a presigned URL generated for direct S3 file upload from the browser?",
+        "Where is the boto3 S3 client configured with credentials and bucket name?",
+        "How does server-side encryption get applied to uploaded S3 objects?",
+        "What S3 event triggers the processing Lambda when a file is uploaded?",
+        "How is multipart upload assembled and completed for large files?"
+      ],
+      "adversarial_queries": [
+        "How does the system handle large binary file uploads from users?",
+        "Where are user-uploaded assets stored and retrieved in the cloud?",
+        "How are temporary download links generated for private files?",
+        "What permissions are required to read and write stored objects?",
+        "How does the application manage uploaded document storage and retrieval?"
+      ]
+    },
+    {
+      "domain_id": "d_search",
+      "domain_label": "Elasticsearch full-text search indexing and queries",
+      "centroid_texts": [
+        "Elasticsearch index mapping, analyzers, and full-text search with match queries",
+        "Elasticsearch bool query: must, should, filter, and must_not clauses",
+        "Index document ingestion, bulk indexing, and reindexing pipelines",
+        "Elasticsearch aggregations: terms, histogram, date_histogram, and nested",
+        "Search relevance scoring with BM25, function_score, and field boosting"
+      ],
+      "probe_queries": [
+        "How is the Elasticsearch index mapping defined for the product catalog?",
+        "Where is the bool query assembled with must and filter clauses?",
+        "How are documents bulk-indexed into Elasticsearch during data ingestion?",
+        "What aggregation computes facets for the search results sidebar?",
+        "How is BM25 relevance tuned with field boosting for title vs description?"
+      ],
+      "adversarial_queries": [
+        "How does the application find records matching a keyword query?",
+        "Where is text tokenization and analysis configured for search?",
+        "How are search results ranked and sorted by relevance score?",
+        "What happens when a search query returns zero matching documents?",
+        "How is autocomplete or typeahead implemented for the search bar?"
+      ]
+    },
+    {
+      "domain_id": "d_payments",
+      "domain_label": "Stripe payment processing and webhook billing",
+      "centroid_texts": [
+        "Stripe PaymentIntent creation, confirmation, and 3D Secure authentication",
+        "Stripe webhook endpoint: signature verification and event handling",
+        "Stripe subscription creation, plan changes, proration, and cancellation",
+        "Stripe customer portal, invoice generation, and failed payment retries",
+        "Stripe Connect platform payments, transfer splits, and payout schedules"
+      ],
+      "probe_queries": [
+        "How is a Stripe PaymentIntent created and confirmed on the server?",
+        "Where is the Stripe webhook signature verified before processing events?",
+        "How does the subscription upgrade from monthly to annual plan work?",
+        "What happens when a Stripe invoice payment fails and needs retry?",
+        "How are Stripe Connect transfers split between the platform and sellers?"
+      ],
+      "adversarial_queries": [
+        "How does the application handle a successful purchase transaction?",
+        "Where is the credit card charge initiated and confirmed?",
+        "How are recurring billing cycles managed for subscribers?",
+        "What callback is triggered when a payment is completed externally?",
+        "How does the app handle refunds and charge reversals?"
+      ]
+    },
+    {
+      "domain_id": "d_websocket",
+      "domain_label": "WebSocket server connection lifecycle and real-time messaging",
+      "centroid_texts": [
+        "WebSocket server handshake, connection upgrade, and keep-alive ping/pong",
+        "Broadcasting messages to connected WebSocket clients in a channel room",
+        "WebSocket connection registry, client disconnection cleanup, and reconnect",
+        "Real-time event push over WebSocket: chat messages, notifications, live updates",
+        "WebSocket authentication via token query parameter on connection establishment"
+      ],
+      "probe_queries": [
+        "How is the WebSocket handshake performed and the connection upgraded?",
+        "Where does the server broadcast a message to all clients in a room?",
+        "How is a disconnected WebSocket client removed from the connection registry?",
+        "What event is sent over the WebSocket when a new chat message arrives?",
+        "How is the user authenticated when establishing the WebSocket connection?"
+      ],
+      "adversarial_queries": [
+        "How does the server push live updates to the browser without polling?",
+        "Where are persistent bidirectional connections between client and server managed?",
+        "How does the application notify connected users of a new event in real time?",
+        "What happens when a client's network drops and they attempt to reconnect?",
+        "How are real-time collaborative features implemented in the application?"
+      ]
+    },
+    {
+      "domain_id": "d_graphql",
+      "domain_label": "GraphQL schema type definitions and resolvers",
+      "centroid_texts": [
+        "GraphQL SDL schema: type Query, type Mutation, type definitions with fields",
+        "GraphQL resolver functions for nested types and data fetching with DataLoader",
+        "GraphQL mutations for create, update, delete operations with input types",
+        "GraphQL subscriptions for real-time data push over WebSocket protocol",
+        "GraphQL error handling, custom directives, and schema stitching"
+      ],
+      "probe_queries": [
+        "Where is the GraphQL type definition for the User query field?",
+        "How does the resolver fetch nested data and avoid N+1 queries with DataLoader?",
+        "How is a GraphQL mutation defined to create a new resource?",
+        "Where are GraphQL subscriptions set up for real-time data streaming?",
+        "How are custom GraphQL directives implemented and applied to fields?"
+      ],
+      "adversarial_queries": [
+        "How does the API expose data querying capabilities to clients?",
+        "Where are the schema definitions for the available API operations?",
+        "How does the GraphQL server resolve queries for nested related resource types?",
+        "What mechanism does the client use to fetch only the fields it needs?",
+        "How are complex data transformation and composition queries handled?"
+      ]
+    },
+    {
+      "domain_id": "d_testing",
+      "domain_label": "pytest test fixtures, mocks, and test infrastructure",
+      "centroid_texts": [
+        "pytest fixtures with scope, tmp_path, monkeypatch, and conftest.py",
+        "unittest.mock: MagicMock, patch decorator, side_effect, and assert_called_with",
+        "pytest parametrize for table-driven tests and hypothesis property-based testing",
+        "Pytest-asyncio async test functions with event loop and AsyncMock",
+        "Test isolation: database transactions rollback, factory_boy fixtures, faker data"
+      ],
+      "probe_queries": [
+        "How is the database fixture set up to rollback after each test?",
+        "Where is monkeypatch used to replace an external service call in tests?",
+        "How does pytest.mark.parametrize generate multiple test cases from a table?",
+        "How is AsyncMock configured to simulate an async API call in tests?",
+        "Where does conftest.py define shared fixtures for the test suite?"
+      ],
+      "adversarial_queries": [
+        "How does the test suite verify the correctness of the application logic?",
+        "Where are fake objects used to isolate units under test?",
+        "How are test cases structured to cover edge cases and error paths?",
+        "What setup and teardown routines run before and after each test function?",
+        "How does the test framework handle flaky network calls in unit tests?"
+      ]
+    },
+    {
+      "domain_id": "d_docker",
+      "domain_label": "Docker containerization and Kubernetes deployment",
+      "centroid_texts": [
+        "Dockerfile: multi-stage build, base image selection, COPY, RUN, ENTRYPOINT",
+        "Docker Compose services, volumes, networks, environment variables, and healthchecks",
+        "Kubernetes Deployment manifest: replicas, rolling update strategy, resource limits",
+        "Kubernetes Service, Ingress, ConfigMap, and Secret resource definitions",
+        "Helm chart templating, values.yaml overrides, and chart dependency management"
+      ],
+      "probe_queries": [
+        "How is the multi-stage Dockerfile structured to minimise the final image size?",
+        "Where are environment variables injected into the Docker Compose service?",
+        "How does the Kubernetes Deployment define rolling update and rollback strategy?",
+        "What Kubernetes Secret is mounted to provide the database credentials?",
+        "How is a Helm chart values override used to deploy to production vs staging?"
+      ],
+      "adversarial_queries": [
+        "How is the application packaged and deployed to a server environment?",
+        "Where is the container image built and pushed to a registry?",
+        "How are service dependencies started and linked in the local dev environment?",
+        "How does the orchestration system restart a crashed application instance?",
+        "Where is infrastructure-as-code used to describe the deployment topology?"
+      ]
+    },
+    {
+      "domain_id": "d_logging",
+      "domain_label": "Structured logging, observability, and log configuration",
+      "centroid_texts": [
+        "structlog JSON logging with bound context: request_id, user_id, component name",
+        "Python logging configuration: handlers, formatters, log levels, and propagation",
+        "Log correlation IDs for distributed tracing across microservice boundaries",
+        "Log rotation, log shipping to ELK stack, and retention policy configuration",
+        "Metrics and counters emitted alongside log events for observability dashboards"
+      ],
+      "probe_queries": [
+        "How is a structlog logger bound with request_id and component name context?",
+        "Where is the Python logging configuration set up for the application?",
+        "How is a correlation ID injected into log records across service calls?",
+        "What log rotation and shipping configuration sends logs to the ELK stack?",
+        "How are counters and metrics emitted alongside structured log events?"
+      ],
+      "adversarial_queries": [
+        "How does the application record what happened during a request for debugging?",
+        "Where is contextual information attached to diagnostic output?",
+        "How are log messages from different services correlated in production?",
+        "What infrastructure collects and indexes application logs centrally?",
+        "How does the system track the frequency of errors and warnings over time?"
+      ]
+    },
+    {
+      "domain_id": "d_ratelimit",
+      "domain_label": "API rate limiting and request throttling middleware",
+      "centroid_texts": [
+        "Token bucket rate limiter: refill rate, burst capacity, and per-client key",
+        "Sliding window request counter in Redis for per-IP and per-API-key throttling",
+        "Rate limit HTTP response headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After",
+        "Rate limiting middleware: FastAPI/Flask decorator checking quota before handler",
+        "Distributed rate limiting across multiple API server instances using Redis atomic ops"
+      ],
+      "probe_queries": [
+        "How is the token bucket algorithm implemented for per-client rate limiting?",
+        "Where does the sliding window counter in Redis enforce the request quota?",
+        "What HTTP headers communicate the rate limit status to API consumers?",
+        "How does the rate limiting middleware intercept requests before the route handler?",
+        "How is rate limiting kept consistent across multiple load-balanced API instances?"
+      ],
+      "adversarial_queries": [
+        "How does the API protect itself from being overwhelmed by too many requests?",
+        "Where is the per-user request quota enforced in the request pipeline?",
+        "How does the server respond when a client exceeds the allowed request rate?",
+        "What mechanism prevents a single client from monopolising API capacity?",
+        "How is abuse prevention implemented for high-frequency API consumers?"
+      ]
+    },
+    {
+      "domain_id": "d_config",
+      "domain_label": "Application configuration loading from env files and TOML",
+      "centroid_texts": [
+        "Pydantic BaseSettings loading configuration from environment variables and .env file",
+        "TOML configuration file parsing with tomllib and typed dataclass defaults",
+        "Secret management: injecting API keys from environment without hardcoding",
+        "Configuration validation at startup: required fields, type coercion, range checks",
+        "Environment-specific config profiles: development, staging, and production overrides"
+      ],
+      "probe_queries": [
+        "How does Pydantic BaseSettings load the DATABASE_URL from the environment?",
+        "Where is the TOML config file parsed and mapped to typed dataclass fields?",
+        "How are API secrets injected at runtime without being stored in source code?",
+        "What validation runs at startup to ensure required configuration is present?",
+        "How are production configuration values overridden relative to development defaults?"
+      ],
+      "adversarial_queries": [
+        "How does the application read its operational parameters at startup?",
+        "Where are environment-specific settings defined and loaded?",
+        "How does the system handle a missing required configuration value?",
+        "What is the strategy for managing sensitive credentials securely?",
+        "How are default settings overridden for different deployment environments?"
+      ]
+    },
+    {
+      "domain_id": "d_email",
+      "domain_label": "Email sending via SMTP and transactional email templates",
+      "centroid_texts": [
+        "SMTP client configuration: host, port, TLS, and authentication credentials",
+        "Transactional email via SendGrid API: dynamic templates, personalizations, and tracking",
+        "Email template rendering with Jinja2: HTML and plain-text parts, variable substitution",
+        "Email bounce handling, unsubscribe links, and suppression list management",
+        "Async email delivery queue: retry on SMTP timeout, dead-letter queue for failures"
+      ],
+      "probe_queries": [
+        "How is the SMTP connection configured with TLS and authentication?",
+        "Where is the SendGrid dynamic template rendered and sent to a recipient?",
+        "How does Jinja2 render the HTML email template with user-specific variables?",
+        "How are email bounces and unsubscribe events handled by the application?",
+        "How does the async email queue retry a failed SMTP delivery attempt?"
+      ],
+      "adversarial_queries": [
+        "How does the application send email notifications to users about important account events?",
+        "Where are outgoing messages to users composed and dispatched?",
+        "How are HTML notifications formatted and delivered to recipients?",
+        "What happens when a message delivery fails and needs to be retried?",
+        "How does the system manage opt-out preferences for outgoing communications?"
+      ]
+    },
+    {
+      "domain_id": "d_tracing",
+      "domain_label": "OpenTelemetry distributed tracing and metrics instrumentation",
+      "centroid_texts": [
+        "OpenTelemetry SDK: Tracer, Span creation, context propagation, and baggage",
+        "Exporting traces to Jaeger or OTLP collector with BatchSpanProcessor",
+        "Auto-instrumentation for FastAPI, SQLAlchemy, and httpx with OTel libraries",
+        "Custom metrics: Counter, Histogram, Gauge using OpenTelemetry Metrics API",
+        "Trace sampling strategies: parent-based, probabilistic, and always-on samplers"
+      ],
+      "probe_queries": [
+        "How is an OpenTelemetry Span created and its attributes set in the handler?",
+        "Where is the OTLP exporter configured to ship traces to the Jaeger backend?",
+        "How does auto-instrumentation attach spans to SQLAlchemy database queries?",
+        "How is a Histogram metric recorded for request latency in the application?",
+        "What sampling strategy is configured and how does it reduce trace volume?"
+      ],
+      "adversarial_queries": [
+        "How does distributed tracing measure the end-to-end latency of a request across services?",
+        "Where is the performance of individual operations measured and recorded?",
+        "How are slow database queries identified through instrumentation?",
+        "What telemetry data is collected and exported for production monitoring?",
+        "How does the system correlate work done across multiple internal service calls?"
+      ]
+    },
+    {
+      "domain_id": "d_ssh",
+      "domain_label": "SSH key management and server provisioning with Ansible",
+      "centroid_texts": [
+        "Ansible playbook tasks: apt install, service, copy, template, and file modules",
+        "SSH key pair generation, authorized_keys deployment, and bastion host configuration",
+        "Ansible inventory files, host groups, and variable precedence in group_vars",
+        "Server provisioning: user creation, sudo permissions, firewall rules with ufw",
+        "Ansible roles structure: tasks, handlers, defaults, templates, and meta"
+      ],
+      "probe_queries": [
+        "How does the Ansible playbook deploy SSH public keys to the target hosts?",
+        "Where is the bastion host configured for tunnelled SSH access to private servers?",
+        "How is the Ansible inventory structured to group web and database hosts?",
+        "What tasks in the playbook create the deploy user and configure sudo access?",
+        "How is the ufw firewall rule configured to allow only SSH on port 22?"
+      ],
+      "adversarial_queries": [
+        "How does the system automate the setup of a new server instance?",
+        "Where are remote machine configurations defined and applied programmatically?",
+        "How are credentials distributed securely to newly provisioned hosts?",
+        "How does the infrastructure code ensure idempotent server configuration?",
+        "What mechanism applies system-level configuration changes across a fleet of servers?"
+      ]
+    },
+    {
+      "domain_id": "d_ast",
+      "domain_label": "Tree-sitter AST parsing and source code analysis",
+      "centroid_texts": [
+        "Tree-sitter parser for Python: loading language grammar, parsing source bytes",
+        "AST node traversal: cursor.goto_first_child(), node.type, node.text extraction",
+        "Extracting function definitions, class bodies, and docstrings from syntax tree",
+        "Tree-sitter query patterns: S-expression syntax for matching named AST nodes",
+        "Incremental parsing with tree-sitter: applying edits to re-parse changed regions"
+      ],
+      "probe_queries": [
+        "How does the tree-sitter parser load the Python grammar and parse source code?",
+        "Where does the AST traversal cursor walk child nodes to find function definitions?",
+        "How is a docstring extracted from a function node in the syntax tree?",
+        "How is a tree-sitter query pattern written to match all class definitions?",
+        "How does incremental parsing apply a code edit without re-parsing the whole file?"
+      ],
+      "adversarial_queries": [
+        "How does the system extract structural information from source code files?",
+        "Where are function signatures and their bodies identified in a parsed file?",
+        "How does the code analysis walk a file to identify all top-level declarations?",
+        "What mechanism is used to understand the syntactic structure of Python code?",
+        "How are code symbols and their locations extracted for indexing purposes?"
+      ]
+    }
+  ]
+}
