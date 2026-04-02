@@ -80,13 +80,33 @@ class TestChunkMetadata:
         data = _make_chunk()
         chunk = ChunkMetadata(**data)
         result = chunk.model_dump()
-        assert result == data
+        # indexed_at defaults to None — present in dump but not in the helper dict
+        assert result["chunk_id"] == data["chunk_id"]
+        assert result["git_sha"] == data["git_sha"]
+        assert result["indexed_at"] is None
 
     def test_round_trip_json(self):
         data = _make_chunk()
         chunk = ChunkMetadata(**data)
         restored = ChunkMetadata.model_validate_json(chunk.model_dump_json())
         assert restored == chunk
+
+    def test_indexed_at_defaults_to_none(self):
+        chunk = ChunkMetadata(**_make_chunk())
+        assert chunk.indexed_at is None
+
+    def test_indexed_at_round_trip_dict(self):
+        data = _make_chunk(indexed_at="2026-04-02T10:00:00+00:00")
+        chunk = ChunkMetadata(**data)
+        assert chunk.indexed_at == "2026-04-02T10:00:00+00:00"
+        restored = ChunkMetadata.model_validate_json(chunk.model_dump_json())
+        assert restored.indexed_at == "2026-04-02T10:00:00+00:00"
+
+    def test_old_chunk_without_indexed_at_deserialises(self):
+        """Chunks persisted before Phase 6-A (no indexed_at key) must load cleanly."""
+        data = _make_chunk()  # helper produces no indexed_at key
+        chunk = ChunkMetadata(**data)
+        assert chunk.indexed_at is None
 
     def test_missing_chunk_id_raises(self):
         data = _make_chunk()
@@ -152,6 +172,37 @@ class TestBucketFrontMatter:
         assert result["domain_label"] == data["domain_label"]
         assert result["token_count"] == data["token_count"]
         assert len(result["chunks"]) == 1
+
+    def test_new_optional_fields_default_to_none_or_zero(self):
+        bfm = BucketFrontMatter(**_make_bucket_front_matter())
+        assert bfm.last_indexed_at is None
+        assert bfm.index_head_sha is None
+        assert bfm.coherence_score is None
+        assert bfm.parent_bucket_id is None
+        assert bfm.generation == 0
+
+    def test_new_fields_round_trip_json(self):
+        data = _make_bucket_front_matter(
+            last_indexed_at="2026-04-02T10:00:00+00:00",
+            index_head_sha="e4f9a3b1c2d3ef45ab67cd89ef012345",
+            coherence_score=0.82,
+            parent_bucket_id="deadbeef",
+            generation=1,
+        )
+        bfm = BucketFrontMatter(**data)
+        restored = BucketFrontMatter.model_validate_json(bfm.model_dump_json())
+        assert restored.last_indexed_at == "2026-04-02T10:00:00+00:00"
+        assert restored.index_head_sha == "e4f9a3b1c2d3ef45ab67cd89ef012345"
+        assert restored.coherence_score == pytest.approx(0.82)
+        assert restored.parent_bucket_id == "deadbeef"
+        assert restored.generation == 1
+
+    def test_old_bucket_without_new_fields_deserialises(self):
+        """BFMs persisted before Phase 6-A (no new fields) must load cleanly."""
+        data = _make_bucket_front_matter()
+        bfm = BucketFrontMatter(**data)
+        assert bfm.generation == 0
+        assert bfm.last_indexed_at is None
 
     def test_centroid_base64_round_trip(self):
         original = np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32)

@@ -20,19 +20,28 @@ import base64
 import json
 import struct
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 
 
 class _BucketEntry:
-    __slots__ = ("centroid", "token_count", "lock", "is_splitting")
+    __slots__ = (
+        "centroid", "token_count", "lock", "is_splitting",
+        "last_indexed_at", "index_head_sha", "coherence_score",
+        "query_hit_count", "last_query_hit_at",
+    )
 
     def __init__(self, centroid: np.ndarray, token_count: int, lock: asyncio.Lock) -> None:
         self.centroid = centroid
         self.token_count = token_count
         self.lock = lock
         self.is_splitting = False
+        self.last_indexed_at: Optional[str] = None
+        self.index_head_sha: Optional[str] = None
+        self.coherence_score: Optional[float] = None
+        self.query_hit_count: int = 0
+        self.last_query_hit_at: Optional[str] = None
 
 
 def _encode_centroid(centroid: np.ndarray) -> str:
@@ -49,6 +58,13 @@ class BucketRegistry:
     def __init__(self, registry_path: Path) -> None:
         self._path = registry_path
         self._buckets: Dict[str, _BucketEntry] = {}
+        self._meta: Dict[str, object] = {
+            "schema_version": 2,
+            "last_indexed_head": None,
+            "last_indexed_at": None,
+            "watcher_pid": None,
+            "merge_history": [],
+        }
 
     # ------------------------------------------------------------------
     # Mutating operations (async so callers can use asyncio.gather)
@@ -79,6 +95,16 @@ class BucketRegistry:
             raise KeyError(f"Bucket not registered: {bucket_id!r}")
         self._buckets[bucket_id].is_splitting = flag
 
+    def update_index_timestamp(
+        self, bucket_id: str, last_indexed_at: str, index_head_sha: str
+    ) -> None:
+        """Record when and at which git HEAD a bucket was last written by a Librarian."""
+        if bucket_id not in self._buckets:
+            raise KeyError(f"Bucket not registered: {bucket_id!r}")
+        entry = self._buckets[bucket_id]
+        entry.last_indexed_at = last_indexed_at
+        entry.index_head_sha = index_head_sha
+
     # ------------------------------------------------------------------
     # Read-only operations (sync — safe because asyncio is single-threaded)
     # ------------------------------------------------------------------
@@ -106,14 +132,18 @@ class BucketRegistry:
     # ------------------------------------------------------------------
 
     def save(self) -> None:
-        data = {
-            bucket_id: {
+        data: Dict[str, object] = {"_meta": self._meta}
+        for bucket_id, entry in self._buckets.items():
+            data[bucket_id] = {
                 "centroid_embedding": _encode_centroid(entry.centroid),
                 "token_count": entry.token_count,
                 "is_splitting": entry.is_splitting,
+                "last_indexed_at": entry.last_indexed_at,
+                "index_head_sha": entry.index_head_sha,
+                "coherence_score": entry.coherence_score,
+                "query_hit_count": entry.query_hit_count,
+                "last_query_hit_at": entry.last_query_hit_at,
             }
-            for bucket_id, entry in self._buckets.items()
-        }
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
@@ -121,11 +151,22 @@ class BucketRegistry:
         if not self._path.exists():
             return
         data = json.loads(self._path.read_text(encoding="utf-8"))
-        for bucket_id, state in data.items():
+        for key, state in data.items():
+            if key.startswith("_"):
+                # Handle registry-level meta blocks; ignore unknown underscore keys.
+                if key == "_meta" and isinstance(state, dict):
+                    self._meta.update(state)
+                continue
+            bucket_id = key
             centroid = _decode_centroid(state["centroid_embedding"])
             # Preserve any existing lock if already in memory (e.g. partial reload).
             existing = self._buckets.get(bucket_id)
             lock = existing.lock if existing else asyncio.Lock()
             entry = _BucketEntry(centroid=centroid, token_count=state["token_count"], lock=lock)
             entry.is_splitting = state.get("is_splitting", False)
+            entry.last_indexed_at = state.get("last_indexed_at")
+            entry.index_head_sha = state.get("index_head_sha")
+            entry.coherence_score = state.get("coherence_score")
+            entry.query_hit_count = state.get("query_hit_count", 0)
+            entry.last_query_hit_at = state.get("last_query_hit_at")
             self._buckets[bucket_id] = entry

@@ -67,23 +67,35 @@ class BucketStore:
     @staticmethod
     def _bfm_to_yaml_block(bfm: BucketFrontMatter) -> str:
         """Serialise a BucketFrontMatter to the raw YAML block string (no delimiters)."""
+        chunks_data = []
+        for c in bfm.chunks:
+            chunk_dict: dict = {
+                "chunk_id": c.chunk_id,
+                "source_file": c.source_file,
+                "start_line": c.start_line,
+                "end_line": c.end_line,
+                "git_sha": c.git_sha,
+                "token_count": c.token_count,
+            }
+            if c.indexed_at is not None:
+                chunk_dict["indexed_at"] = c.indexed_at
+            chunks_data.append(chunk_dict)
+
         data: dict = {
             "bucket_id": bfm.bucket_id,
             "domain_label": bfm.domain_label,
             "centroid_embedding": bfm.centroid_embedding,
             "token_count": bfm.token_count,
-            "chunks": [
-                {
-                    "chunk_id": c.chunk_id,
-                    "source_file": c.source_file,
-                    "start_line": c.start_line,
-                    "end_line": c.end_line,
-                    "git_sha": c.git_sha,
-                    "token_count": c.token_count,
-                }
-                for c in bfm.chunks
-            ],
+            "chunks": chunks_data,
         }
+        # Include new optional metadata fields only when set — keeps files clean.
+        for field in ("last_indexed_at", "index_head_sha", "parent_bucket_id", "coherence_score"):
+            val = getattr(bfm, field)
+            if val is not None:
+                data[field] = val
+        if bfm.generation:
+            data["generation"] = bfm.generation
+
         return yaml.dump(data, allow_unicode=True, sort_keys=False)
 
     @staticmethod
@@ -96,6 +108,11 @@ class BucketStore:
             centroid_embedding=parsed["centroid_embedding"],
             token_count=parsed["token_count"],
             chunks=chunks,
+            last_indexed_at=parsed.get("last_indexed_at"),
+            index_head_sha=parsed.get("index_head_sha"),
+            coherence_score=parsed.get("coherence_score"),
+            parent_bucket_id=parsed.get("parent_bucket_id"),
+            generation=parsed.get("generation", 0),
         )
 
     # ------------------------------------------------------------------
