@@ -17,22 +17,16 @@ class DiffExtractor:
     def __init__(self, repo_path: Path) -> None:
         self._repo = git.Repo(str(repo_path), search_parent_directories=True)
 
-    def extract(self, filepath: Path) -> List[DiffEvent]:
-        """Run ``git diff HEAD -- <filepath> --find-renames`` and parse into DiffEvents."""
-        rel = str(filepath)
-        try:
-            diff_text = self._repo.git.diff(
-                "HEAD", "--find-renames", "--", rel
-            )
-        except git.GitCommandError as exc:
-            log.warning("diff_extractor.git_error", file=rel, error=str(exc))
-            return []
+    # ------------------------------------------------------------------
+    # Internal
+    # ------------------------------------------------------------------
 
+    def _parse_diff_output(self, diff_text: str, rel: str) -> List[DiffEvent]:
+        """Parse raw git diff output into DiffEvents. Shared by extract() and extract_between()."""
         if not diff_text:
             log.debug("diff_extractor.no_diff", file=rel)
             return []
 
-        # Detect binary files — git outputs "Binary files … differ"
         if "Binary files" in diff_text:
             log.warning("diff_extractor.binary_skipped", file=rel)
             return []
@@ -87,3 +81,36 @@ class DiffExtractor:
             )
 
         return events
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def extract(self, filepath: Path) -> List[DiffEvent]:
+        """Run ``git diff HEAD -- <filepath> --find-renames`` and parse into DiffEvents."""
+        rel = str(filepath)
+        try:
+            diff_text = self._repo.git.diff("HEAD", "--find-renames", "--", rel)
+        except git.GitCommandError as exc:
+            log.warning("diff_extractor.git_error", file=rel, error=str(exc))
+            return []
+        return self._parse_diff_output(diff_text, rel)
+
+    def extract_between(self, filepath: Path, from_sha: str, to_sha: str) -> List[DiffEvent]:
+        """Run ``git diff <from_sha> <to_sha> -- <filepath>`` and parse into DiffEvents.
+
+        Used by StartupRecovery to replay commits that occurred while the server was offline.
+        """
+        rel = str(filepath)
+        try:
+            diff_text = self._repo.git.diff(from_sha, to_sha, "--find-renames", "--", rel)
+        except git.GitCommandError as exc:
+            log.warning(
+                "diff_extractor.git_error_between",
+                file=rel,
+                from_sha=from_sha[:8],
+                to_sha=to_sha[:8],
+                error=str(exc),
+            )
+            return []
+        return self._parse_diff_output(diff_text, rel)

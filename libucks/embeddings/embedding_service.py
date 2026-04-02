@@ -62,10 +62,10 @@ class EmbeddingService:
 
     def embed(self, text: str) -> np.ndarray:
         """Embed a single string and return a normalised float32 vector."""
-        raw = self._model.encode(text, convert_to_numpy=True)
+        raw = self._model.encode(text, convert_to_numpy=True, show_progress_bar=False)
         return _l2_normalize(raw)
 
     def embed_batch(self, texts: List[str]) -> np.ndarray:
         """Embed a list of strings and return a (N, D) normalised float32 matrix."""
-        raw = self._model.encode(texts, convert_to_numpy=True)
+        raw = self._model.encode(texts, convert_to_numpy=True, show_progress_bar=False)
         return _l2_normalize(raw)

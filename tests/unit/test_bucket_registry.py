@@ -171,6 +171,101 @@ class TestPersistence:
         assert "bucket-a" in r2.get_all_centroids()
         assert "bucket-b" not in r2.get_all_centroids()
 
+    async def test_save_includes_meta_block(
+        self, registry: BucketRegistry, registry_path: Path
+    ):
+        await registry.register("bucket-a", _centroid(), token_count=10)
+        registry.save()
+        data = json.loads(registry_path.read_text())
+        assert "_meta" in data
+        assert data["_meta"]["schema_version"] == 2
+        # Bucket entries must still be present and accessible
+        assert "bucket-a" in data
+
+    async def test_load_ignores_meta_block_as_bucket(
+        self, registry: BucketRegistry, registry_path: Path
+    ):
+        """The _meta block must not be interpreted as a bucket entry."""
+        await registry.register("bucket-a", _centroid(), token_count=10)
+        registry.save()
+
+        r2 = BucketRegistry(registry_path)
+        r2.load()
+        centroids = r2.get_all_centroids()
+        assert "_meta" not in centroids
+        assert "bucket-a" in centroids
+
+    async def test_load_handles_legacy_format_without_meta(self, registry_path: Path):
+        """Old registry.json files (no _meta key) must load without error."""
+        legacy = {
+            "bucket-a": {
+                "centroid_embedding": base64.b64encode(
+                    _centroid(0.5).tobytes()
+                ).decode(),
+                "token_count": 42,
+                "is_splitting": False,
+            }
+        }
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        registry_path.write_text(json.dumps(legacy), encoding="utf-8")
+
+        r = BucketRegistry(registry_path)
+        r.load()
+        assert "bucket-a" in r.get_all_centroids()
+        assert r.get_token_count("bucket-a") == 42
+
+    async def test_index_timestamp_round_trips(self, registry_path: Path):
+        r1 = BucketRegistry(registry_path)
+        await r1.register("bucket-a", _centroid(), token_count=100)
+        r1.update_index_timestamp("bucket-a", "2026-04-02T10:00:00+00:00", "abc123def456")
+        r1.save()
+
+        r2 = BucketRegistry(registry_path)
+        r2.load()
+        # Access internal entry to verify fields survived round-trip
+        entry = r2._buckets["bucket-a"]
+        assert entry.last_indexed_at == "2026-04-02T10:00:00+00:00"
+        assert entry.index_head_sha == "abc123def456"
+
+    async def test_new_bucket_fields_default_to_none_after_register(
+        self, registry: BucketRegistry
+    ):
+        await registry.register("bucket-a", _centroid(), token_count=100)
+        entry = registry._buckets["bucket-a"]
+        assert entry.last_indexed_at is None
+        assert entry.index_head_sha is None
+        assert entry.coherence_score is None
+        assert entry.query_hit_count == 0
+        assert entry.last_query_hit_at is None
+
+
+# ---------------------------------------------------------------------------
+# update_index_timestamp()
+# ---------------------------------------------------------------------------
+
+class TestIndexTimestamp:
+    async def test_sets_fields_on_registered_bucket(self, registry: BucketRegistry):
+        await registry.register("bucket-a", _centroid(), token_count=100)
+        registry.update_index_timestamp("bucket-a", "2026-04-02T10:00:00+00:00", "sha123")
+        entry = registry._buckets["bucket-a"]
+        assert entry.last_indexed_at == "2026-04-02T10:00:00+00:00"
+        assert entry.index_head_sha == "sha123"
+
+    async def test_unknown_bucket_raises_key_error(self, registry: BucketRegistry):
+        with pytest.raises(KeyError):
+            registry.update_index_timestamp("ghost", "2026-04-02T10:00:00+00:00", "sha123")
+
+    async def test_re_register_preserves_timestamp(self, registry: BucketRegistry):
+        """Re-registering a bucket to update its centroid must not wipe the timestamp."""
+        await registry.register("bucket-a", _centroid(0.1), token_count=100)
+        registry.update_index_timestamp("bucket-a", "2026-04-02T10:00:00+00:00", "sha123")
+        # Re-register with a new centroid (simulates Librarian recomputing after update)
+        await registry.register("bucket-a", _centroid(0.9), token_count=200)
+        entry = registry._buckets["bucket-a"]
+        # Centroid and token_count updated; timestamp preserved
+        assert entry.last_indexed_at == "2026-04-02T10:00:00+00:00"
+        assert entry.index_head_sha == "sha123"
+
 
 # ---------------------------------------------------------------------------
 # set_splitting() / is_splitting()

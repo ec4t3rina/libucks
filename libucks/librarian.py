@@ -11,6 +11,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, List, Optional
 
@@ -48,6 +50,28 @@ def _read_chunk_content(meta: ChunkMetadata) -> str:
         return ""
 
 
+def _get_head_sha(repo_path: Optional[Path]) -> str:
+    """Return the current git HEAD SHA, or 'unknown' if unavailable."""
+    if repo_path is None:
+        return "unknown"
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_path), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 class Librarian:
     def __init__(
         self,
@@ -58,6 +82,7 @@ class Librarian:
         embedder: Optional["EmbeddingService"] = None,
         mitosis_threshold: int = 20_000,
         mitosis_service: Optional["MitosisService"] = None,
+        repo_path: Optional[Path] = None,
     ) -> None:
         self.bucket_id = bucket_id
         self._store = store
@@ -66,6 +91,7 @@ class Librarian:
         self._embedder = embedder
         self._mitosis_threshold = mitosis_threshold
         self._mitosis_service = mitosis_service
+        self._repo_path = repo_path
         self.queue: asyncio.Queue[object] = asyncio.Queue()
 
     # ------------------------------------------------------------------
@@ -138,10 +164,30 @@ class Librarian:
             await self._registry.register(
                 self.bucket_id, centroid.astype(np.float32), new_token_count
             )
+
+            # Phase 6-A: stamp chunks from the updated file with current HEAD SHA
+            # and an indexed_at timestamp, then persist and save registry.
+            head_sha = _get_head_sha(self._repo_path)
+            now = _now_iso()
+            updated_file = event.hunk.file
+            for chunk in front_matter.chunks:
+                # Match on suffix to handle relative vs absolute path variations.
+                if chunk.source_file == updated_file or chunk.source_file.endswith(updated_file):
+                    chunk.git_sha = head_sha
+                    chunk.indexed_at = now
+
+            front_matter.last_indexed_at = now
+            front_matter.index_head_sha = head_sha
+            self._store.write_front_matter(self.bucket_id, front_matter)
+
+            self._registry.update_index_timestamp(self.bucket_id, now, head_sha)
+            self._registry.save()
+
             log.info(
                 "librarian.update.done",
                 bucket_id=self.bucket_id,
                 token_count=new_token_count,
+                head_sha=head_sha,
             )
 
         # Check mitosis outside lock.

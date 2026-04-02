@@ -35,7 +35,7 @@ dev = [
 ]
 
 [project.scripts]
-libucks = "main:cli"
+libucks = "libucks._cli:cli"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

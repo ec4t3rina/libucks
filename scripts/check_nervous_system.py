@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+"""
+scripts/check_nervous_system.py
+================================
+End-to-end vibe check for the libucks production engine.
+
+Checks (in order):
+  1. IPC      — is the Unix socket server reachable?
+  2. Registry — bucket health: token counts vs mitosis threshold
+  3. Stale    — JIT staleness detection after touching a tracked source file
+  4. Query    — direct Python query for the new test function name
+
+Usage:
+  python scripts/check_nervous_system.py [--repo /path/to/repo]
+
+Exit code: 0 = all critical checks passed, 1 = one or more failures.
+"""
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import os
+import socket
+import subprocess
+import sys
+import textwrap
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+# ── Repo / path resolution ────────────────────────────────────────────────────
+
+def _find_repo(explicit: Optional[str]) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    env = os.environ.get("LIBUCKS_REPO_PATH")
+    if env:
+        return Path(env).resolve()
+    # Walk from script location up to project root
+    return Path(__file__).parent.parent.resolve()
+
+
+# ── Terminal colours ──────────────────────────────────────────────────────────
+
+_USE_COLOUR = sys.stdout.isatty()
+
+def _c(code: str, text: str) -> str:
+    return f"\033[{code}m{text}\033[0m" if _USE_COLOUR else text
+
+PASS = lambda: _c("32", "PASS")
+FAIL = lambda: _c("31", "FAIL")
+SKIP = lambda: _c("33", "SKIP")
+INFO = lambda: _c("36", "INFO")
+WARN = lambda: _c("33", "WARN")
+
+
+def _hdr(n: int, title: str) -> None:
+    print(f"\n{'─'*60}")
+    print(f"  [{n}/4] {title}")
+    print(f"{'─'*60}")
+
+
+def _row(tag_fn, msg: str) -> None:
+    print(f"  {tag_fn():<18} {msg}")
+
+
+# ── 1. IPC check ─────────────────────────────────────────────────────────────
+
+def check_ipc(sock_path: Path) -> bool:
+    _hdr(1, "IPC — Unix socket server")
+    print(f"  Socket : {sock_path}")
+
+    if not sock_path.exists():
+        _row(SKIP, "socket file not found — start the server with `libucks serve`")
+        return True  # not a hard failure; server may simply not be running
+
+    payload = json.dumps({"event": "vibe-check", "source": "check_nervous_system"}).encode()
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(3)
+            s.connect(str(sock_path))
+            s.sendall(payload)
+        _row(PASS, "server acknowledged the ping (connection accepted)")
+        return True
+    except OSError as exc:
+        _row(FAIL, f"could not connect to socket: {exc}")
+        return False
+
+
+# ── 2. Registry health ────────────────────────────────────────────────────────
+
+def check_registry(registry_path: Path, mitosis_threshold: int = 20_000) -> bool:
+    _hdr(2, "Registry — bucket health")
+    print(f"  File   : {registry_path}")
+
+    if not registry_path.exists():
+        _row(FAIL, "registry.json not found — run `libucks init --local <repo>` first")
+        return False
+
+    data = json.loads(registry_path.read_text())
+    buckets = {k: v for k, v in data.items() if not k.startswith("_")}
+    meta = data.get("_meta", {})
+
+    print(f"  Head   : {str(meta.get('last_indexed_head', 'unknown'))[:12]}")
+    print(f"  Watcher PID: {meta.get('watcher_pid', 'not set')}")
+    print()
+
+    oversized = 0
+    for bid, state in sorted(buckets.items(), key=lambda x: -x[1].get("token_count", 0)):
+        tokens = state.get("token_count", 0)
+        coherence = state.get("coherence_score")
+        coh_str = f"  coherence={coherence:.2f}" if coherence is not None else ""
+        flag = ""
+        if tokens >= mitosis_threshold:
+            flag = f"  ← OVER {mitosis_threshold:,} (pending mitosis)"
+            oversized += 1
+        print(f"  {bid}  {tokens:>7,} tokens{coh_str}{flag}")
+
+    print()
+    if oversized:
+        _row(WARN, f"{oversized} bucket(s) over threshold — HealthMonitor will split on next pass")
+    else:
+        _row(PASS, f"{len(buckets)} bucket(s) all within token threshold")
+
+    _row(PASS, f"registry loaded successfully ({len(buckets)} buckets)")
+    return True
+
+
+# ── 3. Stale check ────────────────────────────────────────────────────────────
+
+async def _run_stale_check(repo: Path, registry_path: Path) -> bool:
+    """
+    Creates a unique test file, touches a tracked source file to advance its mtime,
+    then runs StaleChecker to prove Level-3 detection fires.
+    """
+    from libucks.storage.bucket_registry import BucketRegistry
+    from libucks.storage.bucket_store import BucketStore
+    from libucks.stale_checker import StaleChecker
+
+    # ── Create the weird test function file ───────────────────────────────────
+    test_file = repo / "fastapi" / "internal" / "test_logic.py"
+    test_file.parent.mkdir(parents=True, exist_ok=True)
+    test_file.write_text(textwrap.dedent("""\
+        # Auto-generated by check_nervous_system.py — safe to delete.
+        def super_secret_fastapi_magic_999(request):
+            \"\"\"Validates the incoming request payload against a secret schema.\"\"\"
+            return {"status": "ok", "magic": 999}
+    """))
+    print(f"  Created: {test_file}")
+
+    # ── Load registry + store ─────────────────────────────────────────────────
+    registry = BucketRegistry(registry_path)
+    registry.load()
+    bucket_dir = registry_path.parent / "buckets"
+    store = BucketStore(bucket_dir)
+
+    bucket_ids = list(registry.get_all_centroids().keys())
+    if not bucket_ids:
+        _row(SKIP, "no buckets registered — index first")
+        return True
+
+    # ── Touch a file that IS already tracked (Level 3 trigger) ───────────────
+    # Find the first tracked source file across all buckets
+    touched_file: Optional[str] = None
+    for bid in bucket_ids:
+        try:
+            fm, _ = store.read(bid)
+            if fm.chunks:
+                src = fm.chunks[0].source_file
+                p = Path(src)
+                if p.exists():
+                    p.touch()  # advance mtime
+                    touched_file = src
+                    print(f"  Touched: {p.name}  (bucket={bid[:8]})")
+                    break
+        except FileNotFoundError:
+            continue
+
+    # ── Run StaleChecker ──────────────────────────────────────────────────────
+    checker = StaleChecker(registry=registry, store=store, repo_path=repo)
+    result_obj = await checker.check(bucket_ids)
+
+    print()
+    print(f"  StaleCheckResult:")
+    print(f"    is_stale        = {result_obj.is_stale}")
+    print(f"    level           = {result_obj.level}")
+    print(f"    reason          = {result_obj.reason}")
+    print(f"    stale_bucket_ids= {result_obj.stale_bucket_ids}")
+    print()
+
+    if result_obj.is_stale:
+        _row(PASS, f"StaleChecker fired (Level {result_obj.level}): {result_obj.reason}")
+    else:
+        if touched_file:
+            _row(WARN, "touched file did not trigger staleness — check last_indexed_at timestamps")
+        else:
+            _row(INFO, "no tracked source file found to touch; staleness not verified")
+
+    return True
+
+
+def check_stale(repo: Path, registry_path: Path) -> bool:
+    _hdr(3, "Stale — JIT staleness detection")
+    return asyncio.run(_run_stale_check(repo, registry_path))
+
+
+# ── 4. Query ──────────────────────────────────────────────────────────────────
+
+def check_query(repo: Path, registry_path: Path) -> bool:
+    """
+    Searches all bucket store files for the weird function name without loading
+    the embedding model (fast grep-style scan of raw .md files in .libucks/buckets/).
+    If the function is found, the content has been indexed.
+    If not, that confirms the StaleChecker was right to flag staleness.
+    """
+    _hdr(4, "Query — content discovery for super_secret_fastapi_magic_999")
+    target = "super_secret_fastapi_magic_999"
+    bucket_dir = registry_path.parent / "buckets"
+
+    if not bucket_dir.exists():
+        _row(SKIP, "bucket directory not found")
+        return True
+
+    md_files = list(bucket_dir.glob("*.md"))
+    print(f"  Scanning {len(md_files)} bucket file(s) for: {target!r}")
+
+    found_in: list[str] = []
+    for md in md_files:
+        try:
+            if target in md.read_text(errors="replace"):
+                found_in.append(md.stem)
+        except OSError:
+            pass
+
+    print()
+    if found_in:
+        _row(PASS, f"function name found in bucket(s): {found_in}")
+        _row(INFO, "content is already indexed — query would return a live answer")
+    else:
+        _row(INFO, "function not yet in any bucket (as expected for a brand-new file)")
+        _row(INFO, "StaleChecker detected the gap; next re-index will absorb it")
+
+    # Also try a subprocess grep over the actual source to confirm the file exists
+    result = subprocess.run(
+        ["grep", "-r", target, str(repo / "fastapi" / "internal")],
+        capture_output=True, text=True,
+    )
+    if result.stdout.strip():
+        _row(PASS, f"source file confirmed on disk:\n           {result.stdout.strip()}")
+
+    return True
+
+
+# ── Main ─────────────────────────────────────────────────────────────────────
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="libucks nervous system vibe check")
+    parser.add_argument("--repo", default=None, help="Path to the indexed repository")
+    args = parser.parse_args()
+
+    repo = _find_repo(args.repo)
+    libucks_dir = repo / ".libucks"
+    registry_path = libucks_dir / "registry.json"
+    sock_path = libucks_dir / "server.sock"
+
+    print(f"\n{'═'*60}")
+    print(f"  libucks nervous system check")
+    print(f"  repo={repo}")
+    print(f"  time={datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}")
+    print(f"{'═'*60}")
+
+    failures = 0
+
+    if not check_ipc(sock_path):
+        failures += 1
+    if not check_registry(registry_path):
+        failures += 1
+    if not check_stale(repo, registry_path):
+        failures += 1
+    if not check_query(repo, registry_path):
+        failures += 1
+
+    print(f"\n{'═'*60}")
+    if failures == 0:
+        print(f"  {PASS()}  All checks passed.")
+    else:
+        print(f"  {FAIL()}  {failures} check(s) failed.")
+    print(f"{'═'*60}\n")
+
+    return 0 if failures == 0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

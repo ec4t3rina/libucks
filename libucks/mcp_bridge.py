@@ -6,6 +6,17 @@ Tools:
 """
 from __future__ import annotations
 
+# Must be set before any native extension (tokenizers Rust runtime, ObjC) is
+# imported — placing them here, at module load, guarantees that.
+import os
+os.environ.setdefault("OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")  # prevents SIGABRT on Apple Silicon
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")             # prevents HF tokenizer deadlock warning
+os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")             # suppresses "BertModel report" etc.
+os.environ.setdefault("TQDM_DISABLE", "1")                           # suppresses "Loading weights" progress bars
+
+import asyncio
+import logging
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -16,9 +27,16 @@ from mcp.server import Server
 
 from libucks.central_agent import CentralAgent
 from libucks.config import Config
+from libucks.diff.diff_extractor import DiffExtractor
 from libucks.embeddings.embedding_service import EmbeddingService
+from libucks.git_hook_receiver import serve_socket
+from libucks.health_monitor import HealthMonitor
 from libucks.librarian import Librarian
+from libucks.merging_service import MergingService
+from libucks.mitosis import MitosisService
 from libucks.query_orchestrator import QueryOrchestrator
+from libucks.stale_checker import StaleChecker
+from libucks.startup_recovery import StartupRecovery
 from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
 from libucks.thinking.text_strategy import TextStrategy
@@ -26,30 +44,56 @@ from libucks.translator import Translator
 
 
 def _load_repo_path() -> Path:
-    """Find the target repo path from .libucks/config.toml in cwd, or use cwd."""
-    cwd = Path.cwd()
-    config_file = cwd / ".libucks" / "config.toml"
-    if config_file.exists():
-        with open(config_file, "rb") as fh:
-            data = tomllib.load(fh)
-        repo = data.get("paths", {}).get("repo_root", None)
-        if repo:
-            return Path(repo).expanduser().resolve()
-    return cwd
+    """Return the repository root.
+
+    Resolution order:
+    1. LIBUCKS_REPO_PATH env var — set this in claude_desktop_config.json "env"
+       to point the server at any repo you want.
+    2. Project root inferred from __file__ — reliable fallback that is never
+       the filesystem root, even when Claude Desktop launches with cwd='/'.
+    """
+    env_path = os.environ.get("LIBUCKS_REPO_PATH")
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+    # __file__ = libucks/mcp_bridge.py → .parent = libucks/ → .parent = project root
+    return Path(__file__).parent.parent.resolve()
 
 
 async def serve() -> None:
+    # Route ALL logging to stderr — stdout is reserved for MCP JSON-RPC.
+    logging.basicConfig(stream=sys.stderr, level=logging.INFO, force=True)
+
+    import structlog
+    structlog.configure(
+        logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
+    )
+
+    try:
+        import transformers
+        transformers.logging.set_verbosity_error()
+    except Exception:
+        pass
+
     repo_path = _load_repo_path()
     cfg = Config.load(repo_path)
-
     registry_path = repo_path / cfg.paths.registry_file
-    bucket_dir = repo_path / cfg.paths.bucket_dir
+    bucket_dir = repo_path / ".libucks"
+    print(f"[libucks] repo={repo_path}  registry={registry_path}  buckets={bucket_dir}", file=sys.stderr)
 
     registry = BucketRegistry(registry_path)
     registry.load()
 
     store = BucketStore(bucket_dir)
-    embedder = EmbeddingService.get_instance(cfg.model.embedding_model)
+
+    # Pre-load the embedding model BEFORE the MCP stdio server starts.
+    # Temporarily redirect sys.stdout → sys.stderr so any remaining direct
+    # prints from model loading never reach the MCP pipe.
+    _real_stdout = sys.stdout
+    sys.stdout = sys.stderr
+    try:
+        embedder = EmbeddingService.get_instance(cfg.model.embedding_model)
+    finally:
+        sys.stdout = _real_stdout  # restore BEFORE mcp.server.stdio.stdio_server() captures it
     strategy = TextStrategy.from_env(cfg.model.anthropic_model)
 
     agent = CentralAgent(registry, cfg, embed_fn=embedder.embed)
@@ -67,13 +111,104 @@ async def serve() -> None:
         librarians[bucket_id] = lib
         agent.register_librarian(bucket_id, lib)
 
+    translator = Translator(strategy)
+
+    # ------------------------------------------------------------------
+    # Startup recovery: replay commits that arrived while server was offline.
+    # ------------------------------------------------------------------
+    recovery: StartupRecovery | None = None
+    try:
+        extractor = DiffExtractor(repo_path)
+        recovery = StartupRecovery(
+            repo_path=repo_path,
+            registry=registry,
+            store=store,
+            librarians=librarians,
+            extractor=extractor,
+        )
+        current_head = await recovery.run()
+        if current_head is not None:
+            registry._meta["last_indexed_head"] = current_head
+            registry._meta["watcher_pid"] = os.getpid()
+            registry.save()
+            print(f"[libucks] startup recovery complete, HEAD={current_head[:8]}", file=sys.stderr)
+    except Exception as exc:
+        # Recovery is best-effort — never block server startup.
+        print(f"[libucks] startup recovery skipped: {exc}", file=sys.stderr)
+
+    # ------------------------------------------------------------------
+    # Git hook socket listener (Phase 6-D).
+    # ------------------------------------------------------------------
+    sock_path = bucket_dir / "server.sock"
+
+    async def _on_hook_event(payload: dict) -> None:
+        """Handle a JSON event from a git hook and trigger background re-index."""
+        if recovery is None:
+            return
+        try:
+            new_head = await recovery.run()
+            if new_head is not None:
+                registry._meta["last_indexed_head"] = new_head
+                registry.save()
+                print(f"[libucks] hook event '{payload.get('event')}' → re-indexed HEAD={new_head[:8]}", file=sys.stderr)
+        except Exception as exc:
+            print(f"[libucks] hook event error: {exc}", file=sys.stderr)
+
+    asyncio.ensure_future(serve_socket(sock_path, _on_hook_event))
+
+    # ------------------------------------------------------------------
+    # HealthMonitor (Phase 6-E/6-F): autonomous quality guardian.
+    # ------------------------------------------------------------------
+    mitosis_svc = MitosisService(
+        store=store,
+        registry=registry,
+        embedder=embedder,
+        agent=agent,
+        strategy=strategy,
+        mitosis_threshold=cfg.routing.mitosis_threshold,
+    )
+    merging_svc = MergingService(
+        registry=registry,
+        store=store,
+        agent=agent,
+        embedder=embedder,
+        strategy=strategy,
+    )
+    health_monitor = HealthMonitor(
+        registry=registry,
+        store=store,
+        mitosis_service=mitosis_svc,
+        merging_service=merging_svc,
+        embedder=embedder,
+        mitosis_threshold=cfg.routing.mitosis_threshold,
+    )
+    asyncio.ensure_future(health_monitor.run())
+
+    # ------------------------------------------------------------------
+    # StaleChecker + reindex callback (Phase 6-C JIT invalidation).
+    # ------------------------------------------------------------------
+    stale_checker = StaleChecker(registry=registry, store=store, repo_path=repo_path)
+
+    async def _reindex_stale(stale_bucket_ids: list[str]) -> None:
+        """Background re-index triggered by stale query results."""
+        if recovery is None:
+            return
+        try:
+            new_head = await recovery.run()
+            if new_head is not None:
+                registry._meta["last_indexed_head"] = new_head
+                registry.save()
+        except Exception as exc:
+            print(f"[libucks] background reindex error: {exc}", file=sys.stderr)
+
     orchestrator = QueryOrchestrator(
         central_agent=agent,
         librarians=librarians,
         embed_fn=embedder.embed,
         top_k=cfg.routing.top_k,
+        stale_checker=stale_checker,
+        reindex_fn=_reindex_stale,
     )
-    translator = Translator(strategy)
 
     server = Server("libucks")
 
