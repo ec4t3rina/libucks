@@ -24,6 +24,23 @@ log = structlog.get_logger(__name__)
 # Extensions considered source code (subset of grammar registry support).
 _SOURCE_EXTENSIONS = set(SUPPORTED_LANGUAGES.keys())
 
+# Additional extensions beyond the grammar registry that carry useful context.
+_EXTRA_EXTENSIONS = {".md"}
+
+# Files larger than this are almost certainly generated blobs or data dumps.
+_MAX_FILE_BYTES = 500 * 1_024  # 500 KB
+
+# Directory names that are pure noise — any path component matching one is skipped.
+_NOISE_DIRS = {
+    "__pycache__", "node_modules", ".venv", "venv",  # already skipped, now explicit
+    "dist", "build", "out",                           # build artifacts
+    "assets", "static", "images", "media",            # non-code assets
+    "coverage", "htmlcov",                            # test coverage reports
+    ".claude",                                        # shadow-clone worktrees / Claude internals
+    "docs",                                           # documentation folders (multi-language explosion)
+    "scripts",                                        # internal build scripts
+}
+
 # Approximate tokens per word for rough counting.
 _TOKENS_PER_CHAR = 0.25
 
@@ -53,15 +70,19 @@ def _to_chunk_metadata(raw: RawChunk) -> ChunkMetadata:
 
 
 def _collect_source_files(repo_path: Path) -> List[Path]:
+    allowed_exts = _SOURCE_EXTENSIONS | _EXTRA_EXTENSIONS
     files: List[Path] = []
     for p in sorted(repo_path.rglob("*")):
         if not p.is_file():
             continue
-        if p.suffix.lower() not in _SOURCE_EXTENSIONS:
+        if p.suffix.lower() not in allowed_exts:
             continue
-        # Skip hidden dirs and common non-source trees.
+        # Skip hidden dirs and known noise directories.
         parts = p.relative_to(repo_path).parts
-        if any(part.startswith(".") or part in ("__pycache__", "node_modules", ".venv", "venv") for part in parts):
+        if any(part.startswith(".") or part in _NOISE_DIRS for part in parts):
+            continue
+        # Skip files that are almost certainly generated blobs or data dumps.
+        if p.stat().st_size > _MAX_FILE_BYTES:
             continue
         files.append(p)
     return files
