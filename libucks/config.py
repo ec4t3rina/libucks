@@ -29,6 +29,22 @@ class ModelConfig:
 
     anthropic_model: str = "claude-haiku-4-5-20251001"
     embedding_model: str = "all-MiniLM-L6-v2"
+    local_model: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    quantization: str = "none"
+    device: str = "auto"
+    strategy: str = "text"
+    compression_steps: int = 8
+
+    def __post_init__(self) -> None:
+        if self.strategy not in ("text", "latent"):
+            raise ValueError(
+                f"strategy must be 'text' or 'latent', got {self.strategy!r}"
+            )
+        if self.quantization not in ("none", "4bit", "8bit"):
+            raise ValueError(
+                f"quantization must be 'none', '4bit', or '8bit', "
+                f"got {self.quantization!r}"
+            )
 
 
 @dataclass
@@ -45,10 +61,17 @@ class RoutingConfig:
     mitosis_threshold: int = 20_000
     """Token count at which a bucket is eligible for manual mitosis."""
 
+    init_bucket_size: int = 2_000
+    """Target raw-token count per bucket during INIT clustering.
+    Controls how many buckets are seeded: n_clusters = total_tokens // init_bucket_size.
+    Kept separate from mitosis_threshold so INIT density can be tuned independently
+    of runtime splitting behaviour."""
+
     def __post_init__(self) -> None:
         self.novelty_threshold = float(self.novelty_threshold)
         self.top_k = int(self.top_k)
         self.mitosis_threshold = int(self.mitosis_threshold)
+        self.init_bucket_size = int(self.init_bucket_size)
 
         if not (0.0 < self.novelty_threshold < 1.0):
             raise ValueError(
@@ -60,6 +83,10 @@ class RoutingConfig:
         if self.mitosis_threshold < 1:
             raise ValueError(
                 f"mitosis_threshold must be >= 1, got {self.mitosis_threshold}"
+            )
+        if self.init_bucket_size < 1:
+            raise ValueError(
+                f"init_bucket_size must be >= 1, got {self.init_bucket_size}"
             )
 
 

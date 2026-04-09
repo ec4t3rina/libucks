@@ -53,6 +53,15 @@ class TestDefaults:
         cfg = Config.load(tmp_path)
         assert cfg.routing.mitosis_threshold == 20_000
 
+    def test_default_init_bucket_size(self, tmp_path: Path):
+        cfg = Config.load(tmp_path)
+        assert cfg.routing.init_bucket_size == 2_000
+
+    def test_init_bucket_size_is_independent_of_mitosis_threshold(self, tmp_path: Path):
+        """init_bucket_size and mitosis_threshold must be separate fields with distinct defaults."""
+        cfg = Config.load(tmp_path)
+        assert cfg.routing.init_bucket_size != cfg.routing.mitosis_threshold
+
     def test_default_bucket_dir(self, tmp_path: Path):
         cfg = Config.load(tmp_path)
         assert cfg.paths.bucket_dir == ".libucks/buckets"
@@ -105,6 +114,11 @@ mitosis_threshold = 8000
         assert cfg.routing.novelty_threshold == pytest.approx(0.5)
         assert cfg.routing.top_k == 5
         assert cfg.routing.mitosis_threshold == 8000
+
+    def test_init_bucket_size_loaded_from_toml(self, tmp_path: Path):
+        _write_toml(tmp_path, "[routing]\ninit_bucket_size = 1500\n")
+        cfg = Config.load(tmp_path)
+        assert cfg.routing.init_bucket_size == 1_500
 
     def test_paths_section_loaded(self, tmp_path: Path):
         _write_toml(tmp_path, """
@@ -202,6 +216,10 @@ class TestTypes:
     def test_mitosis_threshold_is_int(self, tmp_path: Path):
         cfg = Config.load(tmp_path)
         assert isinstance(cfg.routing.mitosis_threshold, int)
+
+    def test_init_bucket_size_is_int(self, tmp_path: Path):
+        cfg = Config.load(tmp_path)
+        assert isinstance(cfg.routing.init_bucket_size, int)
 
     def test_embedding_model_is_str(self, tmp_path: Path):
         cfg = Config.load(tmp_path)

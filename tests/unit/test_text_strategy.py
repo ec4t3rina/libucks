@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from libucks.thinking.base import Representation, ThinkingStrategy
-from libucks.thinking.latent_strategy import LatentStrategy
+from libucks.thinking.latent_strategy import LatentStrategy  # still tested via ABC checks
 from libucks.thinking.text_strategy import TextStrategy
 
 
@@ -197,28 +197,3 @@ class TestTextStrategyConstruction:
             MockClient.assert_called_once()
         assert isinstance(svc, TextStrategy)
 
-
-# ---------------------------------------------------------------------------
-# LatentStrategy — V2 stub
-# ---------------------------------------------------------------------------
-
-class TestLatentStrategy:
-    async def test_encode_raises_not_implemented(self):
-        svc = LatentStrategy()
-        with pytest.raises(NotImplementedError, match="V2"):
-            await svc.encode("text")
-
-    async def test_reason_raises_not_implemented(self):
-        svc = LatentStrategy()
-        with pytest.raises(NotImplementedError, match="V2"):
-            await svc.reason("query", "context")
-
-    async def test_decode_raises_not_implemented(self):
-        svc = LatentStrategy()
-        with pytest.raises(NotImplementedError, match="V2"):
-            await svc.decode("result")
-
-    def test_latent_strategy_can_be_instantiated(self):
-        """Instantiation itself must not raise — only calling methods raises."""
-        svc = LatentStrategy()
-        assert isinstance(svc, LatentStrategy)

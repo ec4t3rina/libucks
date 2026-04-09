@@ -176,7 +176,12 @@ class MitosisService:
             pass
 
         # 7. Clear splitting flag — CentralAgent drains retry buffer.
-        await self._agent.clear_splitting(bucket_id)
+        # Guard with try/except: if the parent was deregistered in step 6 above
+        # (e.g. it no longer exists in the registry), clearing its flag is a no-op.
+        try:
+            await self._agent.clear_splitting(bucket_id)
+        except KeyError:
+            pass
         self._registry.save()
 
         log.info("mitosis.complete", parent=bucket_id, children=child_ids)

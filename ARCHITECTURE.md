@@ -94,7 +94,9 @@ signed with RS256. Expiry is enforced at 15 minutes for access tokens and
 
 **Chunk metadata** (`source_file`, `start_line`, `end_line`, `git_sha`) is the authoritative provenance record. It enables precise invalidation when code changes without re-reading the whole bucket.
 
-**Token limit:** Configurable, default **4 000 tokens**. Exceeding this threshold triggers Bucket Mitosis (§3.4).
+**`domain_label`:** An LLM-generated 5–10 word semantic title (e.g. `"CLI decorator binding and command registration"`), produced by `strategy.reason()` during INIT. It replaces the old mechanical file-stem label and is used to anchor the centroid (see §3.3).
+
+**Token limit:** Configurable, default **20 000 tokens**. Exceeding this threshold triggers Bucket Mitosis (§3.4).
 
 ---
 
@@ -127,7 +129,16 @@ The Central Agent is the embedding-based brain of the UPDATE and QUERY workflows
 
 **Novelty threshold:** Default `0.35` cosine distance (`= 0.65` cosine similarity). Configurable per repo in `.libucks/config.toml`.
 
-**Centroid maintenance:** After every Librarian write, the affected bucket's centroid is recomputed as `normalize(mean(embed(chunk) for chunk in bucket.chunks))`. This prevents centroid drift as bucket content evolves.
+**Centroid maintenance (title-boosted):** After every Librarian write, the centroid is recomputed as:
+
+```
+centroid = normalize(
+    0.8 * mean(embed(chunk) for chunk in bucket.chunks)
+  + 0.2 * embed(domain_label)
+)
+```
+
+The 20% title contribution anchors the bucket's vector identity to its semantic purpose. Without it, centroid drift toward surface-text noise is unchecked. The blend weight α=0.2 was chosen so the title steers direction without overriding the empirical chunk distribution.
 
 **Mitosis coordination:** The Central Agent maintains an `is_splitting` flag per bucket in `BucketRegistry`. If set, incoming `UpdateEvent` objects for that bucket are held in a retry buffer (3 retries, 100ms backoff) and re-routed after mitosis completes.
 
@@ -196,6 +207,48 @@ Tool schemas are defined in a versioned `tools_v1.json` manifest loaded at start
 
 ---
 
+### 3.8 AspectMapper
+
+**File:** `libucks/parsing/aspect_mapper.py`
+
+A pure-Python component (no AI, no torch) that produces a module-affinity distance matrix for use during INIT clustering. Replaces raw cosine distance with a richer signal that keeps logically related chunks together.
+
+**Affinity score between chunk i and chunk j:**
+
+```
+affinity(i, j) = clip(cosine_sim(embed_i, embed_j)
+                     + same_file_bonus(i, j)      # +0.4 if same source file
+                     + import_link_bonus(i, j),   # +0.2 if file A imports file B's stem
+                     0, 1)
+```
+
+**Import detection:** Uses `ast.parse` on each Python chunk's content to extract imported module stems. A bonus applies if either file's stem appears in the other's imports.
+
+**Clustering:** Converts affinity to distance (`1 - affinity`), then calls `scipy.cluster.hierarchy.linkage` with `method="average"`. The same agglomerative algorithm as before — only the distance matrix changes.
+
+---
+
+### 3.9 ContextCondenser
+
+**File:** `libucks/thinking/context_condenser.py`
+
+A pure-Python component that produces a token-budget-safe digest of source code for the INIT prose-generation LLM call. The Encoder (`all-MiniLM-L6-v2`) has a hard 256-token limit; the condenser ensures the digest fits within 200 tokens, leaving headroom for the query prefix.
+
+**Interface:**
+```python
+ContextCondenser().condense(chunks: List[RawChunk], budget_tokens: int = 200) -> str
+```
+
+**Priority order (greedy fill):**
+1. Module-level docstring (file overview — highest signal density)
+2. Function/class signatures + their docstrings (no body lines)
+3. Truncated body lines if budget remains
+4. Hard truncation at the token boundary
+
+**No model dependency.** Uses only `ast.parse` and `ast.unparse`. Safe to call from any context.
+
+---
+
 ## 4. The Latent Space Interface Constraint (V1 → V2 Migration Contract)
 
 > **This section is a hard architectural constraint. All contributors must read it.**
@@ -248,36 +301,44 @@ Librarians call `encode` and `reason`. The Translator calls `reason` (to synthes
 ### 5.1 INIT
 
 ```
-libucks init <repo-url>
-      │
-      ▼
-RepoCloner ──── clone to ~/.libucks/repos/<repo-name>/
+libucks init --local <repo-path>
       │
       ▼
 ASTParser (Tree-sitter + GrammarRegistry)
-  - Walk all source files
-  - Extract top-level declarations: functions, classes, modules, docstrings
+  - Walk all source files (skips hidden dirs, noise dirs, files > 500 KB)
+  - Extract function/class definitions; fallback to 50-line windows
   - Produce: List[RawChunk(source_file, start_line, end_line, content, language)]
       │
       ▼
-EmbeddingService.embed_batch(all_chunk_contents)
+EmbeddingService.embed_batch(all_chunk_contents)  → (N, 384) L2-normalised
       │
       ▼
-Agglomerative clustering (scipy)
-  - n_clusters = max(1, total_tokens // 2000)
+AspectMapper.cluster(chunks, embeddings, n_clusters)
+  - n_clusters = max(1, min(total_tokens // init_bucket_size, N))
+  - Affinity matrix = cosine_sim + same-file bonus(+0.4) + import-link bonus(+0.2)
+  - Agglomerative clustering (scipy, method="average") on 1-affinity distance
   - Each cluster → one initial Bucket
       │
       ▼
-For each cluster:
-  BucketStore.create() → write .md file with YAML front-matter
-  Librarian.initialize(chunks) → ThinkingStrategy.reason → condensed prose
+For each cluster  [asyncio.gather — all LLM calls run concurrently]:
+  ContextCondenser.condense(cluster_chunks, budget=200 tokens) → digest
+  strategy.reason(prompt, digest) → "TITLE: <title>\n---\n<prose>"
+  Parse → (title, prose)
+  title_embed = EmbeddingService.embed(title)
+  centroid = normalize(0.8 * chunk_mean + 0.2 * title_embed)
+  BucketStore.create(domain_label=title, centroid=blended, prose=prose)
   BucketRegistry.register(bucket_id, centroid, token_count)
+      │
+      ▼
+BucketRegistry.save()  →  .libucks/registry.json
       │
       ▼
 libucks serve  (ready to accept MCP connections)
 ```
 
 **Grammar management:** `GrammarRegistry` maps file extensions to language names and lazily downloads compiled Tree-sitter grammar `.so` binaries from the tree-sitter GitHub releases API on first encounter, caching under `~/.libucks/grammars/`. No grammars are bundled at install time.
+
+**INIT concurrency:** All `strategy.reason()` calls for prose generation are issued with `asyncio.gather`, so N API calls run concurrently rather than serially. INIT time scales with the slowest single call, not the sum.
 
 ---
 
@@ -396,13 +457,18 @@ Events
 
 ```toml
 [model]
-ollama_model       = "llama3.2"
+anthropic_model    = "claude-haiku-4-5-20251001"
 embedding_model    = "all-MiniLM-L6-v2"
+local_model        = "Qwen/Qwen2.5-3B-Instruct"   # V2 latent strategy only
+quantization       = "none"                         # "none" | "4bit" | "8bit"
+device             = "auto"                         # "auto" | "cpu" | "cuda" | "mps"
+strategy           = "text"                         # "text" | "latent"
 
 [routing]
 novelty_threshold  = 0.35    # cosine distance below which a new bucket is created
 top_k              = 3       # number of buckets queried per request
-mitosis_threshold  = 4000    # token count at which a bucket splits
+mitosis_threshold  = 20000   # token count at which a live bucket is eligible for manual mitosis
+init_bucket_size   = 2000    # target raw-token count per bucket at INIT; controls seeding density
 
 [paths]
 bucket_dir         = ".libucks/buckets"
@@ -438,11 +504,16 @@ libucks/                         ← this repository (the libucks tool itself)
 │   │   └── embedding_service.py ← sentence-transformers singleton wrapper
 │   ├── thinking/
 │   │   ├── base.py              ← ThinkingStrategy ABC, Representation type alias
-│   │   ├── text_strategy.py     ← V1: async Ollama via httpx
-│   │   └── latent_strategy.py   ← V2 stub: NotImplementedError
+│   │   ├── text_strategy.py     ← V1: async Anthropic API
+│   │   ├── latent_strategy.py   ← V2: Qwen encoder + LoRA receiver
+│   │   ├── context_condenser.py ← §3.9 token-budget-safe digest (pure AST, no model)
+│   │   ├── communication_adapter.py ← N Librarian tensors → fixed (K, D) soft-prompt
+│   │   ├── compressor.py        ← (L, D) → (K, D) latent compression
+│   │   └── model_manager.py     ← Qwen load/cache/unload singleton
 │   ├── parsing/
 │   │   ├── ast_parser.py        ← tree-sitter → RawChunk list
-│   │   └── grammar_registry.py  ← lazy grammar download + cache
+│   │   ├── grammar_registry.py  ← lazy grammar download + cache
+│   │   └── aspect_mapper.py     ← §3.8 affinity graph + agglomerative clustering
 │   ├── diff/
 │   │   └── diff_extractor.py    ← git diff → DiffHunk list, rename detection
 │   ├── watchdog_service.py
@@ -468,6 +539,142 @@ libucks/                         ← this repository (the libucks tool itself)
 
 ---
 
+## 10. V2.1 Interlat-Lite: Stable Latent Injection
+
+### Problem with V2.0 (NormMatch + Residual Anchoring)
+
+The V2.0 decode path achieved 0.0002 MSE loss during adapter training but
+produced character-soup at inference. Three root causes:
+
+1. **MSE optimises geometry, not decodability.** A vector can be geometrically
+   close to a target hidden state but still off the language manifold —
+   deviations compound exponentially through autoregressive generation.
+2. **Instruct model ChatML rigidity.** Qwen2.5-3B-Instruct was RLHF'd on
+   ChatML templates. Injecting arbitrary continuous vectors causes the model
+   to "repair" a perceived format corruption, yielding BPE fragments.
+3. **The receiver was never trained.** Latents were injected into a *frozen*
+   model. No gradient ever connected "adapter output → coherent generated text."
+
+### Model Split (V2.1)
+
+| Role | Model | Purpose |
+|---|---|---|
+| **Encoder** | Qwen2.5-3B-Instruct | Librarians: `encode()` / `reason()` → latent tensors |
+| **Receiver** | Qwen2.5-3B-Base + LoRA | Translator: `receive()` → natural language |
+
+Using a Base model eliminates ChatML rigidity. LoRA fine-tuning (q_proj / v_proj
+only, r=16, alpha=32) trains the model to interpret framed latent injections.
+
+### Injection Protocol
+
+```
+inputs_embeds = [e(<bop>), h_1, ..., h_K, e(<eop>)]   shape: (K+2, D)
+```
+
+`CommunicationAdapter.frame(soft_prompt, bop_embed, eop_embed)` prepends
+`e(<bop>)` and appends `e(<eop>)` boundary embeddings. The receiver has been
+trained to recognise this structure.
+
+No NormMatch. No Residual Anchoring. The trained Base receiver handles the
+manifold gap directly.
+
+### Training Objective
+
+```
+L_total = L_task - λ_sep * L_sep
+
+L_task = CrossEntropy(generated_tokens | injected_framed_latents)   # teacher forcing
+L_sep  = JSD(logits_correct_latent, logits_wrong_latent)            # from losses.py
+```
+
+Minimising `L_task` provides the only real decodability signal — the model
+must generate the correct target text given the injected latent. Minimising
+`-L_sep` (maximising JSD) prevents the model from ignoring the latent signal.
+
+### Curriculum Mixing
+
+At each training step, sample `r ~ U[0, 1]`:
+
+```
+H^(r) = [e_1, ..., e_{floor(r·K)}] ⊕ [h_{floor(r·K)+1}, ..., h_K]
+          ← token embeddings →        ←        latents          →
+```
+
+`r = 0` → pure latents; `r = 1` → pure token embeddings. Uniform sampling
+forces the receiver to handle any mixture, bridging the known token manifold
+and the target latent manifold smoothly. Removal of curriculum drops success
+from 70% to 33% in Interlat ablations.
+
+### Training Pipeline Optimisations (Phase 12.7)
+
+#### Pre-computation cache
+
+All `TextStrategy.reason()` API calls and `LatentStrategy.reason()` local
+inference calls are executed **once per bucket** before the epoch loop begins.
+Results — `inputs_embeds`, `inputs_embeds_wrong`, `target_ids`, `prefix_len` —
+are stored as CPU tensors.  The epoch loop moves each item to the device just
+before the gradient step and releases it immediately after.
+
+This eliminates the dominant bottleneck: with 47 buckets and 30 epochs the old
+code made 1,410 API + 1,410 local inference calls (≈30 min). The new code makes
+47 API + 47 local inference calls in a one-time pre-compute phase (≈2–3 min),
+then trains for ~1–2 min of pure GPU work.
+
+#### Batched dual forward pass
+
+`LoRAReceiverTrainer._forward_and_losses()` stacks the correct-latent and
+wrong-latent embed sequences into a single `(2, S, D)` tensor:
+
+```
+embeds_batch = torch.stack([inputs_embeds, inputs_embeds_wrong], dim=0)
+out_batch    = model(inputs_embeds=embeds_batch)   # one GPU call, not two
+```
+
+This halves GPU forward-pass overhead per gradient step.
+
+#### L_sep gradient requirement
+
+`logits_tgt` and `logits_wrong_tgt` must **not** be detached before passing to
+`separation_loss()`.  Detaching them (as in the original Phase 12.6 code) makes
+`sep` a constant in the autograd graph — `total.backward()` propagates only
+through `task_loss`, silently zeroing the separation signal.  Without it, the
+receiver ignores the latent prefix and falls back to unconditional language
+modelling, producing word-salad output.
+
+#### Gradient accumulation
+
+Default `ACCUM_STEPS = 8`.  `accumulate_step(batch, scale=8, step=is_last)`
+divides the loss by 8 before each `backward()` call and only advances the
+optimizer after every 8th bucket (or at end of epoch).  Effective batch size = 8
+without requiring padded batching, keeping peak MPS memory bounded.
+
+#### Recommended hyperparameters
+
+| Param | Phase 12.6 (broken) | Phase 12.7 (fixed) | Rationale |
+|---|---|---|---|
+| `lora_r` | 32 | 4 | r=32 overfits 47 samples; r=4 sufficient (Hu et al. 2022 Table 2) |
+| `lora_alpha` | 64 | 8 | Preserves scaling ratio alpha/r = 2 |
+| `lr` | 1e-3 | 2e-4 | Standard LoRA fine-tuning range (1e-4 – 3e-4) |
+
+### Implementation Files
+
+| File | Role |
+|---|---|
+| `libucks/thinking/curriculum.py` | `CurriculumMixer.mix(latents, tok_embeds, r)` |
+| `libucks/thinking/communication_adapter.py` | `frame(soft_prompt, bop, eop)` + 8-head MHA |
+| `libucks/thinking/model_manager.py` | `load_base_model()` / `get_base_model()` |
+| `libucks/thinking/training/losses.py` | `separation_loss(logits_c, logits_w)` |
+| `libucks/thinking/training/lora_trainer.py` | `LoRAReceiverTrainer` (train_step, accumulate_step) |
+| `libucks/thinking/latent_strategy.py` | `receive(framed_latent)` — new decode path |
+| `scripts/train_lora_receiver.py` | Pre-compute cache + gradient accumulation loop |
+
+### Latent Space Constraint (unchanged)
+
+Librarians only produce `Representation` objects. ONLY the Translator's
+`receive()` path (which calls the LoRA Base receiver) outputs natural language.
+
+---
+
 ## 9. Key Dependencies
 
 | Package | Version | Purpose |
@@ -487,3 +694,29 @@ libucks/                         ← this repository (the libucks tool itself)
 | `rich` | `>=13.0` | CLI progress and status tables |
 | `mcp` | `>=1.0` | Anthropic MCP Python SDK |
 | `structlog` | `>=24.0` | Structured JSON logging |
+
+---
+
+## 11. Routing Architecture: Flat Retrieval Decision Record
+
+> **Decision: Flat cosine retrieval over all buckets. Hierarchical (super-bucket) retrieval is explicitly rejected at current scale.**
+
+### Why Hierarchical Was Considered
+
+With 40–50 granular buckets, a concern arises that `top_k=3` cosine search might retrieve superficially similar but semantically irrelevant buckets ("retrieval noise").
+
+A two-tier hierarchy was proposed: 5–8 "super-buckets" (architectural domains) acting as a coarse filter, followed by a fine-grained search within the winning super-bucket.
+
+### Why Flat Wins
+
+**Gating failure.** Hierarchical routing has a catastrophic failure mode with no recovery: if the query's embedding lands in the wrong super-bucket, the correct granular bucket is never queried. Flat search always scans all candidates; a noisy centroid returns a slightly wrong bucket but top-3 usually still includes the correct one.
+
+**Scale doesn't justify it.** O(N) dot products over 50 unit vectors takes <1 ms. Hierarchy buys O(√N) speedup — irrelevant until N > 2000 (multi-service monorepo territory).
+
+**Double maintenance burden.** Super-bucket centroids must be recomputed whenever any child bucket's centroid drifts after an UPDATE event. This doubles registry complexity with no query quality benefit at small N.
+
+**Title-boosted centroids already provide semantic anchoring.** `centroid = normalize(0.8*chunk_mean + 0.2*embed(domain_label))` embeds the bucket's semantic identity directly into its routing vector. This is the key benefit super-buckets were intended to provide — without a second tier.
+
+### Trigger for Reconsideration
+
+Measure the false-positive retrieval rate (queries returning ≥1 irrelevant bucket in top-3) empirically. If it exceeds **20% at N > 500 buckets**, revisit hierarchy with measured data rather than theoretical concern.

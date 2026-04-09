@@ -26,6 +26,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+latent = [
+    "torch>=2.2",
+    "transformers>=4.40",
+    "accelerate>=0.28",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -42,6 +47,7 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "slow: marks tests that load the embedding model (deselect with '-m not slow')",
+    "gpu: marks tests that require a real model and GPU (deselect with '-m not gpu')",
 ]
 
 [tool.setuptools.packages.find]

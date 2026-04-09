@@ -50,6 +50,22 @@ def _read_chunk_content(meta: ChunkMetadata) -> str:
         return ""
 
 
+def _collect_source_text(front_matter, max_chars: int = 3000) -> str:
+    """Concatenate actual code content from ChunkMetadata, up to max_chars."""
+    parts = []
+    total = 0
+    for meta in front_matter.chunks:
+        content = _read_chunk_content(meta)
+        if not content:
+            continue
+        block = f"# {meta.source_file}\n{content}\n"
+        if total + len(block) > max_chars:
+            break
+        parts.append(block)
+        total += len(block)
+    return "\n---\n\n".join(parts)
+
+
 def _get_head_sha(repo_path: Optional[Path]) -> str:
     """Return the current git HEAD SHA, or 'unknown' if unavailable."""
     if repo_path is None:
@@ -158,6 +174,14 @@ class Librarian:
                     centroid /= norm
             else:
                 centroid = self._embedder.embed(updated_prose)
+
+            # Blend title embedding into centroid (α=0.2) so the bucket's vector
+            # identity stays anchored to its semantic aspect label.
+            title_embed = self._embedder.embed(front_matter.domain_label)
+            centroid = 0.8 * centroid + 0.2 * title_embed
+            norm = np.linalg.norm(centroid)
+            if norm > 0:
+                centroid /= norm
 
             new_token_count = sum(c.token_count for c in front_matter.chunks)
 
@@ -271,13 +295,16 @@ class Librarian:
     async def _handle_query(self, event: QueryEvent) -> Representation:
         # Read-only — no lock required.
         try:
-            _, prose = self._store.read(self.bucket_id)
+            front_matter, prose = self._store.read(self.bucket_id)
         except FileNotFoundError:
             return ""
 
+        # Use actual code content (same as training); fall back to prose if unreadable
+        source_text = _collect_source_text(front_matter, max_chars=3000) or prose
+
         log.info("librarian.query", bucket_id=self.bucket_id, query=event.query[:60])
         try:
-            result = await self._strategy.reason(event.query, prose)
+            result = await self._strategy.reason(event.query, source_text)
         except Exception as exc:
             log.warning("librarian.query.reason_failed", bucket_id=self.bucket_id, error=str(exc))
             result = prose  # Fall back to raw prose.

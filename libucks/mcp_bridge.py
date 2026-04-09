@@ -13,6 +13,10 @@ os.environ.setdefault("OBJC_DISABLE_INITIALIZE_FORK_SAFETY", "YES")  # prevents 
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")             # prevents HF tokenizer deadlock warning
 os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")             # suppresses "BertModel report" etc.
 os.environ.setdefault("TQDM_DISABLE", "1")                           # suppresses "Loading weights" progress bars
+os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")    # disables MPS pool pre-reservation; does not
+                                                                      # fix peak single-op allocation (see model_manager.py
+                                                                      # attn_implementation="eager") but reduces background
+                                                                      # fragmentation pressure on unified memory
 
 import asyncio
 import logging
@@ -39,7 +43,7 @@ from libucks.stale_checker import StaleChecker
 from libucks.startup_recovery import StartupRecovery
 from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
-from libucks.thinking.text_strategy import TextStrategy
+from libucks.thinking import create_strategy
 from libucks.translator import Translator
 
 
@@ -78,12 +82,13 @@ async def serve() -> None:
     cfg = Config.load(repo_path)
     registry_path = repo_path / cfg.paths.registry_file
     bucket_dir = repo_path / ".libucks"
-    print(f"[libucks] repo={repo_path}  registry={registry_path}  buckets={bucket_dir}", file=sys.stderr)
+    bucket_store_dir = repo_path / cfg.paths.bucket_dir
+    print(f"[libucks] repo={repo_path}  registry={registry_path}  buckets={bucket_store_dir}", file=sys.stderr)
 
     registry = BucketRegistry(registry_path)
     registry.load()
 
-    store = BucketStore(bucket_dir)
+    store = BucketStore(bucket_store_dir)
 
     # Pre-load the embedding model BEFORE the MCP stdio server starts.
     # Temporarily redirect sys.stdout → sys.stderr so any remaining direct
@@ -94,7 +99,7 @@ async def serve() -> None:
         embedder = EmbeddingService.get_instance(cfg.model.embedding_model)
     finally:
         sys.stdout = _real_stdout  # restore BEFORE mcp.server.stdio.stdio_server() captures it
-    strategy = TextStrategy.from_env(cfg.model.anthropic_model)
+    strategy = create_strategy(cfg)
 
     agent = CentralAgent(registry, cfg, embed_fn=embedder.embed)
 
@@ -111,7 +116,17 @@ async def serve() -> None:
         librarians[bucket_id] = lib
         agent.register_librarian(bucket_id, lib)
 
-    translator = Translator(strategy)
+    adapter = None
+    if cfg.model.strategy == "latent":
+        from libucks.thinking.communication_adapter import CommunicationAdapter
+        import torch
+        adapter = CommunicationAdapter()
+        adapter.load_saved_weights(bucket_dir / "adapter.pt")
+        # dtype must match the model's output dtype. ModelManager loads Qwen in
+        # float16 on MPS; float32 adapter parameters cause an MPS broadcast error.
+        adapter = adapter.to(device="mps", dtype=torch.float16)
+
+    translator = Translator(strategy, adapter=adapter)
 
     # ------------------------------------------------------------------
     # Startup recovery: replay commits that arrived while server was offline.
@@ -241,8 +256,11 @@ async def serve() -> None:
             top_k = int(arguments.get("top_k", cfg.routing.top_k))
             orchestrator._top_k = top_k
 
+            print(f"[libucks] query: routing '{query_text[:60]}' (top_k={top_k})", file=sys.stderr, flush=True)
             representations = await orchestrator.query(query_text)
+            print(f"[libucks] query: got {len(representations)} representations", file=sys.stderr, flush=True)
             answer = await translator.synthesize(query_text, representations)
+            print(f"[libucks] query: synthesis complete ({len(answer)} chars)", file=sys.stderr, flush=True)
             return [types.TextContent(type="text", text=answer)]
 
         if name == "libucks_status":
