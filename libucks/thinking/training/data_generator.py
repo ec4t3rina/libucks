@@ -38,6 +38,8 @@ def _read_chunk_content(meta) -> str:
 
 def _collect_source_text(front_matter, max_chars: int = 3000) -> str:
     """Concatenate actual code content from ChunkMetadata, up to max_chars."""
+    if not hasattr(front_matter, "chunks"):
+        return ""
     parts = []
     total = 0
     for meta in front_matter.chunks:

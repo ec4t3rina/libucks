@@ -28,7 +28,7 @@ class LatentStrategy(ThinkingStrategy):
         model_manager: object | None = None,
         compressor: object | None = None,
         injection_gate: float = 0.3,
-        temperature: float = 0.8,
+        temperature: float = 0.7,
         top_p: float = 0.9,
         repetition_penalty: float = 1.3,
         receive_temperature: float = 0.6,
