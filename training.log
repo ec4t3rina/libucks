@@ -1,0 +1,63 @@
+nohup: ignoring input
+   Building libucks @ file:///workspace/libucks
+      Built libucks @ file:///workspace/libucks
+Uninstalled 4 packages in 1.93s
+Installed 4 packages in 1.72s
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+[libucks] Basic MSE training on 148 buckets for 5 epoch(s)...
+Traceback (most recent call last):
+  File "/workspace/libucks/.venv/bin/libucks", line 10, in <module>
+    sys.exit(cli())
+             ^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/click/core.py", line 1485, in __call__
+    return self.main(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/click/core.py", line 1406, in main
+    rv = self.invoke(ctx)
+         ^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/click/core.py", line 1873, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/click/core.py", line 1269, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/click/core.py", line 824, in invoke
+    return callback(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/libucks/_cli.py", line 88, in train_adapter_cmd
+    asyncio.run(_run_train_adapter(target, creative=creative, epochs=epochs))
+  File "/root/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/runners.py", line 195, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/root/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/.local/share/uv/python/cpython-3.12.13-linux-x86_64-gnu/lib/python3.12/asyncio/base_events.py", line 691, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/workspace/libucks/libucks/_cli.py", line 140, in _run_train_adapter
+    await _train_basic(cfg, registry, store, bucket_ids, adapter, epochs, bucket_dir)
+  File "/workspace/libucks/libucks/_cli.py", line 206, in _train_basic
+    latent_strategy = create_strategy(cfg)
+                      ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/libucks/thinking/__init__.py", line 18, in create_strategy
+    mgr.load(
+  File "/workspace/libucks/libucks/thinking/model_manager.py", line 71, in load
+    self._model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/transformers/models/auto/auto_factory.py", line 381, in from_pretrained
+    return model_class.from_pretrained(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/transformers/modeling_utils.py", line 4091, in from_pretrained
+    hf_quantizer.preprocess_model(
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/transformers/quantizers/base.py", line 171, in preprocess_model
+    self._process_model_before_weight_loading(model, **kwargs)
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/transformers/quantizers/quantizer_bnb_4bit.py", line 138, in _process_model_before_weight_loading
+    model = replace_with_bnb_linear(
+            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/transformers/integrations/bitsandbytes.py", line 222, in replace_with_bnb_linear
+    model.set_submodule(module_name, new_module)
+    ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/libucks/.venv/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1729, in __getattr__
+    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+AttributeError: 'Qwen2ForCausalLM' object has no attribute 'set_submodule'. Did you mean: 'get_submodule'?
