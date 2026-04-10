@@ -225,11 +225,12 @@ async def _train_basic(cfg, registry, store, bucket_ids, adapter, epochs, bucket
                 click.echo(f"  Skipped {bucket_id}: {exc}", err=True)
                 continue
 
-            latents = [t.clone().detach().to(_device) for t in sample.librarian_latents]
+            latents = [t.clone().detach().to(_device, torch.float32) for t in sample.librarian_latents]
+            latents = [t.to(torch.float32) for t in latents]
             optimizer.zero_grad()
             output = adapter(latents)
             anchor = F.normalize(output.mean(dim=0), dim=0)
-            target = F.normalize(sample.target_latent.clone().detach().to(_device).mean(dim=0), dim=0)
+            target = F.normalize(sample.target_latent.clone().detach().to(_device, torch.float32).mean(dim=0), dim=0)
             loss = 1.0 - torch.dot(anchor, target)
             loss.backward()
             optimizer.step()
