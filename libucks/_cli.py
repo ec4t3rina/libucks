@@ -126,6 +126,10 @@ async def _run_train_adapter(repo_path: Path, creative: bool, epochs: int) -> No
     adapter = CommunicationAdapter(hidden_dim=_hidden_dim)
     adapter.load_saved_weights(bucket_dir / "adapter.pt")
 
+    from libucks.thinking.model_manager import ModelManager as _MM
+    _training_device = _MM._resolve_device(cfg.model.device)
+    adapter = adapter.to(_training_device)
+
     if creative:
         click.echo(f"[libucks] Creative contrastive training on {len(bucket_ids)} buckets "
                    f"for {epochs} epoch(s)...")
@@ -210,6 +214,7 @@ async def _train_basic(cfg, registry, store, bucket_ids, adapter, epochs, bucket
         store=store,
     )
     optimizer = AdamW(adapter.parameters(), lr=1e-4)
+    _device = next(adapter.parameters()).device
 
     for epoch in range(epochs):
         total_loss = 0.0
@@ -220,10 +225,11 @@ async def _train_basic(cfg, registry, store, bucket_ids, adapter, epochs, bucket
                 click.echo(f"  Skipped {bucket_id}: {exc}", err=True)
                 continue
 
+            latents = [t.clone().detach().to(_device) for t in sample.librarian_latents]
             optimizer.zero_grad()
-            output = adapter(sample.librarian_latents)
+            output = adapter(latents)
             anchor = F.normalize(output.mean(dim=0), dim=0)
-            target = F.normalize(sample.target_latent.mean(dim=0), dim=0)
+            target = F.normalize(sample.target_latent.clone().detach().to(_device).mean(dim=0), dim=0)
             loss = 1.0 - torch.dot(anchor, target)
             loss.backward()
             optimizer.step()

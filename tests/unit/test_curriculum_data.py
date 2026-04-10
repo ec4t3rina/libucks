@@ -24,6 +24,8 @@ def mock_latent_strategy():
     strategy = MagicMock()
     # encode() returns a (5, D) tensor
     strategy.encode = AsyncMock(return_value=torch.randn(5, D))
+    # reason() is also awaited in generate_curriculum_batch()
+    strategy.reason = AsyncMock(return_value=torch.randn(5, D))
     return strategy
 
 
@@ -49,6 +51,9 @@ def mock_embedding():
     """Fake embedding layer — maps token ID to D-dim vector."""
     emb = MagicMock()
     emb.return_value = torch.randn(K, D)   # returns (K, D) for any input
+    mock_param = MagicMock()
+    mock_param.device = torch.device("cpu")
+    emb.parameters.side_effect = lambda: iter([mock_param])
     return emb
 
 
