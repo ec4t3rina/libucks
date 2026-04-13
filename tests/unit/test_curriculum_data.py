@@ -67,12 +67,13 @@ def mock_text_strategy():
 @pytest.fixture
 def generator(mock_latent_strategy, mock_adapter, mock_tokenizer, mock_embedding, mock_text_strategy):
     from libucks.thinking.training.data_generator import MultiPerspectiveDataGenerator
-    gen = MultiPerspectiveDataGenerator(
-        text_strategy=mock_text_strategy,
-        latent_strategy=mock_latent_strategy,
-        registry=MagicMock(),
-        store=MagicMock(),
-    )
+    with patch("libucks.thinking.training.data_generator.MultiPerspectiveDataGenerator.__init__",
+               lambda self, *a, **kw: None):
+        gen = MultiPerspectiveDataGenerator.__new__(MultiPerspectiveDataGenerator)
+    gen._latent_strategy = mock_latent_strategy
+    gen._registry = MagicMock()
+    gen._store = MagicMock()
+    gen._teacher_reason = AsyncMock(return_value="This module handles routing logic.")
     gen._store.read.return_value = ("id", "some prose about code")
     gen._registry.get_all_centroids.return_value = {}
     return gen

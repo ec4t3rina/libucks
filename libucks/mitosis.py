@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from libucks.embeddings.embedding_service import EmbeddingService
     from libucks.librarian import Librarian
     from libucks.thinking.base import ThinkingStrategy
+    from libucks.translator import Translator
 
 log = structlog.get_logger(__name__)
 
@@ -61,6 +62,7 @@ class MitosisService:
         agent: "CentralAgent",
         strategy: "ThinkingStrategy",
         mitosis_threshold: int = 20_000,
+        translator: "Translator | None" = None,
     ) -> None:
         self._store = store
         self._registry = registry
@@ -68,6 +70,7 @@ class MitosisService:
         self._agent = agent
         self._strategy = strategy
         self._mitosis_threshold = mitosis_threshold
+        self._translator = translator
 
     async def split(self, bucket_id: str) -> None:
         """Split *bucket_id* into two child buckets."""
@@ -133,7 +136,10 @@ class MitosisService:
             prompt = f"Write a concise technical summary for these code chunks: domain={domain}"
             try:
                 result = await self._strategy.reason(prompt, child_content[:2000])
-                child_prose = str(result)
+                if self._translator is not None:
+                    child_prose = await self._translator.synthesize("", [result])
+                else:
+                    child_prose = f"# {domain}\n\n"
             except Exception as exc:
                 log.warning("mitosis.reason_failed", child_id=child_id, error=str(exc))
                 child_prose = f"# {domain}\n\n{child_content[:500]}"
@@ -159,6 +165,7 @@ class MitosisService:
                 embedder=self._embedder,
                 mitosis_threshold=self._mitosis_threshold,
                 mitosis_service=self,
+                translator=self._translator,
             )
             self._agent.register_librarian(child_id, child_librarian)
             child_ids.append(child_id)

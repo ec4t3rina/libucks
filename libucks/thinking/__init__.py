@@ -6,10 +6,6 @@ from libucks.thinking.base import Representation, ThinkingStrategy
 
 def create_strategy(config) -> ThinkingStrategy:
     """Construct the ThinkingStrategy specified by config.model.strategy."""
-    if config.model.strategy == "text":
-        from libucks.thinking.text_strategy import TextStrategy
-        return TextStrategy.from_env(config.model.anthropic_model)
-
     if config.model.strategy == "latent":
         from libucks.thinking.model_manager import ModelManager
         from libucks.thinking.latent_strategy import LatentStrategy
@@ -18,6 +14,7 @@ def create_strategy(config) -> ThinkingStrategy:
         mgr.load(
             model_id=config.model.local_model,
             quantization=config.model.quantization,
+            bnb_4bit_compute_dtype=config.model.bnb_4bit_compute_dtype,
             device=config.model.device,
         )
         return LatentStrategy(mgr)

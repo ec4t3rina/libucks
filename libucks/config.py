@@ -30,15 +30,17 @@ class ModelConfig:
     anthropic_model: str = "claude-haiku-4-5-20251001"
     embedding_model: str = "all-MiniLM-L6-v2"
     local_model: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    base_model: str = "Qwen/Qwen2.5-0.5B"
     quantization: str = "none"
+    bnb_4bit_compute_dtype: str = "float32"
     device: str = "auto"
-    strategy: str = "text"
+    strategy: str = "latent"
     compression_steps: int = 8
 
     def __post_init__(self) -> None:
-        if self.strategy not in ("text", "latent"):
+        if self.strategy != "latent":
             raise ValueError(
-                f"strategy must be 'text' or 'latent', got {self.strategy!r}"
+                f"strategy must be 'latent', got {self.strategy!r}"
             )
         if self.quantization not in ("none", "4bit", "8bit"):
             raise ValueError(

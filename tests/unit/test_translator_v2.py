@@ -1,10 +1,9 @@
 """Phase 9-B: Translator V2 — latent path dispatch and decode boundary.
 
 Verifies that:
-  - str representations → existing V1 text path (unchanged)
-  - tensor representations → new V2 latent path
-  - strategy.decode() is called exactly once in both paths
-  - CommunicationAdapter is called only in the latent path
+  - Tensor representations → V2 latent path through the CommunicationAdapter
+  - strategy.decode() is called exactly once
+  - With no adapter, a single representation is decoded directly (init use-case)
 """
 from __future__ import annotations
 
@@ -31,50 +30,14 @@ def mock_strategy():
 def mock_adapter():
     adapter = MagicMock()
     adapter.return_value = torch.randn(32, 2048)
+    # Translator.__init__ calls adapter.to(device); make it return the adapter itself
+    # so self._adapter is the same object the test has a reference to.
+    adapter.to.return_value = adapter
     return adapter
 
 
 # ---------------------------------------------------------------------------
-# V1 text path (backward compatibility)
-# ---------------------------------------------------------------------------
-
-class TestTranslatorV1TextPath:
-    async def test_str_representations_use_text_path(self, mock_strategy, mock_adapter):
-        translator = Translator(mock_strategy, adapter=mock_adapter)
-        await translator.synthesize("query", ["ans1", "ans2", "ans3"])
-        mock_adapter.assert_not_called()
-
-    async def test_str_path_calls_strategy_reason(self, mock_strategy, mock_adapter):
-        translator = Translator(mock_strategy, adapter=mock_adapter)
-        await translator.synthesize("query", ["ans1"])
-        mock_strategy.reason.assert_called_once()
-
-    async def test_str_path_calls_strategy_decode_once(self, mock_strategy, mock_adapter):
-        translator = Translator(mock_strategy, adapter=mock_adapter)
-        await translator.synthesize("query", ["ans1"])
-        mock_strategy.decode.assert_called_once()
-
-    async def test_str_path_returns_decoded_string(self, mock_strategy):
-        mock_strategy.decode = AsyncMock(return_value="V1 answer")
-        translator = Translator(mock_strategy)
-        result = await translator.synthesize("query", ["context"])
-        assert result == "V1 answer"
-
-    async def test_empty_representations_returns_fallback(self, mock_strategy):
-        translator = Translator(mock_strategy)
-        result = await translator.synthesize("query", [])
-        assert "No relevant context" in result
-        mock_strategy.reason.assert_not_called()
-        mock_strategy.decode.assert_not_called()
-
-    async def test_no_adapter_injected_still_works_for_text(self, mock_strategy):
-        translator = Translator(mock_strategy)  # no adapter
-        result = await translator.synthesize("query", ["text answer"])
-        assert isinstance(result, str)
-
-
-# ---------------------------------------------------------------------------
-# V2 latent path
+# V2 latent path (with adapter)
 # ---------------------------------------------------------------------------
 
 class TestTranslatorV2LatentPath:
@@ -124,11 +87,35 @@ class TestTranslatorV2LatentPath:
         result = await translator.synthesize("query", [torch.randn(10, 2048)])
         assert result == "latent decoded answer"
 
-    async def test_latent_path_empty_list_returns_fallback(self, mock_strategy, mock_adapter):
+    async def test_empty_representations_returns_fallback(self, mock_strategy, mock_adapter):
         translator = Translator(mock_strategy, adapter=mock_adapter)
         result = await translator.synthesize("query", [])
         assert "No relevant context" in result
         mock_adapter.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# No-adapter path (init / single-tensor use-case)
+# ---------------------------------------------------------------------------
+
+class TestTranslatorNoAdapterPath:
+    async def test_single_rep_decoded_directly_when_no_adapter(self, mock_strategy):
+        mock_strategy.decode = AsyncMock(return_value="decoded prose")
+        translator = Translator(mock_strategy)  # no adapter
+        result = await translator.synthesize("", [torch.randn(10, 2048)])
+        assert result == "decoded prose"
+        mock_strategy.decode.assert_called_once()
+
+    async def test_multiple_reps_raise_without_adapter(self, mock_strategy):
+        translator = Translator(mock_strategy)
+        with pytest.raises(ValueError, match="no adapter"):
+            await translator.synthesize("", [torch.randn(5, 2048), torch.randn(5, 2048)])
+
+    async def test_empty_list_returns_fallback_without_adapter(self, mock_strategy):
+        translator = Translator(mock_strategy)
+        result = await translator.synthesize("", [])
+        assert "No relevant context" in result
+        mock_strategy.decode.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

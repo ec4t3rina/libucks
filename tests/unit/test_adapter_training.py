@@ -95,13 +95,6 @@ class TestMultiPerspectiveDataGenerator:
 
     def _make_generator(self, centroids: dict | None = None):
         """Return a generator with fully mocked dependencies."""
-        text_strategy = MagicMock()
-        text_strategy.reason = AsyncMock(side_effect=[
-            "This code authenticates users via JWT.",       # perspective 1
-            "It checks header → decode → validate → ok.",   # perspective 2
-            "Depends on jwt_lib; called by APIGateway.",    # perspective 3
-        ])
-
         latent_strategy = MagicMock()
         latent_strategy.encode = AsyncMock(
             return_value=torch.randn(10, HIDDEN_DIM)
@@ -117,12 +110,16 @@ class TestMultiPerspectiveDataGenerator:
         store = MagicMock()
         store.read.return_value = (MagicMock(), "auth module prose")
 
-        return MultiPerspectiveDataGenerator(
-            text_strategy=text_strategy,
-            latent_strategy=latent_strategy,
-            registry=registry,
-            store=store,
-        )
+        gen = MultiPerspectiveDataGenerator.__new__(MultiPerspectiveDataGenerator)
+        gen._latent_strategy = latent_strategy
+        gen._registry = registry
+        gen._store = store
+        gen._teacher_reason = AsyncMock(side_effect=[
+            "This code authenticates users via JWT.",       # perspective 1
+            "It checks header → decode → validate → ok.",   # perspective 2
+            "Depends on jwt_lib; called by APIGateway.",    # perspective 3
+        ])
+        return gen
 
     async def test_generate_returns_training_sample(self):
         gen = self._make_generator()
@@ -160,7 +157,7 @@ class TestMultiPerspectiveDataGenerator:
         await gen.generate("bucket-auth")
 
         # Verify text_strategy.reason was called with 3 different perspective prompts
-        calls = gen._text_strategy.reason.call_args_list
+        calls = gen._teacher_reason.call_args_list
         assert len(calls) == 3
         prompts_used = [c[0][0] for c in calls]  # first positional arg each time
         # Each prompt should be distinct
@@ -170,7 +167,7 @@ class TestMultiPerspectiveDataGenerator:
         """Verify the three perspective prompts are the canonical ones."""
         gen = self._make_generator()
         await gen.generate("bucket-auth")
-        calls = gen._text_strategy.reason.call_args_list
+        calls = gen._teacher_reason.call_args_list
         prompts_used = {c[0][0] for c in calls}
         assert prompts_used == set(PERSPECTIVE_PROMPTS)
 

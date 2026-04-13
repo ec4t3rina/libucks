@@ -101,6 +101,28 @@ async def serve() -> None:
         sys.stdout = _real_stdout  # restore BEFORE mcp.server.stdio.stdio_server() captures it
     strategy = create_strategy(cfg)
 
+    if cfg.model.strategy == "latent":
+        # The Base receiver (Qwen2.5-3B-Base + LoRA) must be loaded before the first
+        # query — LatentStrategy.decode() calls get_base_model() which raises if absent.
+        strategy._mgr.load_base_model(
+            model_id=cfg.model.base_model,
+            quantization=cfg.model.quantization,
+            bnb_4bit_compute_dtype=cfg.model.bnb_4bit_compute_dtype,
+            device=cfg.model.device,
+        )
+        print(f"[libucks] base receiver loaded: {cfg.model.base_model}", file=sys.stderr)
+
+        lora_path = bucket_dir / "lora_receiver.pt"
+        if lora_path.exists():
+            import torch
+            from libucks.thinking.model_manager import ModelManager as _MM
+            from libucks.thinking.training.lora_trainer import _inject_lora, _LORA_TARGETS
+            _resolved = _MM._resolve_device(cfg.model.device)
+            _inject_lora(strategy._mgr.get_base_model(), _LORA_TARGETS, r=4, alpha=4.0)
+            _state = torch.load(lora_path, map_location=_resolved, weights_only=True)
+            strategy._mgr.get_base_model().load_state_dict(_state, strict=False)
+            print(f"[libucks] LoRA receiver weights loaded from {lora_path}", file=sys.stderr)
+
     agent = CentralAgent(registry, cfg, embed_fn=embedder.embed)
 
     librarians: dict[str, Librarian] = {}
@@ -119,12 +141,15 @@ async def serve() -> None:
     adapter = None
     if cfg.model.strategy == "latent":
         from libucks.thinking.communication_adapter import CommunicationAdapter
+        from libucks.thinking.model_manager import ModelManager as _MM
         import torch
+        _adapter_device = _MM._resolve_device(cfg.model.device)
         adapter = CommunicationAdapter()
         adapter.load_saved_weights(bucket_dir / "adapter.pt")
         # dtype must match the model's output dtype. ModelManager loads Qwen in
         # float16 on MPS; float32 adapter parameters cause an MPS broadcast error.
-        adapter = adapter.to(device="mps", dtype=torch.float16)
+        _adapter_dtype = torch.float16 if _adapter_device == "mps" else None
+        adapter = adapter.to(device=_adapter_device, dtype=_adapter_dtype)
 
     translator = Translator(strategy, adapter=adapter)
 
