@@ -2,9 +2,19 @@
 
 # libucks — Librarian Buckets
 
+An experimental research project investigating alternative long context memory architectures for coding agents
+
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
+
+---
+
+Currently, agents interacting with large repositories suffer from context bloat, "lost in the middle" degradation, and high computational redundancy. Standard RAG pipelines attempt to solve this by repeatedly fetching and summarizing text files. However, this introduces a fundamental information bottleneck: forcing a model to summarize its understanding back into English text discards approximately 99.96% of its internal representation.
+
+This project proposes a persistent, structured RAM layer. We deploy a swarm of autonomous "Librarian" agents that maintain domain-specific memory buckets, updated asynchronously via OS-level file monitoring.
+
+Our primary research focus is the V2 Latent Space Communication protocol. Instead of exchanging English text, libucks Librarians output raw hidden-state tensors. These latents are aggregated and injected directly into a LoRA-finetuned receiver model. By bypassing the English language entirely, we aim to preserve the high-dimensional context that is typically lost during text decoding.
 
 ---
 
