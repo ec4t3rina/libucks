@@ -2,35 +2,9 @@
 
 # libucks — Librarian Buckets
 
-**A persistent, latent-space memory server for coding agents. Your agent stops reading files. It queries memory.**
-
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
-
----
-
-## The Brutal Reality
-
-Coding agents working on large repositories are broken by design. Three compounding failure modes kill them in production:
-
-1. **Context bloat.** 100,000+ line repos do not fit in a context window. Agents that try to read everything either truncate silently or blow the token budget on the first query.
-
-2. **"Lost in the middle" degradation.** LLM attention is not uniform. Content buried at position 60K in a 128K context window gets ~40% less weight than content at the boundaries. Your critical auth logic is functionally invisible.
-
-3. **Runaway API cost.** Re-reading unchanged files on every query burns money on redundant computation. A file unchanged since yesterday does not need to be re-read today.
-
-Every existing solution — RAG pipelines, context compression, file summarizers — patches one failure mode while ignoring the others. They are also stateless: no memory between queries, no awareness of code evolution, no understanding of domain boundaries.
-
-**`libucks` is not a patch.**
-
----
-
-## Enter libucks
-
-`libucks` is a **persistent, structured memory layer** between the coding agent and the repository. It maintains a swarm of domain-specific **context buckets**, updates them asynchronously as code changes, and serves compressed, semantically-routed context to the agent via the **Model Context Protocol (MCP)**.
-
-The agent is given a single tool: `libucks_query(query, top_k=3)`. It never reads raw files again.
 
 ---
 
