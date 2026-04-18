@@ -1,3 +1,5 @@
+<img width="1289" height="721" alt="Screenshot 2026-04-18 at 04 18 03" src="https://github.com/user-attachments/assets/fe8b015b-b917-4e86-9e56-505f33cb287b" />
+
 (DE MODIFICAT ACEST SLOPPY SLOP)
 
 # libucks — Architecture Reference
@@ -5,9 +7,6 @@
 **Librarian Buckets** | Local AI Memory Server for Coding Agents
 
 ---
-
-<img width="1289" height="721" alt="Screenshot 2026-04-18 at 04 18 03" src="https://github.com/user-attachments/assets/fe8b015b-b917-4e86-9e56-505f33cb287b" />
-
 
 ## 1. Problem Statement
 
