@@ -226,7 +226,6 @@ async def _train_basic(cfg, registry, store, bucket_ids, adapter, epochs, bucket
                 continue
 
             latents = [t.clone().detach().to(_device, torch.float32) for t in sample.librarian_latents]
-            latents = [t.to(torch.float32) for t in latents]
             optimizer.zero_grad()
             output = adapter(latents)
             anchor = F.normalize(output.mean(dim=0), dim=0)

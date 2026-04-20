@@ -23,8 +23,6 @@ dependencies = [
     "rich>=13.0",
     "mcp>=1.0",
     "structlog>=24.0",
-    "bitsandbytes>=0.46.1",
-    "transformers==4.48.2",
 ]
 
 [project.optional-dependencies]
