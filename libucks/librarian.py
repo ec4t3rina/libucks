@@ -33,6 +33,7 @@ from libucks.thinking.base import Representation, ThinkingStrategy
 if TYPE_CHECKING:
     from libucks.embeddings.embedding_service import EmbeddingService
     from libucks.mitosis import MitosisService
+    from libucks.translator import Translator
 
 log = structlog.get_logger(__name__)
 
@@ -99,6 +100,7 @@ class Librarian:
         mitosis_threshold: int = 20_000,
         mitosis_service: Optional["MitosisService"] = None,
         repo_path: Optional[Path] = None,
+        translator: Optional["Translator"] = None,
     ) -> None:
         self.bucket_id = bucket_id
         self._store = store
@@ -108,6 +110,7 @@ class Librarian:
         self._mitosis_threshold = mitosis_threshold
         self._mitosis_service = mitosis_service
         self._repo_path = repo_path
+        self._translator = translator
         self.queue: asyncio.Queue[object] = asyncio.Queue()
 
     # ------------------------------------------------------------------
@@ -155,7 +158,10 @@ class Librarian:
 
             try:
                 result = await self._strategy.reason(prompt, current_prose)
-                updated_prose = str(result)
+                if self._translator is not None:
+                    updated_prose = await self._translator.synthesize("", [result])
+                else:
+                    updated_prose = current_prose
             except Exception as exc:
                 log.warning("librarian.update.reason_failed", bucket_id=self.bucket_id, error=str(exc))
                 updated_prose = current_prose + f"\n\n<!-- update: {diff_content[:200]} -->"
@@ -241,14 +247,15 @@ class Librarian:
             self._store.write_front_matter(self.bucket_id, front_matter)
 
             if surviving:
-                purged_count = len(front_matter.chunks) - len(surviving) + (len(front_matter.chunks) - len(surviving))
                 prompt = (
                     f"Some code has been deleted. Rewrite the summary omitting the deleted concepts. "
                     f"Chunk IDs removed: {event.chunk_ids}"
                 )
                 try:
                     result = await self._strategy.reason(prompt, current_prose)
-                    self._store.write_prose(self.bucket_id, str(result))
+                    if self._translator is not None:
+                        new_prose = await self._translator.synthesize("", [result])
+                        self._store.write_prose(self.bucket_id, new_prose)
                 except Exception as exc:
                     log.warning("librarian.tombstone.reason_failed", bucket_id=self.bucket_id, error=str(exc))
 

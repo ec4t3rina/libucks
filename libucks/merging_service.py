@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from libucks.storage.bucket_registry import BucketRegistry
     from libucks.storage.bucket_store import BucketStore
     from libucks.thinking.base import ThinkingStrategy
+    from libucks.translator import Translator
 
 log = structlog.get_logger(__name__)
 
@@ -48,12 +49,14 @@ class MergingService:
         agent: "CentralAgent",
         embedder: "EmbeddingService",
         strategy: "ThinkingStrategy",
+        translator: "Translator | None" = None,
     ) -> None:
         self._registry = registry
         self._store = store
         self._agent = agent
         self._embedder = embedder
         self._strategy = strategy
+        self._translator = translator
 
     # ------------------------------------------------------------------
     # Public
@@ -152,7 +155,10 @@ class MergingService:
                 f"Summarize these merged code chunks: {domain}",
                 combined_content[:2000],
             )
-            prose = str(result)
+            if self._translator is not None:
+                prose = await self._translator.synthesize("", [result])
+            else:
+                prose = f"# {domain}\n\n"
         except Exception as exc:
             log.warning("merging.reason_failed", error=str(exc))
             prose = f"# {domain}\n\n(merged bucket)"

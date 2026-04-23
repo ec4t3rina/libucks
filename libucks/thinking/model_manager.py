@@ -25,6 +25,7 @@ class ModelManager:
         self,
         model_id: str,
         quantization: str = "none",
+        bnb_4bit_compute_dtype: str = "float32",
         device: str = "auto",
     ) -> None:
         """Load model and tokenizer from HuggingFace hub or local cache."""
@@ -32,11 +33,17 @@ class ModelManager:
 
         import torch
 
+        _DTYPE_MAP = {"float16": torch.float16, "float32": torch.float32, "bfloat16": torch.bfloat16}
+        _compute_dtype = _DTYPE_MAP.get(bnb_4bit_compute_dtype, torch.float32)
+
         kwargs: dict = {"device_map": resolved_device}
 
         if quantization == "4bit":
             from transformers import BitsAndBytesConfig
-            kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
+            kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=_compute_dtype,
+            )
         elif quantization == "8bit":
             from transformers import BitsAndBytesConfig
             kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
@@ -93,6 +100,7 @@ class ModelManager:
         self,
         model_id: str,
         quantization: str = "none",
+        bnb_4bit_compute_dtype: str = "float32",
         device: str = "auto",
     ) -> None:
         """Load the Base receiver model for latent injection (Interlat-Lite decoder).
@@ -104,11 +112,17 @@ class ModelManager:
 
         import torch
 
+        _DTYPE_MAP = {"float16": torch.float16, "float32": torch.float32, "bfloat16": torch.bfloat16}
+        _compute_dtype = _DTYPE_MAP.get(bnb_4bit_compute_dtype, torch.float32)
+
         kwargs: dict = {"device_map": resolved_device}
 
         if quantization == "4bit":
             from transformers import BitsAndBytesConfig
-            kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
+            kwargs["quantization_config"] = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=_compute_dtype,
+            )
         elif quantization == "8bit":
             from transformers import BitsAndBytesConfig
             kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)

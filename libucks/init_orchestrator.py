@@ -7,7 +7,7 @@ import hashlib
 import random
 import struct
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
 import structlog
@@ -22,6 +22,9 @@ from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
 from libucks.thinking.base import ThinkingStrategy
 from libucks.thinking.context_condenser import ContextCondenser
+
+if TYPE_CHECKING:
+    from libucks.translator import Translator
 
 log = structlog.get_logger(__name__)
 
@@ -113,38 +116,13 @@ def _n_clusters(total_tokens: int, target_tokens: int, n_chunks: int) -> int:
     return max(1, min(total_tokens // target_tokens, n_chunks))
 
 
-def _parse_title_and_prose(response: str, fallback_label: str) -> Tuple[str, str]:
-    """Parse a TITLE: / --- structured LLM response.
-
-    Expected format::
-
-        TITLE: <5-10 word aspect title>
-        ---
-        <prose summary>
-
-    Falls back to *fallback_label* as the title (and full response as prose)
-    if the expected structure is not found.
-    """
-    lines = response.strip().splitlines()
-    title = fallback_label
-    prose = response.strip()
-
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith("TITLE:"):
-            title = stripped[len("TITLE:"):].strip()
-            # Find the --- separator following the TITLE line.
-            for j in range(i + 1, len(lines)):
-                if lines[j].strip() == "---":
-                    prose = "\n".join(lines[j + 1:]).strip()
-                    break
-            break
-
-    return title, prose
-
-
 class InitOrchestrator:
-    def __init__(self, repo_path: Path, strategy: Optional[ThinkingStrategy] = None) -> None:
+    def __init__(
+        self,
+        repo_path: Path,
+        strategy: Optional[ThinkingStrategy] = None,
+        translator: Optional["Translator"] = None,
+    ) -> None:
         self._repo = repo_path.resolve()
         self._cfg = Config.load(self._repo)
         bucket_dir = self._repo / self._cfg.paths.bucket_dir
@@ -154,6 +132,7 @@ class InitOrchestrator:
         self._parser = ASTParser()
         self._embedder = EmbeddingService.get_instance(self._cfg.model.embedding_model)
         self._strategy = strategy
+        self._translator = translator
         self._condenser = ContextCondenser()
         self._aspect_mapper = AspectMapper()
         self._sem = asyncio.Semaphore(_PROSE_CONCURRENCY)
@@ -257,20 +236,18 @@ class InitOrchestrator:
     # ------------------------------------------------------------------
 
     async def _generate_prose(self, data: dict) -> dict:
-        """Call strategy.reason() with semaphore + jittered-exponential retry on 429."""
+        """Encode the cluster via strategy.reason(), decode via Translator, return prose."""
         digest = self._condenser.condense(data["cluster_chunks"], budget_tokens=_CONDENSER_BUDGET)
         prompt = (
-            "Analyze this code and respond in EXACTLY this format:\n"
-            "TITLE: <5-10 word aspect title>\n"
-            "---\n"
-            "<2-3 paragraph summary of what this code does, its main functions, and purpose>"
+            "Summarize what this code does: its main functions, purpose, and key design decisions. "
+            "Be concise and technical. 2-3 paragraphs."
         )
 
-        raw_response: str = ""
+        latent = None
         for attempt in range(_MAX_RETRIES):
             async with self._sem:
                 try:
-                    raw_response = str(await self._strategy.reason(prompt, digest))
+                    latent = await self._strategy.reason(prompt, digest)
                     break
                 except Exception as exc:
                     is_rate_limit = "429" in str(exc) or "rate_limit" in str(exc).lower()
@@ -281,7 +258,6 @@ class InitOrchestrator:
                             attempt=attempt,
                             error=str(exc),
                         )
-                        raw_response = ""
                         break
                     delay = _RETRY_BASE_DELAY * (2 ** attempt) + random.uniform(0, 1)
                     log.warning(
@@ -292,7 +268,11 @@ class InitOrchestrator:
                     )
                     await asyncio.sleep(delay)
 
-        title, prose = _parse_title_and_prose(raw_response, data["fallback_label"])
+        prose = ""
+        if latent is not None and self._translator is not None:
+            prose = await self._translator.synthesize("", [latent])
+
+        title = data["fallback_label"]
 
         # Blend title embedding into centroid (α=0.2 title, 0.8 chunk mean).
         title_embed = self._embedder.embed(title).astype(np.float32)

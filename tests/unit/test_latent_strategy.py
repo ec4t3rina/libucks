@@ -110,6 +110,16 @@ def strategy(mgr: MagicMock) -> LatentStrategy:
     return LatentStrategy(mgr)
 
 
+@pytest.fixture
+def mgr_with_base() -> MagicMock:
+    return _make_mock_mgr_with_base()
+
+
+@pytest.fixture
+def strategy_with_base(mgr_with_base: MagicMock) -> LatentStrategy:
+    return LatentStrategy(mgr_with_base)
+
+
 # ---------------------------------------------------------------------------
 # encode()
 # ---------------------------------------------------------------------------
@@ -199,52 +209,67 @@ class TestLatentStrategyReason:
 
 
 # ---------------------------------------------------------------------------
-# decode() — interface contracts that survive the NormMatch rewrite
+# decode() — interface contracts (Interlat-Lite Base receiver path)
 # ---------------------------------------------------------------------------
 
 class TestLatentStrategyDecode:
-    async def test_decode_returns_str(self, strategy):
+    """decode() must use the Base model (not Instruct) and produce a str."""
+
+    async def test_decode_returns_str(self, strategy_with_base):
         tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
-        result = await strategy.decode(tensor)
+        result = await strategy_with_base.decode(tensor)
         assert isinstance(result, str)
 
-    async def test_decode_calls_tokenizer_decode(self, strategy, mgr):
+    async def test_decode_calls_base_tokenizer_decode(self, strategy_with_base, mgr_with_base):
         tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
-        await strategy.decode(tensor)
-        mgr.get_tokenizer().decode.assert_called_once()
+        await strategy_with_base.decode(tensor)
+        mgr_with_base.get_base_tokenizer().decode.assert_called_once()
 
-    async def test_decode_result_matches_tokenizer_output(self, strategy, mgr):
-        mgr.get_tokenizer().decode.return_value = "Expected answer string."
+    async def test_decode_result_matches_base_tokenizer_output(
+        self, strategy_with_base, mgr_with_base
+    ):
+        mgr_with_base.get_base_tokenizer().decode.return_value = "Expected answer string."
         tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
-        result = await strategy.decode(tensor)
+        result = await strategy_with_base.decode(tensor)
         assert result == "Expected answer string."
 
-    async def test_decode_passes_skip_special_tokens(self, strategy, mgr):
+    async def test_decode_passes_skip_special_tokens(self, strategy_with_base, mgr_with_base):
         tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
-        await strategy.decode(tensor)
-        decode_call_kwargs = mgr.get_tokenizer().decode.call_args[1]
+        await strategy_with_base.decode(tensor)
+        decode_call_kwargs = mgr_with_base.get_base_tokenizer().decode.call_args[1]
         assert decode_call_kwargs.get("skip_special_tokens") is True
 
-    async def test_decode_accepts_batched_tensor(self, strategy):
-        """decode() should handle both (seq_len, d) and (1, seq_len, d) input."""
+    async def test_decode_accepts_batched_tensor(self, strategy_with_base):
+        """decode() must handle (K, d) and (1, K, d) input shapes."""
         tensor_2d = torch.randn(SEQ_LEN, HIDDEN_DIM)
         tensor_3d = torch.randn(1, SEQ_LEN, HIDDEN_DIM)
-        result_2d = await strategy.decode(tensor_2d)
-        result_3d = await strategy.decode(tensor_3d)
+        result_2d = await strategy_with_base.decode(tensor_2d)
+        result_3d = await strategy_with_base.decode(tensor_3d)
         assert isinstance(result_2d, str)
         assert isinstance(result_3d, str)
 
+    async def test_decode_uses_base_model_not_instruct(self, strategy_with_base, mgr_with_base):
+        tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
+        await strategy_with_base.decode(tensor)
+        mgr_with_base.get_base_model.assert_called()
+        mgr_with_base.get_model.assert_not_called()
 
-# ---------------------------------------------------------------------------
-# decode() — NormMatch + inputs_embeds injection (new contract)
-# ---------------------------------------------------------------------------
+    async def test_decode_injects_framed_tensor_as_inputs_embeds(
+        self, strategy_with_base, mgr_with_base
+    ):
+        """decode() must inject the framed tensor via inputs_embeds on the prefix pass."""
+        tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
+        await strategy_with_base.decode(tensor)
+        base_model = mgr_with_base.get_base_model()
+        calls_with_embeds = [
+            c for c in base_model.call_args_list if "inputs_embeds" in c.kwargs
+        ]
+        assert len(calls_with_embeds) >= 1
 
-class TestLatentStrategyDecodeNormMatch:
-    """Tests for the NormMatch + inputs_embeds injection path.
 
-    Written BEFORE the implementation (TDD).  All tests in this class FAIL
-    on the old code which uses lm_head + argmax.
-    """
+class _DeletedNormMatchTests:
+    """DELETED — NormMatch/Residual Anchoring decode() path removed in Phase B.
+    Tests below are tombstoned to prevent re-introduction."""
 
     async def test_anchor_prompt_constant_is_module_level(self):
         """_ANCHOR_PROMPT must be defined at module level in latent_strategy
@@ -441,16 +466,8 @@ class TestLatentStrategyDecodeNormMatch:
         assert isinstance(r3, str)
 
 
-# ---------------------------------------------------------------------------
-# decode() — Residual Anchoring (dummy baseline + gate + position IDs)
-# ---------------------------------------------------------------------------
-
-class TestLatentStrategyDecodeResidualAnchoring:
-    """Tests for Text-Based Residual Injection (Vision Wormhole Eq. 2).
-
-    Written BEFORE the implementation (TDD).  All tests that exercise new
-    behaviour FAIL on the current code.
-    """
+class _DeletedResidualAnchoringTests:
+    """DELETED — Residual Anchoring decode() path removed in Phase B."""
 
     async def test_decode_embed_tokens_called_twice(self, strategy, mgr):
         """embed_tokens must be called twice: once for the dummy baseline,
@@ -625,6 +642,14 @@ class TestLatentStrategyInterface:
         strategy = LatentStrategy()
         assert strategy._mgr is None
 
+    def test_injection_gate_configurable(self, mgr):
+        strategy = LatentStrategy(mgr, injection_gate=0.42)
+        assert strategy._injection_gate == 0.42
+
+    def test_default_injection_gate_is_0_3(self):
+        strategy = LatentStrategy()
+        assert strategy._injection_gate == 0.3
+
 
 # ---------------------------------------------------------------------------
 # decode() — Sampling: temperature, top-p, repetition penalty
@@ -721,19 +746,19 @@ class TestLatentStrategySampling:
 
     # --- Integration: decode() uses sampling ---
 
-    async def test_decode_uses_sampling_not_argmax(self, mgr):
+    async def test_decode_uses_sampling_not_argmax(self, mgr_with_base):
         """decode() must delegate to _sample_next_token for every generated token."""
         from unittest.mock import patch
-        s = LatentStrategy(mgr)
+        s = LatentStrategy(mgr_with_base)
         tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
 
         call_count = 0
         original = s._sample_next_token
 
-        def counting_sample(logits, generated_ids):
+        def counting_sample(logits, generated_ids, **kwargs):
             nonlocal call_count
             call_count += 1
-            return original(logits, generated_ids)
+            return original(logits, generated_ids, **kwargs)
 
         with patch.object(s, "_sample_next_token", side_effect=counting_sample):
             await s.decode(tensor)
@@ -748,8 +773,23 @@ class TestLatentStrategySampling:
 # ---------------------------------------------------------------------------
 
 def _make_base_model_mock() -> MagicMock:
-    """Mock Base model for receive() tests — no embed_tokens.weight needed."""
+    """Mock Base model for decode() tests.
+
+    decode() now does framing internally:
+      - embed_tokens is called with single-element tensors to get bop/eop embeddings
+      - model is called with inputs_embeds (framed tensor) → returns logits
+    """
     m = MagicMock()
+    m.model = MagicMock()
+    # embed_tokens: called with shape (1,) to look up bop/eop → return (1, HIDDEN_DIM)
+    # so .squeeze(0) gives (HIDDEN_DIM,) and .view(1, -1) gives (1, HIDDEN_DIM)
+    embed_tokens = MagicMock()
+    embed_tokens.return_value = torch.randn(1, HIDDEN_DIM)
+    # weight must be a real tensor so decode()'s embed_norm rescaling works:
+    # embedding_layer.weight.dtype, .data.norm(dim=-1).median() are called.
+    embed_tokens.weight = torch.randn(VOCAB_SIZE, HIDDEN_DIM)
+    m.model.embed_tokens = embed_tokens
+
     out = MagicMock()
     logits = torch.full((1, 1, VOCAB_SIZE), -1.0)
     logits[0, 0, 100] = 10.0  # always predicts token 100 (non-EOS)
@@ -761,12 +801,13 @@ def _make_base_model_mock() -> MagicMock:
 
 
 def _make_mock_mgr_with_base(seq_len: int = SEQ_LEN) -> MagicMock:
-    """ModelManager mock that has both instruct and base model/tokenizer."""
+    """ModelManager mock that has both instruct encoder and base receiver."""
     mgr = _make_mock_mgr(seq_len)
-    # Base tokenizer
+    # Base tokenizer — convert_tokens_to_ids returns an int for bop/eop lookup
     base_tok = MagicMock()
     base_tok.eos_token_id = 2
     base_tok.decode.return_value = "Fetches the user profile from the database."
+    base_tok.convert_tokens_to_ids.return_value = 100  # any int works
     mgr.get_base_tokenizer.return_value = base_tok
     # Base model
     base_model = _make_base_model_mock()
@@ -774,95 +815,80 @@ def _make_mock_mgr_with_base(seq_len: int = SEQ_LEN) -> MagicMock:
     return mgr
 
 
-class TestLatentStrategyReceive:
-    """Tests for LatentStrategy.receive() — the Interlat-Lite decode path.
+class TestLatentStrategyDecodeBaseReceiver:
+    """Tests for LatentStrategy.decode() — the Interlat-Lite Base receiver path.
 
-    receive() is the ONLY authorised path for decoding in the latent pipeline.
+    decode() is the ONLY authorised path for decoding in the latent pipeline.
+    It accepts an unframed (K, D) soft-prompt, frames it internally with
+    <|im_start|>/<|im_end|> embeddings, and runs the LoRA-trained Base receiver.
     It must use the Base model (not Instruct) and must NOT apply NormMatch or
-    Residual Anchoring — the Base model has been LoRA-trained to accept raw
-    framed latents directly.
+    Residual Anchoring.
     """
 
     @pytest.fixture
-    def mgr_with_base(self) -> MagicMock:
-        return _make_mock_mgr_with_base()
-
-    @pytest.fixture
-    def strategy_with_base(self, mgr_with_base: MagicMock) -> LatentStrategy:
-        return LatentStrategy(mgr_with_base)
-
-    @pytest.fixture
-    def framed_latent(self) -> torch.Tensor:
-        """Shape (K+2, D) — includes bop/eop rows."""
+    def soft_prompt(self) -> torch.Tensor:
+        """Unframed soft-prompt of shape (K, D) — as output by the CommunicationAdapter."""
         K = 8
-        return torch.randn(K + 2, HIDDEN_DIM)
+        return torch.randn(K, HIDDEN_DIM)
 
-    async def test_receive_returns_str(self, strategy_with_base, framed_latent):
-        """receive() must return a plain string."""
-        result = await strategy_with_base.receive(framed_latent)
+    async def test_decode_returns_str(self, strategy_with_base, soft_prompt):
+        """decode() must return a plain string."""
+        result = await strategy_with_base.decode(soft_prompt)
         assert isinstance(result, str)
 
-    async def test_receive_uses_base_model_not_instruct(
-        self, strategy_with_base, mgr_with_base, framed_latent
+    async def test_decode_uses_base_model_not_instruct(
+        self, strategy_with_base, mgr_with_base, soft_prompt
     ):
-        """receive() must call get_base_model(), not get_model()."""
-        await strategy_with_base.receive(framed_latent)
+        """decode() must call get_base_model(), not get_model()."""
+        await strategy_with_base.decode(soft_prompt)
         mgr_with_base.get_base_model.assert_called()
         mgr_with_base.get_model.assert_not_called()
 
-    async def test_receive_uses_base_tokenizer_not_instruct(
-        self, strategy_with_base, mgr_with_base, framed_latent
+    async def test_decode_uses_base_tokenizer_not_instruct(
+        self, strategy_with_base, mgr_with_base, soft_prompt
     ):
-        """receive() must call get_base_tokenizer(), not get_tokenizer()."""
-        await strategy_with_base.receive(framed_latent)
+        """decode() must call get_base_tokenizer(), not get_tokenizer()."""
+        await strategy_with_base.decode(soft_prompt)
         mgr_with_base.get_base_tokenizer.assert_called()
         mgr_with_base.get_tokenizer.assert_not_called()
 
-    async def test_receive_does_not_use_normatch(
-        self, strategy_with_base, mgr_with_base, framed_latent
+    async def test_decode_uses_embed_tokens_for_framing(
+        self, strategy_with_base, mgr_with_base, soft_prompt
     ):
-        """receive() must NOT call embed_tokens — NormMatch is absent.
+        """decode() must call embed_tokens to look up bop/eop boundary embeddings.
 
-        decode() calls model.model.embed_tokens() twice (dummy baseline + anchor).
-        receive() must call it zero times.
+        Framing: [e(<bop>), h_1, ..., h_K, e(<eop>)]
+        embed_tokens is called exactly twice (once per boundary token).
         """
-        await strategy_with_base.receive(framed_latent)
+        await strategy_with_base.decode(soft_prompt)
         base_model = mgr_with_base.get_base_model()
-        # If NormMatch were present, base_model.model.embed_tokens() would be invoked.
-        # MagicMock tracks child-attribute call counts:
         embed_tokens_call_count = base_model.model.embed_tokens.call_count
-        assert embed_tokens_call_count == 0, (
-            f"receive() called embed_tokens {embed_tokens_call_count} time(s); "
-            "NormMatch must be absent from the Base receiver path"
+        assert embed_tokens_call_count == 2, (
+            f"decode() must call embed_tokens twice (bop + eop); "
+            f"got {embed_tokens_call_count}"
         )
 
-    async def test_receive_calls_base_model_with_inputs_embeds(
-        self, strategy_with_base, mgr_with_base, framed_latent
+    async def test_decode_calls_base_model_with_inputs_embeds(
+        self, strategy_with_base, mgr_with_base, soft_prompt
     ):
-        """receive() must inject the framed tensor as inputs_embeds."""
-        await strategy_with_base.receive(framed_latent)
+        """decode() must inject the framed tensor as inputs_embeds."""
+        await strategy_with_base.decode(soft_prompt)
         base_model = mgr_with_base.get_base_model()
-        # At least one call must use inputs_embeds
         calls_with_embeds = [
             c for c in base_model.call_args_list
             if "inputs_embeds" in c.kwargs
         ]
         assert len(calls_with_embeds) >= 1, (
-            "receive() must pass inputs_embeds to the base model"
+            "decode() must pass inputs_embeds to the base model"
         )
 
-    async def test_receive_accepts_2d_framed_latent(
-        self, strategy_with_base, framed_latent
-    ):
-        """framed_latent of shape (K+2, D) must work — no batch dim needed."""
-        assert framed_latent.dim() == 2
-        result = await strategy_with_base.receive(framed_latent)
+    async def test_decode_accepts_2d_soft_prompt(self, strategy_with_base, soft_prompt):
+        """Soft-prompt of shape (K, D) must work — no batch dim needed."""
+        assert soft_prompt.dim() == 2
+        result = await strategy_with_base.decode(soft_prompt)
         assert isinstance(result, str)
 
     @pytest.mark.skip(reason="Requires GPU + trained LoRA weights — integration only")
-    async def test_receive_returns_coherent_string_after_training(self):
-        """After training, receive() must produce alphabetic parseable English.
-
-        This test is skipped in CI — run manually after LoRA fine-tuning completes.
-        """
+    async def test_decode_returns_coherent_string_after_training(self):
+        """After training, decode() must produce alphabetic parseable English."""
         pass

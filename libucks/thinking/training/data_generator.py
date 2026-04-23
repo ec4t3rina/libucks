@@ -1,6 +1,6 @@
 """MultiPerspectiveDataGenerator — produces contrastive training triplets.
 
-For each bucket, the V1 TextStrategy teacher generates three complementary
+For each bucket, the Anthropic teacher model generates three complementary
 perspectives on the bucket's prose:
   1. Summary      — what the code does, concisely
   2. Logic Flow   — control structure and algorithmic decisions
@@ -15,6 +15,8 @@ be confusing, but representing a different domain.
 
 The teacher's summary text is also encoded to form the target latent that
 the CommunicationAdapter should learn to align with.
+
+Requires the `train` optional extra: pip install libucks[train]
 """
 from __future__ import annotations
 
@@ -38,6 +40,8 @@ def _read_chunk_content(meta) -> str:
 
 def _collect_source_text(front_matter, max_chars: int = 3000) -> str:
     """Concatenate actual code content from ChunkMetadata, up to max_chars."""
+    if not hasattr(front_matter, "chunks"):
+        return ""
     parts = []
     total = 0
     for meta in front_matter.chunks:
@@ -85,26 +89,46 @@ class TrainingSample:
 
 
 class MultiPerspectiveDataGenerator:
-    """Generates TrainingSamples by combining a V1 teacher with a V2 LatentStrategy.
+    """Generates TrainingSamples using an Anthropic teacher + V2 LatentStrategy.
 
     Args:
-        text_strategy:   V1 TextStrategy (calls Anthropic API) — the teacher.
         latent_strategy: V2 LatentStrategy (local model) — produces tensors.
         registry:        BucketRegistry — for centroid-based negative mining.
         store:           BucketStore — for reading bucket prose.
+        teacher_model:   Anthropic model ID for the teacher (default: claude-haiku-4-5-20251001).
+        max_tokens:      Max tokens per teacher response.
     """
 
     def __init__(
         self,
-        text_strategy,
         latent_strategy,
         registry,
         store,
+        teacher_model: str = "claude-haiku-4-5-20251001",
+        max_tokens: int = 1024,
     ) -> None:
-        self._text_strategy = text_strategy
+        try:
+            import anthropic
+            self._client = anthropic.AsyncAnthropic()
+        except ImportError as exc:
+            raise ImportError(
+                "MultiPerspectiveDataGenerator requires anthropic. "
+                "Install with: pip install libucks[train]"
+            ) from exc
+        self._teacher_model = teacher_model
+        self._max_tokens = max_tokens
         self._latent_strategy = latent_strategy
         self._registry = registry
         self._store = store
+
+    async def _teacher_reason(self, prompt: str, context: str) -> str:
+        """Call the Anthropic teacher model and return the response text."""
+        response = await self._client.messages.create(
+            model=self._teacher_model,
+            max_tokens=self._max_tokens,
+            messages=[{"role": "user", "content": f"{prompt}\n\n{context}"}],
+        )
+        return response.content[0].text
 
     async def generate(self, bucket_id: str) -> TrainingSample:
         """Generate a TrainingSample for the given bucket.
@@ -123,11 +147,13 @@ class MultiPerspectiveDataGenerator:
         # ------------------------------------------------------------------ #
         teacher_texts: list[str] = []
         for prompt in PERSPECTIVE_PROMPTS:
-            text = await self._text_strategy.reason(prompt, prose)
+            text = await self._teacher_reason(prompt, prose)
             teacher_texts.append(text)
 
         librarian_latents: list[torch.Tensor] = []
         for text in teacher_texts:
+            if not text or not text.strip():
+                continue
             latent = await self._latent_strategy.encode(text)
             librarian_latents.append(latent)
 
@@ -188,7 +214,7 @@ class MultiPerspectiveDataGenerator:
         source_text = _collect_source_text(front_matter, max_chars=3000) or prose
 
         # Get teacher summary text from actual code (not metadata prose)
-        summary_text = await self._text_strategy.reason(PERSPECTIVE_PROMPTS[0], source_text)
+        summary_text = await self._teacher_reason(PERSPECTIVE_PROMPTS[0], source_text)
 
         # Encode via reason() to match inference-time encoding distribution
         # (_handle_query also calls strategy.reason(), not encode())
@@ -260,6 +286,8 @@ class MultiPerspectiveDataGenerator:
 
             if NEG_SIM_LO <= sim <= NEG_SIM_HI:
                 _, other_prose = self._store.read(other_id)
+                if not other_prose or not other_prose.strip():
+                    continue
                 neg_latent = await self._latent_strategy.encode(other_prose)
                 negatives.append(neg_latent)
 

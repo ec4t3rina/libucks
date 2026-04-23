@@ -163,21 +163,34 @@ class LoRAReceiverTrainer:
         """
         inputs_embeds: torch.Tensor = batch["inputs_embeds"]       # (S, D)
         target_ids: torch.Tensor = batch["target_ids"].long()      # (T,)
-        prefix_len: int = int(batch["prefix_len"])                 # K+2
+        prefix_len: int = int(batch["prefix_len"])                 # K+2+Q
 
         inputs_embeds_wrong: torch.Tensor = batch.get(
             "inputs_embeds_wrong",
             torch.zeros_like(inputs_embeds),
         )
 
+        if target_ids.shape[0] == 0:
+            raise ValueError("target_ids is empty — skip this bucket")
+
+        # use_cache=False: transformers ≥4.46 creates a DynamicCache(config=…)
+        # inside the forward when use_cache=True (the default).  In train() mode
+        # the cache's get_seq_length() can return a stale value that makes
+        # cache_position = arange(S, 2S) — an S-length range starting at S — so
+        # the model processes 0 "new" tokens, producing hidden_states of shape
+        # (1, 0, D).  Qwen2Attention then does .view(*shape[:-1], -1, head_dim)
+        # = .view(1, 0, -1, 64) on a 0-element tensor, which fails because -1 is
+        # ambiguous.  Passing use_cache=False bypasses the cache entirely.
         # ── Correct path — full gradient graph ────────────────────────────── #
-        out_correct = self.model(inputs_embeds=inputs_embeds.unsqueeze(0))
+        out_correct = self.model(inputs_embeds=inputs_embeds.unsqueeze(0),
+                                 use_cache=False)
         logits_all = out_correct.logits.squeeze(0)   # (S, V)
         del out_correct  # release 36-layer hidden_states immediately
 
         # ── Wrong path — NO gradient (halves activation memory) ───────────── #
         with torch.no_grad():
-            out_wrong = self.model(inputs_embeds=inputs_embeds_wrong.unsqueeze(0))
+            out_wrong = self.model(inputs_embeds=inputs_embeds_wrong.unsqueeze(0),
+                                   use_cache=False)
             logits_all_wrong = out_wrong.logits.squeeze(0).detach()  # (S, V)
             del out_wrong
 

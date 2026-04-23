@@ -54,15 +54,6 @@ async def main(repo_path: Path, query_text: str, lora_path: Path, top_k: int, de
 
     strategy = LatentStrategy(mgr)
 
-    # Token recycling: native Qwen chat-boundary tokens as frame markers.
-    base_tokenizer = mgr.get_base_tokenizer()
-    base_model = mgr.get_base_model()
-    bop_id = base_tokenizer.convert_tokens_to_ids("<|im_start|>")
-    eop_id = base_tokenizer.convert_tokens_to_ids("<|im_end|>")
-    embedding_layer = base_model.model.embed_tokens
-    bop_embed = embedding_layer(torch.tensor([bop_id], device=device)).squeeze(0).detach()
-    eop_embed = embedding_layer(torch.tensor([eop_id], device=device)).squeeze(0).detach()
-
     # ── Load buckets + routing ────────────────────────────────────────────────
     registry = BucketRegistry(repo_path / cfg.paths.registry_file)
     registry.load()
@@ -111,14 +102,13 @@ async def main(repo_path: Path, query_text: str, lora_path: Path, top_k: int, de
         print("No relevant context found.", file=sys.stderr)
         return
 
-    # Merge via adapter, frame with <bop>/<eop>, decode via Base receiver
+    # Merge via adapter, then decode via Base receiver (framing is done internally)
     contiguous_reps = [r.contiguous() for r in representations]
     with torch.no_grad():
         soft_prompt = adapter(contiguous_reps)            # (K, D)
-    framed = adapter.frame(soft_prompt, bop_embed, eop_embed)   # (K+2, D)
 
-    print("[query] Calling strategy.receive()...", file=sys.stderr)
-    answer = await strategy.receive(framed)
+    print("[query] Calling strategy.decode()...", file=sys.stderr)
+    answer = await strategy.decode(soft_prompt)
 
     # Answer to stdout; all logs to stderr
     print(answer)
