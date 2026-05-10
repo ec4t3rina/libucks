@@ -39,7 +39,7 @@ class EmbeddingService:
     _instance: ClassVar[Optional["EmbeddingService"]] = None
 
     def __init__(self, model_name: str = _DEFAULT_MODEL) -> None:
-        self._model = SentenceTransformer(model_name)
+        self._model = SentenceTransformer(model_name, device="cpu")
 
     # ------------------------------------------------------------------
     # Singleton access

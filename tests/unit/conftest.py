@@ -19,6 +19,11 @@ from unittest.mock import MagicMock
 def _stub_sentence_transformers() -> None:
     if "sentence_transformers" in sys.modules:
         return
+    try:
+        import sentence_transformers  # noqa: F401
+        return  # real package available — no stub needed
+    except (ImportError, NameError):
+        pass
     stub = MagicMock()
     stub.SentenceTransformer = MagicMock
     sys.modules["sentence_transformers"] = stub

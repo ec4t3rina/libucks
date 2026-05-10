@@ -21,7 +21,6 @@ os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")    # disables M
 import asyncio
 import logging
 import sys
-import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -29,36 +28,28 @@ import mcp.server.stdio
 import mcp.types as types
 from mcp.server import Server
 
-from libucks.central_agent import CentralAgent
 from libucks.config import Config
-from libucks.diff.diff_extractor import DiffExtractor
-from libucks.embeddings.embedding_service import EmbeddingService
-from libucks.git_hook_receiver import serve_socket
-from libucks.health_monitor import HealthMonitor
-from libucks.librarian import Librarian
-from libucks.merging_service import MergingService
-from libucks.mitosis import MitosisService
-from libucks.query_orchestrator import QueryOrchestrator
-from libucks.stale_checker import StaleChecker
-from libucks.startup_recovery import StartupRecovery
 from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
-from libucks.thinking import create_strategy
-from libucks.translator import Translator
 
 
 def _load_repo_path() -> Path:
     """Return the repository root.
 
     Resolution order:
-    1. LIBUCKS_REPO_PATH env var — set this in claude_desktop_config.json "env"
-       to point the server at any repo you want.
-    2. Project root inferred from __file__ — reliable fallback that is never
+    1. LIBUCKS_REPO_PATH env var — explicit override for CI/scripting.
+    2. ~/.libucks/active_repo — written by `libucks use <path>`.
+    3. Project root inferred from __file__ — reliable fallback that is never
        the filesystem root, even when Claude Desktop launches with cwd='/'.
     """
     env_path = os.environ.get("LIBUCKS_REPO_PATH")
     if env_path:
         return Path(env_path).expanduser().resolve()
+    active_repo_file = Path.home() / ".libucks" / "active_repo"
+    if active_repo_file.exists():
+        stored = active_repo_file.read_text().strip()
+        if stored:
+            return Path(stored).resolve()
     # __file__ = libucks/mcp_bridge.py → .parent = libucks/ → .parent = project root
     return Path(__file__).parent.parent.resolve()
 
@@ -66,6 +57,8 @@ def _load_repo_path() -> Path:
 async def serve() -> None:
     # Route ALL logging to stderr — stdout is reserved for MCP JSON-RPC.
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, force=True)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 
     import structlog
     structlog.configure(
@@ -85,170 +78,218 @@ async def serve() -> None:
     bucket_store_dir = repo_path / cfg.paths.bucket_dir
     print(f"[libucks] repo={repo_path}  registry={registry_path}  buckets={bucket_store_dir}", file=sys.stderr)
 
+    # Lightweight setup — no model loading yet.
     registry = BucketRegistry(registry_path)
     registry.load()
-
     store = BucketStore(bucket_store_dir)
 
-    # Pre-load the embedding model BEFORE the MCP stdio server starts.
-    # Temporarily redirect sys.stdout → sys.stderr so any remaining direct
-    # prints from model loading never reach the MCP pipe.
-    _real_stdout = sys.stdout
-    sys.stdout = sys.stderr
-    try:
-        embedder = EmbeddingService.get_instance(cfg.model.embedding_model)
-    finally:
-        sys.stdout = _real_stdout  # restore BEFORE mcp.server.stdio.stdio_server() captures it
-    strategy = create_strategy(cfg)
+    # _ready gates call_tool until background loading finishes.
+    # _state holds the objects produced by _load_heavy().
+    # _load_error holds the exception message if loading fails.
+    _ready: asyncio.Event = asyncio.Event()
+    _state: dict[str, Any] = {}
+    _load_error: list[str] = []
 
-    if cfg.model.strategy == "latent":
-        # The Base receiver (Qwen2.5-3B-Base + LoRA) must be loaded before the first
-        # query — LatentStrategy.decode() calls get_base_model() which raises if absent.
-        strategy._mgr.load_base_model(
-            model_id=cfg.model.base_model,
-            quantization=cfg.model.quantization,
-            bnb_4bit_compute_dtype=cfg.model.bnb_4bit_compute_dtype,
-            device=cfg.model.device,
-        )
-        print(f"[libucks] base receiver loaded: {cfg.model.base_model}", file=sys.stderr)
-
-        lora_path = bucket_dir / "lora_receiver.pt"
-        if lora_path.exists():
-            import torch
-            from libucks.thinking.model_manager import ModelManager as _MM
-            from libucks.thinking.training.lora_trainer import _inject_lora, _LORA_TARGETS
-            _resolved = _MM._resolve_device(cfg.model.device)
-            _inject_lora(strategy._mgr.get_base_model(), _LORA_TARGETS, r=4, alpha=4.0)
-            _state = torch.load(lora_path, map_location=_resolved, weights_only=True)
-            strategy._mgr.get_base_model().load_state_dict(_state, strict=False)
-            print(f"[libucks] LoRA receiver weights loaded from {lora_path}", file=sys.stderr)
-
-    agent = CentralAgent(registry, cfg, embed_fn=embedder.embed)
-
-    librarians: dict[str, Librarian] = {}
-    for bucket_id in registry.get_all_centroids():
-        lib = Librarian(
-            bucket_id=bucket_id,
-            store=store,
-            registry=registry,
-            strategy=strategy,
-            embedder=embedder,
-            mitosis_threshold=cfg.routing.mitosis_threshold,
-        )
-        librarians[bucket_id] = lib
-        agent.register_librarian(bucket_id, lib)
-
-    adapter = None
-    if cfg.model.strategy == "latent":
-        from libucks.thinking.communication_adapter import CommunicationAdapter
-        from libucks.thinking.model_manager import ModelManager as _MM
-        import torch
-        _adapter_device = _MM._resolve_device(cfg.model.device)
-        adapter = CommunicationAdapter()
-        adapter.load_saved_weights(bucket_dir / "adapter.pt")
-        # dtype must match the model's output dtype. ModelManager loads Qwen in
-        # float16 on MPS; float32 adapter parameters cause an MPS broadcast error.
-        _adapter_dtype = torch.float16 if _adapter_device == "mps" else None
-        adapter = adapter.to(device=_adapter_device, dtype=_adapter_dtype)
-
-    translator = Translator(strategy, adapter=adapter)
-
-    # ------------------------------------------------------------------
-    # Startup recovery: replay commits that arrived while server was offline.
-    # ------------------------------------------------------------------
-    recovery: StartupRecovery | None = None
-    try:
-        extractor = DiffExtractor(repo_path)
-        recovery = StartupRecovery(
-            repo_path=repo_path,
-            registry=registry,
-            store=store,
-            librarians=librarians,
-            extractor=extractor,
-        )
-        current_head = await recovery.run()
-        if current_head is not None:
-            registry._meta["last_indexed_head"] = current_head
-            registry._meta["watcher_pid"] = os.getpid()
-            registry.save()
-            print(f"[libucks] startup recovery complete, HEAD={current_head[:8]}", file=sys.stderr)
-    except Exception as exc:
-        # Recovery is best-effort — never block server startup.
-        print(f"[libucks] startup recovery skipped: {exc}", file=sys.stderr)
-
-    # ------------------------------------------------------------------
-    # Git hook socket listener (Phase 6-D).
-    # ------------------------------------------------------------------
-    sock_path = bucket_dir / "server.sock"
-
-    async def _on_hook_event(payload: dict) -> None:
-        """Handle a JSON event from a git hook and trigger background re-index."""
-        if recovery is None:
-            return
+    async def _load_heavy() -> None:
+        # Redirect stdout → stderr so stray HF prints never reach the MCP pipe.
+        # This is safe to do inside the background task because mcp.server.stdio
+        # has already captured the real stdout by the time this runs.
+        _real_stdout = sys.stdout
+        sys.stdout = sys.stderr
         try:
-            new_head = await recovery.run()
-            if new_head is not None:
-                registry._meta["last_indexed_head"] = new_head
-                registry.save()
-                print(f"[libucks] hook event '{payload.get('event')}' → re-indexed HEAD={new_head[:8]}", file=sys.stderr)
+            loop = asyncio.get_event_loop()
+
+            # All imports and synchronous model loading run in a thread executor so
+            # the event loop stays responsive for MCP handshake messages (initialize,
+            # list_tools) while the ~25s setup runs in the background.
+            def _sync_setup():
+                from libucks.central_agent import CentralAgent
+                from libucks.embeddings.embedding_service import EmbeddingService
+                from libucks.librarian import Librarian
+                from libucks.thinking import create_strategy
+                from libucks.translator import Translator
+
+                embedder = EmbeddingService.get_instance(cfg.model.embedding_model)
+                strategy = create_strategy(cfg)
+
+                if cfg.model.strategy == "latent":
+                    strategy._mgr.load_base_model(
+                        model_id=cfg.model.base_model,
+                        quantization=cfg.model.quantization,
+                        bnb_4bit_compute_dtype=cfg.model.bnb_4bit_compute_dtype,
+                        device=cfg.model.device,
+                    )
+                    print(f"[libucks] base receiver loaded: {cfg.model.base_model}", file=sys.stderr)
+
+                    lora_path = bucket_dir / "lora_receiver.pt"
+                    if lora_path.exists():
+                        import torch
+                        from libucks.thinking.model_manager import ModelManager as _MM
+                        from libucks.thinking.training.lora_trainer import _inject_lora, _LORA_TARGETS
+                        _resolved = _MM._resolve_device(cfg.model.device)
+                        _inject_lora(strategy._mgr.get_base_model(), _LORA_TARGETS, r=4, alpha=4.0)
+                        _lora_state = torch.load(lora_path, map_location=_resolved, weights_only=True)
+                        strategy._mgr.get_base_model().load_state_dict(_lora_state, strict=False)
+                        print(f"[libucks] LoRA receiver weights loaded from {lora_path}", file=sys.stderr)
+
+                agent = CentralAgent(registry, cfg, embed_fn=embedder.embed)
+
+                librarians: dict[str, Librarian] = {}
+                for bucket_id in registry.get_all_centroids():
+                    lib = Librarian(
+                        bucket_id=bucket_id,
+                        store=store,
+                        registry=registry,
+                        strategy=strategy,
+                        embedder=embedder,
+                        mitosis_threshold=cfg.routing.mitosis_threshold,
+                    )
+                    librarians[bucket_id] = lib
+                    agent.register_librarian(bucket_id, lib)
+
+                adapter = None
+                if cfg.model.strategy == "latent":
+                    from libucks.thinking.communication_adapter import CommunicationAdapter
+                    from libucks.thinking.model_manager import ModelManager as _MM
+                    from transformers import AutoConfig as _AC
+                    _adapter_device = _MM._resolve_device(cfg.model.device)
+                    _enc_dim  = _AC.from_pretrained(cfg.model.local_model).hidden_size
+                    _base_dim = _AC.from_pretrained(cfg.model.base_model).hidden_size
+                    adapter = CommunicationAdapter(hidden_dim=_enc_dim, output_dim=_base_dim)
+                    adapter.load_saved_weights(bucket_dir / "adapter.pt")
+                    # Read dtype from the already-loaded base model rather than guessing from
+                    # device. ModelManager loads Qwen in float16 on MPS and float32 on CPU.
+                    _adapter_dtype = strategy._mgr.get_base_model().dtype
+                    adapter = adapter.to(device=_adapter_device, dtype=_adapter_dtype)
+
+                translator = Translator(strategy, adapter=adapter)
+                return embedder, strategy, agent, librarians, adapter, translator
+
+            embedder, strategy, agent, librarians, adapter, translator = \
+                await loop.run_in_executor(None, _sync_setup)
+
+            # ------------------------------------------------------------------
+            # Startup recovery: replay commits that arrived while server was offline.
+            # ------------------------------------------------------------------
+            from libucks.diff.diff_extractor import DiffExtractor
+            from libucks.git_hook_receiver import serve_socket
+            from libucks.health_monitor import HealthMonitor
+            from libucks.merging_service import MergingService
+            from libucks.mitosis import MitosisService
+            from libucks.query_orchestrator import QueryOrchestrator
+            from libucks.stale_checker import StaleChecker
+            from libucks.startup_recovery import StartupRecovery
+
+            recovery: StartupRecovery | None = None
+            try:
+                extractor = DiffExtractor(repo_path)
+                recovery = StartupRecovery(
+                    repo_path=repo_path,
+                    registry=registry,
+                    store=store,
+                    librarians=librarians,
+                    extractor=extractor,
+                )
+                current_head = await recovery.run()
+                if current_head is not None:
+                    registry._meta["last_indexed_head"] = current_head
+                    registry._meta["watcher_pid"] = os.getpid()
+                    registry.save()
+                    print(f"[libucks] startup recovery complete, HEAD={current_head[:8]}", file=sys.stderr)
+            except Exception as exc:
+                # Recovery is best-effort — never block server startup.
+                print(f"[libucks] startup recovery skipped: {exc}", file=sys.stderr)
+
+            # ------------------------------------------------------------------
+            # Git hook socket listener (Phase 6-D).
+            #
+            # Update architecture: git post-commit hook → Unix socket → recovery.run()
+            # WatchdogService (OS file events) is intentionally NOT started here.
+            # Updates are driven by git commit boundaries, not every save. This keeps
+            # bucket state consistent with what is actually committed to the repo.
+            # WatchdogService is available as an opt-in for non-git directories but is
+            # not appropriate as the default — triggering on every file write would
+            # cause partial/uncommitted state to pollute the index.
+            # ------------------------------------------------------------------
+            sock_path = bucket_dir / "server.sock"
+
+            async def _on_hook_event(payload: dict) -> None:
+                if recovery is None:
+                    return
+                try:
+                    new_head = await recovery.run()
+                    if new_head is not None:
+                        registry._meta["last_indexed_head"] = new_head
+                        registry.save()
+                        print(f"[libucks] hook event '{payload.get('event')}' → re-indexed HEAD={new_head[:8]}", file=sys.stderr)
+                except Exception as exc:
+                    print(f"[libucks] hook event error: {exc}", file=sys.stderr)
+
+            asyncio.ensure_future(serve_socket(sock_path, _on_hook_event))
+
+            # ------------------------------------------------------------------
+            # HealthMonitor (Phase 6-E/6-F): autonomous quality guardian.
+            # ------------------------------------------------------------------
+            mitosis_svc = MitosisService(
+                store=store,
+                registry=registry,
+                embedder=embedder,
+                agent=agent,
+                strategy=strategy,
+                mitosis_threshold=cfg.routing.mitosis_threshold,
+            )
+            merging_svc = MergingService(
+                registry=registry,
+                store=store,
+                agent=agent,
+                embedder=embedder,
+                strategy=strategy,
+            )
+            health_monitor = HealthMonitor(
+                registry=registry,
+                store=store,
+                mitosis_service=mitosis_svc,
+                merging_service=merging_svc,
+                embedder=embedder,
+                mitosis_threshold=cfg.routing.mitosis_threshold,
+            )
+            asyncio.ensure_future(health_monitor.run())
+
+            # ------------------------------------------------------------------
+            # StaleChecker + reindex callback (Phase 6-C JIT invalidation).
+            # ------------------------------------------------------------------
+            stale_checker = StaleChecker(registry=registry, store=store, repo_path=repo_path)
+
+            async def _reindex_stale(stale_bucket_ids: list[str]) -> None:
+                if recovery is None:
+                    return
+                try:
+                    new_head = await recovery.run()
+                    if new_head is not None:
+                        registry._meta["last_indexed_head"] = new_head
+                        registry.save()
+                except Exception as exc:
+                    print(f"[libucks] background reindex error: {exc}", file=sys.stderr)
+
+            orchestrator = QueryOrchestrator(
+                central_agent=agent,
+                librarians=librarians,
+                embed_fn=embedder.embed,
+                top_k=cfg.routing.top_k,
+                stale_checker=stale_checker,
+                reindex_fn=_reindex_stale,
+            )
+
+            _state["orchestrator"] = orchestrator
+            _state["translator"] = translator
+            print("[libucks] ready", file=sys.stderr)
+
         except Exception as exc:
-            print(f"[libucks] hook event error: {exc}", file=sys.stderr)
-
-    asyncio.ensure_future(serve_socket(sock_path, _on_hook_event))
-
-    # ------------------------------------------------------------------
-    # HealthMonitor (Phase 6-E/6-F): autonomous quality guardian.
-    # ------------------------------------------------------------------
-    mitosis_svc = MitosisService(
-        store=store,
-        registry=registry,
-        embedder=embedder,
-        agent=agent,
-        strategy=strategy,
-        mitosis_threshold=cfg.routing.mitosis_threshold,
-    )
-    merging_svc = MergingService(
-        registry=registry,
-        store=store,
-        agent=agent,
-        embedder=embedder,
-        strategy=strategy,
-    )
-    health_monitor = HealthMonitor(
-        registry=registry,
-        store=store,
-        mitosis_service=mitosis_svc,
-        merging_service=merging_svc,
-        embedder=embedder,
-        mitosis_threshold=cfg.routing.mitosis_threshold,
-    )
-    asyncio.ensure_future(health_monitor.run())
-
-    # ------------------------------------------------------------------
-    # StaleChecker + reindex callback (Phase 6-C JIT invalidation).
-    # ------------------------------------------------------------------
-    stale_checker = StaleChecker(registry=registry, store=store, repo_path=repo_path)
-
-    async def _reindex_stale(stale_bucket_ids: list[str]) -> None:
-        """Background re-index triggered by stale query results."""
-        if recovery is None:
-            return
-        try:
-            new_head = await recovery.run()
-            if new_head is not None:
-                registry._meta["last_indexed_head"] = new_head
-                registry.save()
-        except Exception as exc:
-            print(f"[libucks] background reindex error: {exc}", file=sys.stderr)
-
-    orchestrator = QueryOrchestrator(
-        central_agent=agent,
-        librarians=librarians,
-        embed_fn=embedder.embed,
-        top_k=cfg.routing.top_k,
-        stale_checker=stale_checker,
-        reindex_fn=_reindex_stale,
-    )
+            _load_error.append(str(exc))
+            print(f"[libucks] startup failed: {exc}", file=sys.stderr)
+        finally:
+            sys.stdout = _real_stdout
+            _ready.set()
 
     server = Server("libucks")
 
@@ -276,7 +317,18 @@ async def serve() -> None:
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
+        try:
+            await asyncio.wait_for(_ready.wait(), timeout=120.0)
+        except asyncio.TimeoutError:
+            return [types.TextContent(type="text", text=
+                "libucks models are still loading (>120s). "
+                "Try again in a moment — check stderr for errors if this persists.")]
+        if _load_error:
+            return [types.TextContent(type="text", text=f"libucks startup failed: {_load_error[0]}")]
+
         if name == "libucks_query":
+            orchestrator = _state["orchestrator"]
+            translator = _state["translator"]
             query_text = arguments["query"]
             top_k = int(arguments.get("top_k", cfg.routing.top_k))
             orchestrator._top_k = top_k
@@ -308,6 +360,7 @@ async def serve() -> None:
         raise ValueError(f"Unknown tool: {name!r}")
 
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
+        asyncio.ensure_future(_load_heavy())
         await server.run(
             read_stream,
             write_stream,

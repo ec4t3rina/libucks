@@ -150,7 +150,7 @@ class TestSingleton:
         call_count = 0
         RealST = emb_module.SentenceTransformer
 
-        def tracking_ST(model_name):
+        def tracking_ST(model_name, **kwargs):
             nonlocal call_count
             call_count += 1
             return RealST(model_name)

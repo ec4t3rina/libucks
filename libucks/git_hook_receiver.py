@@ -71,39 +71,94 @@ async def serve_socket(sock_path: Path, on_event: OnEventFn) -> None:
 # ---------------------------------------------------------------------------
 
 _HOOK_EVENTS = ["post-commit", "post-checkout", "post-rewrite"]
-_HOOK_LINE = "libucks hook {event} \"$@\" || true"
+# Absolute path to the libucks binary is baked in so git's sterile hook shell
+# doesn't need the venv on PATH.  LIBUCKS_REPO_PATH ensures the correct socket
+# is found when the indexed subdirectory differs from the git root.
+_HOOK_LINE = "LIBUCKS_REPO_PATH={libucks_path} {libucks_bin} hook {event} \"$@\" || true"
 
 
-def install_hooks(repo_path: Path) -> list[str]:
+def find_git_root(path: Path) -> Path:
+    """Walk up from *path* until a directory containing ``.git/`` is found.
+
+    Raises RuntimeError if no git root exists above *path*.
+    """
+    current = path.resolve()
+    while True:
+        if (current / ".git").exists():
+            return current
+        parent = current.parent
+        if parent == current:
+            raise RuntimeError(f"No .git directory found above {path}")
+        current = parent
+
+
+_LIBUCKS_MARKER = "libucks hook"
+
+
+def install_hooks(
+    libucks_path: Path,
+    git_root: Path | None = None,
+    force: bool = False,
+    libucks_bin: str | None = None,
+) -> tuple[list[str], Path]:
     """Append libucks trigger lines to .git/hooks/.
 
-    Rules:
+    *libucks_path* is the directory libucks tracks (contains ``.libucks/``).
+    *git_root*     is where ``.git/`` lives; auto-detected by walking up from
+                   *libucks_path* when not supplied.
+    *force*        remove any existing libucks trigger lines first, then
+                   re-install fresh ones (use to fix stale/mismatched hooks).
+    *libucks_bin*  absolute path to the libucks executable; resolved via
+                   ``shutil.which`` when omitted.
+
+    Rules (normal mode):
     - If the hook file does not exist: create it with a ``#!/bin/sh`` shebang.
     - If it exists but already contains our trigger: skip (idempotent).
-    - Always appends — never overwrites existing content.
-    - Sets executable bit on newly created files.
+    - Always appends — never overwrites non-libucks content.
+    - Sets executable bit on every modified file.
 
-    Returns the list of hook names that were modified.
+    Returns ``(modified_hook_names, hooks_dir)``.
     """
-    hooks_dir = repo_path / ".git" / "hooks"
+    import shutil as _shutil
+    if libucks_bin is None:
+        libucks_bin = _shutil.which("libucks") or "libucks"
+
+    if git_root is None:
+        git_root = find_git_root(libucks_path)
+
+    hooks_dir = git_root / ".git" / "hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
 
+    abs_libucks = libucks_path.resolve()
     modified: list[str] = []
     for event in _HOOK_EVENTS:
-        trigger = _HOOK_LINE.format(event=event)
+        trigger = _HOOK_LINE.format(
+            libucks_path=abs_libucks, libucks_bin=libucks_bin, event=event
+        )
         hook_file = hooks_dir / event
 
         if hook_file.exists():
             existing = hook_file.read_text()
-            if trigger in existing:
+
+            if force:
+                # Strip ALL existing libucks trigger lines (any format/path).
+                clean_lines = [
+                    ln for ln in existing.splitlines()
+                    if _LIBUCKS_MARKER not in ln
+                ]
+                existing = "\n".join(clean_lines).rstrip("\n")
+
+            elif trigger in existing:
                 log.debug("git_hook_receiver.hook_already_installed", hook_event=event)
                 continue
+
             hook_file.write_text(existing.rstrip("\n") + "\n" + trigger + "\n")
         else:
             hook_file.write_text(f"#!/bin/sh\n{trigger}\n")
-            hook_file.chmod(0o755)
 
+        # Always ensure executable — covers both new files and appended existing ones.
+        hook_file.chmod(0o755)
         modified.append(event)
         log.info("git_hook_receiver.hook_installed", hook_event=event, path=str(hook_file))
 
-    return modified
+    return modified, hooks_dir

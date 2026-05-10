@@ -33,6 +33,8 @@ def mock_adapter():
     # Translator.__init__ calls adapter.to(device); make it return the adapter itself
     # so self._adapter is the same object the test has a reference to.
     adapter.to.return_value = adapter
+    # _synthesize_latent calls next(adapter.parameters()).dtype to determine cast dtype.
+    adapter.parameters.side_effect = lambda: iter([torch.zeros(1)])
     return adapter
 
 

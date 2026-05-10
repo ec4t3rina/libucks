@@ -75,31 +75,41 @@ class ContrastiveAdapterTrainer:
         target: torch.Tensor,       # (seq_len_t, d) — positive
         negatives: List[torch.Tensor],  # each (seq_len_n, d)
     ) -> torch.Tensor:
-        """InfoNCE loss between the adapter's output and the teacher's target.
+        """Per-slot InfoNCE: each of K outputs has its own contrastive problem.
 
-        All tensors are mean-pooled to (d,) and L2-normalised before the
-        similarity computation so the loss is purely directional.
+        The earlier mean-pooled version collapsed K → 1 before similarity, which
+        removed all pressure to keep slots distinct (32 identical vectors and
+        32 distinct ones with the same mean produce the same loss). Per-slot
+        supervision gives each slot its own gradient signal — see the long
+        docstring on `_mse_distillation_loss` for the same lesson learned in
+        the small-repo path.
+
+        Targets and negatives are linearly resampled from their native length
+        to K via F.interpolate (same trick the MSE fallback uses).
         """
-        a = self._pool(anchor.to(self.device))
-        p = self._pool(target.to(self.device).clone().detach())
-
-        pos_sim = torch.dot(a, p) / self.temperature
-
-        # If fewer than min_negatives hard negatives were mined (e.g. a tiny
-        # repo with only 1-2 buckets), InfoNCE degenerates — fall back to a
-        # direct MSE alignment between adapter output and teacher target.
         if len(negatives) < self.min_negatives:
             return self._mse_distillation_loss(anchor, target)
-        effective_negatives = negatives
 
-        neg_sims = torch.stack([
-            torch.dot(a, self._pool(neg.to(self.device).clone().detach())) / self.temperature
-            for neg in effective_negatives
-        ])
+        K = anchor.shape[0]
+        a = F.normalize(anchor.to(self.device), dim=-1)               # (K, d)
 
-        # log-sum-exp over [positive, negatives]
-        all_sims = torch.cat([pos_sim.unsqueeze(0), neg_sims])
-        return -pos_sim + torch.logsumexp(all_sims, dim=0)
+        def _to_K(x: torch.Tensor) -> torch.Tensor:
+            x = x.to(self.device).clone().detach()                    # (seq_len, d)
+            x_K = F.interpolate(
+                x.T.unsqueeze(0), size=K, mode="linear", align_corners=False,
+            ).squeeze(0).T                                            # (K, d)
+            return F.normalize(x_K, dim=-1)
+
+        p = _to_K(target)                                             # (K, d)
+        pos_sim = (a * p).sum(dim=-1) / self.temperature              # (K,)
+
+        neg_K = torch.stack([_to_K(n) for n in negatives])            # (Nneg, K, d)
+        neg_sims = (neg_K * a.unsqueeze(0)).sum(dim=-1) / self.temperature  # (Nneg, K)
+
+        # K parallel InfoNCE problems; mean over slots so total loss scale
+        # matches the prior single-vector version.
+        all_sims = torch.cat([pos_sim.unsqueeze(0), neg_sims], dim=0) # (1+Nneg, K)
+        return (-pos_sim + torch.logsumexp(all_sims, dim=0)).mean()   # scalar
 
     def train_step(self, sample: TrainingSample) -> float:
         """Single optimisation step. Returns the scalar loss value."""
@@ -120,6 +130,14 @@ class ContrastiveAdapterTrainer:
             loss = self.contrastive_loss(
                 output, sample.target_latent, sample.hard_negatives
             )
+            # Diversity regularizer: penalize high inter-slot cosine. Squared so
+            # collapsed slots (cos→1) cost ~1, diverse slots (cos≈0) cost ~0.
+            # Belt-and-braces against the slot collapse measured Nov 2026 even
+            # after the per-slot InfoNCE + adapter residual fixes.
+            sp_unit = F.normalize(output, dim=-1)
+            K = output.shape[0]
+            inter_cos = (sp_unit @ sp_unit.T) - torch.eye(K, device=output.device)
+            loss = loss + 0.5 * inter_cos.pow(2).mean()
 
         if self._scaler is not None:
             self._scaler.scale(loss).backward()

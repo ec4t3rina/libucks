@@ -257,12 +257,12 @@ class TestLatentStrategyDecode:
     async def test_decode_injects_framed_tensor_as_inputs_embeds(
         self, strategy_with_base, mgr_with_base
     ):
-        """decode() must inject the framed tensor via inputs_embeds on the prefix pass."""
+        """decode() must pass inputs_embeds to model.generate() (not a direct forward call)."""
         tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
         await strategy_with_base.decode(tensor)
         base_model = mgr_with_base.get_base_model()
         calls_with_embeds = [
-            c for c in base_model.call_args_list if "inputs_embeds" in c.kwargs
+            c for c in base_model.generate.call_args_list if "inputs_embeds" in c.kwargs
         ]
         assert len(calls_with_embeds) >= 1
 
@@ -747,24 +747,28 @@ class TestLatentStrategySampling:
     # --- Integration: decode() uses sampling ---
 
     async def test_decode_uses_sampling_not_argmax(self, mgr_with_base):
-        """decode() must delegate to _sample_next_token for every generated token."""
-        from unittest.mock import patch
+        """decode() must use nucleus sampling (do_sample=True), not greedy argmax.
+
+        Beam search (num_beams=4) is confirmed incompatible with 4-bit MPS: batch
+        expansion to beam_count collapses all beams to EOS after 1 token on
+        mps_bitsandbytes Linear4bit layers. Nucleus sampling achieves the same
+        anti-greedy goal with no batch expansion.
+        """
         s = LatentStrategy(mgr_with_base)
         tensor = torch.randn(SEQ_LEN, HIDDEN_DIM)
+        await s.decode(tensor)
 
-        call_count = 0
-        original = s._sample_next_token
+        base_model = mgr_with_base.get_base_model()
+        generate_calls = base_model.generate.call_args_list
+        assert generate_calls, "model.generate() was not called during decode()"
 
-        def counting_sample(logits, generated_ids, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            return original(logits, generated_ids, **kwargs)
-
-        with patch.object(s, "_sample_next_token", side_effect=counting_sample):
-            await s.decode(tensor)
-
-        assert call_count >= 1, (
-            "_sample_next_token must be called at least once during decode()"
+        call_kwargs = generate_calls[0].kwargs
+        assert call_kwargs.get("do_sample") is True, (
+            f"decode() must use nucleus sampling (do_sample=True); got {call_kwargs.get('do_sample')}"
+        )
+        temperature = call_kwargs.get("temperature", 0)
+        assert temperature > 0, (
+            f"decode() must pass temperature > 0 for sampling; got temperature={temperature}"
         )
 
 
@@ -775,9 +779,9 @@ class TestLatentStrategySampling:
 def _make_base_model_mock() -> MagicMock:
     """Mock Base model for decode() tests.
 
-    decode() now does framing internally:
+    decode() does framing internally:
       - embed_tokens is called with single-element tensors to get bop/eop embeddings
-      - model is called with inputs_embeds (framed tensor) → returns logits
+      - model.generate() is called with inputs_embeds → returns generated token IDs
     """
     m = MagicMock()
     m.model = MagicMock()
@@ -790,12 +794,9 @@ def _make_base_model_mock() -> MagicMock:
     embed_tokens.weight = torch.randn(VOCAB_SIZE, HIDDEN_DIM)
     m.model.embed_tokens = embed_tokens
 
-    out = MagicMock()
-    logits = torch.full((1, 1, VOCAB_SIZE), -1.0)
-    logits[0, 0, 100] = 10.0  # always predicts token 100 (non-EOS)
-    out.logits = logits
-    out.past_key_values = MagicMock()
-    m.return_value = out
+    # generate() returns only the newly generated token IDs (not the prefix).
+    # Shape (1, n_generated) — a single EOS token is sufficient for unit tests.
+    m.generate.return_value = torch.tensor([[2]])  # token 2 = EOS
     m.side_effect = None
     return m
 
@@ -855,31 +856,34 @@ class TestLatentStrategyDecodeBaseReceiver:
     async def test_decode_uses_embed_tokens_for_framing(
         self, strategy_with_base, mgr_with_base, soft_prompt
     ):
-        """decode() must call embed_tokens to look up bop/eop boundary embeddings.
+        """decode() must call embed_tokens exactly for bop, eop, and assistant-cue tokens.
 
-        Framing: [e(<bop>), h_1, ..., h_K, e(<eop>)]
-        embed_tokens is called exactly twice (once per boundary token).
+        Current framing: [e(<bop>), soft_prompt, e(<eop>), optional_query, e(asst_cue)]
+        embed_tokens is called exactly 3 times when no query is passed:
+          1. bop  — <|im_start|>
+          2. eop  — <|im_end|>
+          3. asst — <|im_start|>assistant\\n  (always appended unconditionally)
         """
         await strategy_with_base.decode(soft_prompt)
         base_model = mgr_with_base.get_base_model()
         embed_tokens_call_count = base_model.model.embed_tokens.call_count
-        assert embed_tokens_call_count == 2, (
-            f"decode() must call embed_tokens twice (bop + eop); "
+        assert embed_tokens_call_count == 3, (
+            f"decode() must call embed_tokens 3 times (bop + eop + asst cue); "
             f"got {embed_tokens_call_count}"
         )
 
     async def test_decode_calls_base_model_with_inputs_embeds(
         self, strategy_with_base, mgr_with_base, soft_prompt
     ):
-        """decode() must inject the framed tensor as inputs_embeds."""
+        """decode() must pass inputs_embeds to model.generate() (not a direct forward call)."""
         await strategy_with_base.decode(soft_prompt)
         base_model = mgr_with_base.get_base_model()
         calls_with_embeds = [
-            c for c in base_model.call_args_list
+            c for c in base_model.generate.call_args_list
             if "inputs_embeds" in c.kwargs
         ]
         assert len(calls_with_embeds) >= 1, (
-            "decode() must pass inputs_embeds to the base model"
+            "decode() must pass inputs_embeds to model.generate()"
         )
 
     async def test_decode_accepts_2d_soft_prompt(self, strategy_with_base, soft_prompt):

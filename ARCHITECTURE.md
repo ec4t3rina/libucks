@@ -112,6 +112,8 @@ signed with RS256. Expiry is enforced at 15 minutes for access tokens and
 
 **Design constraint:** The Watchdog performs zero AI inference. It is a pure data-extraction process. This keeps it fast, always-on, and independently restartable.
 
+**Deployment note:** `libucks serve` does NOT start WatchdogService by default. The primary update path is git-hook–driven: `git post-commit` → Unix socket → `StartupRecovery.run()`. Use `libucks install-hooks` to wire a target repo. WatchdogService is available as an opt-in for repos that do not use git hooks (e.g. non-git directories), but must be started explicitly.
+
 ---
 
 ### 3.3 Central Agent (Router / Dispatcher)
@@ -648,13 +650,60 @@ divides the loss by 8 before each `backward()` call and only advances the
 optimizer after every 8th bucket (or at end of epoch).  Effective batch size = 8
 without requiring padded batching, keeping peak MPS memory bounded.
 
+#### Query dropout (Phase 12.8 fix)
+
+**Problem discovered:** With tight teacher-generated Q&A pairs, L_sep collapsed to 0.0000
+throughout all training epochs. The model learned to reconstruct answers directly from
+query tokens — the latent prefix carried zero additional information and gradient never
+flowed through it.
+
+**Root cause:** `L_task` can be minimised without ever attending to the latent when
+`[query_prefix → target_text]` is a memorisable mapping. The model correctly ignores
+the latent because doing so is sufficient.
+
+**Fix:** Query dropout (`query_dropout_rate = 0.5`). Each training step independently
+samples whether to include the query prefix:
+
+```python
+use_query = (random.random() >= 0.5)
+# prefix = [bop, latent_K, eop, query (or empty), target]
+```
+
+On dropout steps the model sees only `[bop, latent_K, eop, "Answer:\n", target]`.
+Without query tokens, the only source of signal for reconstructing `target_text` is
+the latent. This forces L_sep > 0 and gradient to flow through the latent channel.
+Non-dropout steps retain query conditioning so the model also learns the combined path
+used at inference time.
+
+**Hard-negative selection:** The wrong-path bucket is now the centroid-nearest neighbour
+(highest cosine similarity) rather than the first non-matching bucket. A hard negative
+with semantically close content makes L_sep harder to satisfy, producing a stronger
+discrimination gradient.
+
+**Updated λ_sep:** Raised from 0.1 → 0.3 so the separation term can compete with a
+near-zero task loss once L_task converges.
+
+**L_sep computed at position [:1] only (Phase 12.9):** Applying `separation_loss` over
+all T=64 target positions dilutes the genuine signal by 64×. Positions 1..T-1 attend to
+teacher-forced target tokens that are *identical* in both correct and wrong paths, making
+their logit distributions nearly identical. Only position 0 (predicting the first target
+token from the prefix alone) is genuinely latent-conditioned. Fix: `logits_tgt[:1]` in
+`LoRAReceiverTrainer._forward_and_losses`.
+
+**Wrong-path always r=0 (Phase 12.9):** The wrong soft-prompt uses `CurriculumMixer.mix`
+with `r=0.0` (pure latents), while the correct path uses the sampled `r ∈ [0,1]`. This
+ensures all K latent positions differ between correct and wrong paths, maximising the
+discriminative signal at position 0 regardless of the correct path's mixing rate.
+
 #### Recommended hyperparameters
 
-| Param | Phase 12.6 (broken) | Phase 12.7 (fixed) | Rationale |
-|---|---|---|---|
-| `lora_r` | 32 | 4 | r=32 overfits 47 samples; r=4 sufficient (Hu et al. 2022 Table 2) |
-| `lora_alpha` | 64 | 8 | Preserves scaling ratio alpha/r = 2 |
-| `lr` | 1e-3 | 2e-4 | Standard LoRA fine-tuning range (1e-4 – 3e-4) |
+| Param | Phase 12.6 (broken) | Phase 12.7 (fixed) | Phase 12.8 (fixed) | Rationale |
+|---|---|---|---|---|
+| `lora_r` | 32 | 4 | 4 | r=32 overfits 47 samples |
+| `lora_alpha` | 64 | 8 | 4.0 | alpha/r = 1 (conservative) |
+| `lr` | 1e-3 | 2e-4 | 2e-4 | Standard LoRA range |
+| `query_dropout` | — | — | 0.5 | Forces latent conditioning |
+| `λ_sep` | 0.1 | 0.1 | 0.3 | Competes with low L_task |
 
 ### Implementation Files
 

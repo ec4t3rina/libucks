@@ -180,9 +180,13 @@ class TestModelManagerDevice:
         with pytest.raises(RuntimeError, match="not loaded"):
             _ = mgr.device
 
+    @patch("transformers.AutoConfig.from_pretrained")
     @patch("libucks.thinking.model_manager.AutoTokenizer")
     @patch("libucks.thinking.model_manager.AutoModelForCausalLM")
-    def test_auto_device_resolves_to_string(self, mock_model_cls, mock_tok_cls):
+    def test_auto_device_resolves_to_string(self, mock_model_cls, mock_tok_cls, mock_cfg):
+        # On Apple Silicon _resolve_device("auto") returns "mps", which triggers
+        # AutoConfig.from_pretrained(model_id) inside the mps branch.  Patch it so
+        # the test never attempts a network download for the fake "test-model" id.
         from libucks.thinking.model_manager import ModelManager
 
         mgr = ModelManager()

@@ -37,10 +37,19 @@ class CommunicationAdapter(nn.Module):
         output_len: int = 32,
         num_heads: int = 8,
         num_inter_layers: int = 2,
+        output_dim: int | None = None,
     ) -> None:
         super().__init__()
         self.hidden_dim = hidden_dim
         self.output_len = output_len
+        # output_dim: dim of the Base receiver model (may differ from hidden_dim).
+        # e.g. Instruct=3B (2048) feeding into Base=0.5B (896).
+        # A linear projection bridges the two spaces.
+        _out = output_dim if output_dim is not None else hidden_dim
+        self.output_dim = _out
+        self.output_proj: nn.Linear | None = (
+            nn.Linear(hidden_dim, _out, bias=False) if _out != hidden_dim else None
+        )
 
         # --- Stage 1: Attentive Pooling ---
         # Learned query attends over each Librarian's token dimension
@@ -59,7 +68,8 @@ class CommunicationAdapter(nn.Module):
         )
 
         # --- Stage 3: Output Projection ---
-        # K learned output queries cross-attend over the N summaries
+        # K learned output queries cross-attend over the N summaries.
+        # output_queries supply per-slot identity (orthogonal at init via randn).
         self.output_queries = nn.Parameter(torch.randn(1, output_len, hidden_dim))
         self.output_attn = nn.MultiheadAttention(
             hidden_dim, num_heads, batch_first=True
@@ -111,11 +121,14 @@ class CommunicationAdapter(nn.Module):
         # ------------------------------------------------------------------ #
         # Stage 3: Output Projection — (1, K, d) soft-prompt
         # ------------------------------------------------------------------ #
-        out_q = self.output_queries.to(device)       # (1, K, d)
-        output, _ = self.output_attn(out_q, x, x)   # (1, K, d)
-        output = self.output_norm(output)
+        out_q = self.output_queries.to(device)
+        attn_out, _ = self.output_attn(out_q, x, x)
+        output = self.output_norm(out_q + attn_out).squeeze(0)
 
-        return output.squeeze(0)   # (K, d)
+        if self.output_proj is not None:
+            output = self.output_proj(output)        # (K, output_dim)
+
+        return output   # (K, output_dim)
 
     def frame(
         self,

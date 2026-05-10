@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from libucks.git_hook_receiver import _HOOK_EVENTS, _HOOK_LINE, install_hooks, serve_socket
+from libucks.git_hook_receiver import _HOOK_EVENTS, _HOOK_LINE, find_git_root, install_hooks, serve_socket
 
 
 @pytest.fixture()
@@ -35,6 +35,9 @@ def short_sock_path() -> Path:
 # Fixtures
 # ---------------------------------------------------------------------------
 
+FAKE_BIN = "/fake/venv/bin/libucks"
+
+
 @pytest.fixture()
 def fake_repo(tmp_path: Path) -> Path:
     """A minimal directory tree that looks like a git repo (.git/hooks/)."""
@@ -48,7 +51,7 @@ def fake_repo(tmp_path: Path) -> Path:
 
 class TestInstallHooks:
     def test_creates_new_hook_files(self, fake_repo: Path) -> None:
-        modified = install_hooks(fake_repo)
+        modified, _ = install_hooks(fake_repo, git_root=fake_repo, libucks_bin=FAKE_BIN)
 
         assert set(modified) == set(_HOOK_EVENTS)
         hooks_dir = fake_repo / ".git" / "hooks"
@@ -57,10 +60,11 @@ class TestInstallHooks:
             assert hook_file.exists(), f"{event} hook not created"
             content = hook_file.read_text()
             assert content.startswith("#!/bin/sh\n"), f"{event} missing shebang"
-            assert _HOOK_LINE.format(event=event) in content
+            expected = _HOOK_LINE.format(libucks_path=fake_repo.resolve(), libucks_bin=FAKE_BIN, event=event)
+            assert expected in content
 
     def test_new_hook_files_are_executable(self, fake_repo: Path) -> None:
-        install_hooks(fake_repo)
+        install_hooks(fake_repo, git_root=fake_repo, libucks_bin=FAKE_BIN)
         hooks_dir = fake_repo / ".git" / "hooks"
         for event in _HOOK_EVENTS:
             hook_file = hooks_dir / event
@@ -73,35 +77,86 @@ class TestInstallHooks:
         hook_file = hooks_dir / "post-commit"
         hook_file.write_text(existing_content)
 
-        install_hooks(fake_repo)
+        install_hooks(fake_repo, git_root=fake_repo, libucks_bin=FAKE_BIN)
 
         result = hook_file.read_text()
         assert "echo 'existing hook'" in result, "existing content was erased"
-        assert _HOOK_LINE.format(event="post-commit") in result, "trigger not appended"
-        # Shebang should appear only once
+        expected = _HOOK_LINE.format(libucks_path=fake_repo.resolve(), libucks_bin=FAKE_BIN, event="post-commit")
+        assert expected in result, "trigger not appended"
         assert result.count("#!/bin/sh") == 1
 
     def test_idempotent_does_not_double_append(self, fake_repo: Path) -> None:
-        install_hooks(fake_repo)
-        install_hooks(fake_repo)  # second call should be a no-op
+        install_hooks(fake_repo, git_root=fake_repo, libucks_bin=FAKE_BIN)
+        install_hooks(fake_repo, git_root=fake_repo, libucks_bin=FAKE_BIN)  # second call should be a no-op
 
         hooks_dir = fake_repo / ".git" / "hooks"
         for event in _HOOK_EVENTS:
             content = (hooks_dir / event).read_text()
-            trigger = _HOOK_LINE.format(event=event)
+            trigger = _HOOK_LINE.format(libucks_path=fake_repo.resolve(), libucks_bin=FAKE_BIN, event=event)
             assert content.count(trigger) == 1, f"trigger duplicated for {event}"
 
     def test_returns_empty_list_when_already_installed(self, fake_repo: Path) -> None:
-        install_hooks(fake_repo)
-        second_pass = install_hooks(fake_repo)
+        install_hooks(fake_repo, git_root=fake_repo, libucks_bin=FAKE_BIN)
+        second_pass, _ = install_hooks(fake_repo, git_root=fake_repo, libucks_bin=FAKE_BIN)
         assert second_pass == [], "expected [] on no-op second install"
 
     def test_creates_hooks_dir_if_missing(self, tmp_path: Path) -> None:
         """install_hooks creates .git/hooks/ if it does not exist."""
         (tmp_path / ".git").mkdir()
-        # hooks dir intentionally not created
-        modified = install_hooks(tmp_path)
+        modified, _ = install_hooks(tmp_path, git_root=tmp_path, libucks_bin=FAKE_BIN)
         assert set(modified) == set(_HOOK_EVENTS)
+
+    def test_subdirectory_installs_in_git_root(self, tmp_path: Path) -> None:
+        """When libucks_path is a subdirectory, hooks land in the git root."""
+        git_root = tmp_path / "repo"
+        libucks_path = git_root / "src" / "mylib"
+        (git_root / ".git" / "hooks").mkdir(parents=True)
+        libucks_path.mkdir(parents=True)
+
+        modified, _ = install_hooks(libucks_path, git_root=git_root, libucks_bin=FAKE_BIN)
+
+        hooks_dir = git_root / ".git" / "hooks"
+        assert set(modified) == set(_HOOK_EVENTS)
+        for event in _HOOK_EVENTS:
+            content = (hooks_dir / event).read_text()
+            expected = _HOOK_LINE.format(libucks_path=libucks_path.resolve(), libucks_bin=FAKE_BIN, event=event)
+            assert expected in content, f"hook for {event} missing LIBUCKS_REPO_PATH"
+            assert str(libucks_path.resolve()) in content
+
+    def test_absolute_binary_path_written_to_hook(self, fake_repo: Path) -> None:
+        """The hook script must contain the absolute binary path, not 'libucks'."""
+        install_hooks(fake_repo, git_root=fake_repo, libucks_bin=FAKE_BIN)
+        content = (fake_repo / ".git" / "hooks" / "post-commit").read_text()
+        assert FAKE_BIN in content
+        assert content.count("libucks hook") == 1  # no bare 'libucks' on its own line
+
+    def test_force_replaces_stale_trigger(self, fake_repo: Path) -> None:
+        """--force removes old libucks lines and writes the current trigger."""
+        hooks_dir = fake_repo / ".git" / "hooks"
+        stale = "#!/bin/sh\nlibucks hook post-commit \"$@\" || true\n"
+        (hooks_dir / "post-commit").write_text(stale)
+
+        modified, _ = install_hooks(fake_repo, git_root=fake_repo, force=True, libucks_bin=FAKE_BIN)
+
+        content = (hooks_dir / "post-commit").read_text()
+        assert FAKE_BIN in content
+        fresh_trigger = _HOOK_LINE.format(libucks_path=fake_repo.resolve(), libucks_bin=FAKE_BIN, event="post-commit")
+        assert fresh_trigger in content
+        assert content.count("libucks hook post-commit") == 1
+
+    def test_find_git_root_walks_up(self, tmp_path: Path) -> None:
+        """find_git_root should return the ancestor that contains .git/."""
+        git_root = tmp_path / "repo"
+        sub = git_root / "src" / "pkg"
+        (git_root / ".git").mkdir(parents=True)
+        sub.mkdir(parents=True)
+
+        assert find_git_root(sub) == git_root
+
+    def test_find_git_root_raises_outside_repo(self, tmp_path: Path) -> None:
+        """find_git_root should raise RuntimeError if no .git found."""
+        with pytest.raises(RuntimeError, match="No .git"):
+            find_git_root(tmp_path)
 
 
 # ---------------------------------------------------------------------------

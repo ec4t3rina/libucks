@@ -194,51 +194,82 @@ def test_task_loss_decreases_over_two_steps(tiny_model, batch):
 
 
 def test_sep_loss_influences_gradients():
-    """L_sep must contribute gradient to LoRA params (detach bug guard).
+    """L_sep must contribute gradient to LoRA params on Q=0 steps.
 
-    When correct == wrong, L_sep == 0 and its gradient is zero.
-    When correct != wrong, L_sep > 0 and contributes a non-zero gradient
-    that changes the parameter update vs the zero-sep case.
+    Strategy: compare raw gradients (before any optimizer step) between:
+      - Q=0 batch (has_plan=False): task + sep both contribute gradient
+      - Q=1 batch (has_plan=True):  only task contributes gradient
 
-    If L_sep is detached (Bug 6), both cases produce identical param updates
-    (only task_loss matters, and inputs_embeds is the same) — the assertion fails.
+    Both batches use identical correct-path inputs, so task gradient is the same.
+    If L_sep is detached (Bug 6), both gradients are equal — the assertion fails.
+    If L_sep is correctly wired, the Q=0 gradient includes the sep contribution.
+
+    wrong inputs are perturbed (not identical to correct) so that JSD(p_correct, p_wrong) > 0,
+    guaranteeing a non-zero L_sep gradient for Q=0.
+    Adam normalisation is avoided by comparing raw .grad tensors, not post-step params.
     """
-    from libucks.thinking.training.lora_trainer import LoRAReceiverTrainer
+    from libucks.thinking.training.lora_trainer import LoRAReceiverTrainer, LoRALinear
 
+    torch.manual_seed(7)
     shared_embed = torch.randn(PREFIX_LEN + SEQ, HIDDEN)
+    wrong_embed = shared_embed.clone() + torch.randn(PREFIX_LEN + SEQ, HIDDEN) * 0.5
     target_ids = torch.randint(0, VOCAB, (SEQ,))
+    Q = 4
+    plan_embeds = torch.randn(Q + SEQ, HIDDEN)
 
-    def make_batch(wrong_embed):
-        return {
-            "inputs_embeds":       shared_embed.clone(),
-            "inputs_embeds_wrong": wrong_embed,
-            "target_ids":          target_ids.clone(),
-            "prefix_len":          PREFIX_LEN,
-        }
+    # Q=0 batch: no plan path → sep fires; wrong differs from correct → JSD > 0
+    batch_q0 = {
+        "inputs_embeds":       shared_embed.clone(),
+        "inputs_embeds_wrong": wrong_embed.clone(),
+        "target_ids":          target_ids.clone(),
+        "prefix_len":          PREFIX_LEN,
+    }
+    # Q=1 batch: plan path present → has_plan=True → sep skipped, task only
+    batch_q1 = {
+        "inputs_embeds":       shared_embed.clone(),
+        "inputs_embeds_wrong": shared_embed.clone(),
+        "target_ids":          target_ids.clone(),
+        "prefix_len":          PREFIX_LEN,
+        "inputs_embeds_plan":  plan_embeds.clone(),
+        "plan_prefix_len":     Q,
+    }
 
-    # Case A: wrong == correct → sep ≈ 0 → gradient purely from task_loss
     torch.manual_seed(7)
-    m_a = TinyMLP(vocab=VOCAB, hidden=HIDDEN)
-    t_a = LoRAReceiverTrainer(m_a, lora_r=2, lora_alpha=4, lr=1e-2)
-    t_a.train_step(make_batch(shared_embed.clone()))
-    params_a = {n: p.data.clone() for n, p in t_a.model.named_parameters() if p.requires_grad}
+    m = TinyMLP(vocab=VOCAB, hidden=HIDDEN)
+    t = LoRAReceiverTrainer(m, lora_r=2, lora_alpha=4, lr=1e-2)
 
-    # Case B: wrong very different → sep > 0 → extra gradient from L_sep
-    torch.manual_seed(7)
-    m_b = TinyMLP(vocab=VOCAB, hidden=HIDDEN)
-    t_b = LoRAReceiverTrainer(m_b, lora_r=2, lora_alpha=4, lr=1e-2)
-    very_different = shared_embed * -50.0
-    t_b.train_step(make_batch(very_different))
-    params_b = {n: p.data.clone() for n, p in t_b.model.named_parameters() if p.requires_grad}
+    # Gradient from Q=0 (task + sep)
+    t.model.train()
+    t.optimizer.zero_grad()
+    with torch.inference_mode(False), torch.enable_grad():
+        _, _, _, total_q0 = t._forward_and_losses(batch_q0)
+    total_q0.backward()
+    grads_q0 = {
+        n: p.grad.clone()
+        for n, p in t.model.named_parameters()
+        if p.requires_grad and p.grad is not None
+    }
 
-    assert params_a.keys() == params_b.keys()
+    # Gradient from Q=1 (task only) — same correct inputs, different loss path
+    t.optimizer.zero_grad()
+    with torch.inference_mode(False), torch.enable_grad():
+        _, _, _, total_q1 = t._forward_and_losses(batch_q1)
+    total_q1.backward()
+    grads_q1 = {
+        n: p.grad.clone()
+        for n, p in t.model.named_parameters()
+        if p.requires_grad and p.grad is not None
+    }
+
+    assert grads_q0.keys() == grads_q1.keys(), "Gradient key sets differ"
+
     any_differ = any(
-        not torch.allclose(params_a[n], params_b[n], atol=1e-7)
-        for n in params_a
+        not torch.allclose(grads_q0[n], grads_q1[n], atol=1e-6)
+        for n in grads_q0
     )
     assert any_differ, (
-        "LoRA parameters are identical whether sep=0 or sep>0 — "
-        "L_sep is likely detached and contributing zero gradient (Bug 6)"
+        "Q=0 and Q=1 gradients are identical — L_sep is likely detached "
+        "and contributing zero gradient to LoRA params (Bug 6)"
     )
 
 

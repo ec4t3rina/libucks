@@ -52,7 +52,14 @@ class Translator:
         _log(f"_synthesize_latent: {len(representations)} reps, shapes={shapes}")
         # .contiguous() before the adapter: MultiheadAttention on MPS hangs
         # on non-contiguous tensors produced by prior squeeze/expand operations.
-        contiguous_reps = [r.contiguous().to(torch.float32) for r in representations]
+        # Cast to the adapter's dtype (not hardcoded float32) — on MPS the adapter
+        # runs in float16 and a float32 input causes an mps_add broadcast crash.
+        _target_dtype = (
+            next(self._adapter.parameters()).dtype
+            if self._adapter is not None
+            else torch.float32
+        )
+        contiguous_reps = [r.contiguous().to(_target_dtype) for r in representations]
 
         if self._adapter is not None:
             with torch.no_grad():
