@@ -3,6 +3,7 @@
 Tools:
   libucks_query(query, top_k=3)  — query the memory store, returns synthesized answer
   libucks_status()               — bucket count and token totals
+  (LoRA loaded with r=16 to match lsep_v3 training — see _cli.py:691)
 """
 from __future__ import annotations
 
@@ -127,7 +128,7 @@ async def serve() -> None:
                         from libucks.thinking.model_manager import ModelManager as _MM
                         from libucks.thinking.training.lora_trainer import _inject_lora, _LORA_TARGETS
                         _resolved = _MM._resolve_device(cfg.model.device)
-                        _inject_lora(strategy._mgr.get_base_model(), _LORA_TARGETS, r=4, alpha=4.0)
+                        _inject_lora(strategy._mgr.get_base_model(), _LORA_TARGETS, r=16, alpha=16.0)
                         _lora_state = torch.load(lora_path, map_location=_resolved, weights_only=True)
                         strategy._mgr.get_base_model().load_state_dict(_lora_state, strict=False)
                         print(f"[libucks] LoRA receiver weights loaded from {lora_path}", file=sys.stderr)
