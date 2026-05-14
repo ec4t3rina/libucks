@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "libucks"
@@ -59,6 +59,3 @@ markers = [
     "gpu: marks tests that require a real model and GPU (deselect with '-m not gpu')",
 ]
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["libucks*"]
