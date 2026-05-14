@@ -34,33 +34,49 @@ The agent is given a single tool: `libucks_query(query, top_k=3)`. It never read
 
 ---
 
+## Research Foundations
+
+libucks V2 is grounded in five papers from the agent communication and latent reasoning literature:
+
+| Paper | arXiv | Role in libucks |
+|---|---|---|
+| **Interlat** — *Enabling Agents to Communicate Entirely in Latent Space* | [2511.09149](https://arxiv.org/abs/2511.09149) | **Primary architecture.** The latent injection protocol, `<bop>`/`<eop>` framing, L_task + L_sep training objective, and query dropout are all direct implementations of Interlat §3.2-3.3 and §10. |
+| **Coconut** — *Training Large Language Models to Reason in a Continuous Latent Space* | [2412.06769](https://arxiv.org/abs/2412.06769) | Motivates reasoning without language constraints. The curriculum mixing schedule (token→latent interpolation) adapts Coconut's chain-of-continuous-thought approach to the cross-agent communication setting. |
+| **AgentPrune** — *Cut the Crap: An Economical Communication Pipeline for LLM-Based Multi-Agent Systems* | [2410.02506](https://arxiv.org/abs/2410.02506) | Informs the bucket routing design. Sparse, structured communication between agents (Librarians → Translator) rather than broadcasting full context to all agents. |
+| **Latent Collaboration in Multi-Agent Systems** | [2511.20639](https://arxiv.org/abs/2511.20639) | Supports the multi-Librarian → single Translator aggregation pattern via the CommunicationAdapter's inter-agent attention layers. |
+| **Reasoning Models Don't Always Say What They Think** | [2505.05410](https://arxiv.org/abs/2505.05410) | Motivates the architectural constraint that Librarians never produce natural language. Faithfulness is enforced structurally: Librarians return tensors, not strings. |
+
+The research papers are available in full in [`docs/`](./docs/).
+
+---
+
 ## Quickstart
 
 ### Install
 
 ```bash
-# V1 (Anthropic API strategy)
+# V1 (Anthropic API strategy — no local model required)
 pip install libucks
 
 # V2 — full latent space pipeline (recommended)
 pip install "libucks[latent]"
 ```
 
-> **V2 hardware:** Apple Silicon (MPS, float16), CUDA, CPU fallback. `Qwen2.5-3B-Instruct` fits in ~6 GB at float16 or ~2 GB at 4-bit NF4.
+> **V2 hardware:** Apple Silicon (MPS, float16), CUDA, CPU fallback. Current PoC uses `Qwen2.5-0.5B` (encoder) and `Qwen2.5-0.5B-Base` (receiver) — fits comfortably in 4 GB. Production target is `Qwen2.5-1.5B` or `Qwen2.5-3B`.
 
 ### Initialize + Train in One Shot
 
 ```bash
 # Index the repo and train the full V2 pipeline (no API key required)
-libucks init --local /path/to/your/repo --train --no-teacher --epochs 5
+libucks init --local /path/to/your/repo --train --no-teacher
 
 # With an Anthropic API key — uses Claude Haiku to generate richer Q&A training targets
-libucks init --local /path/to/your/repo --train --epochs 5
+libucks init --local /path/to/your/repo --train
 ```
 
 `--train` runs both training phases automatically after indexing:
 - **Phase 1 — CommunicationAdapter:** aligns Librarian latent tensors to the Base receiver's embedding space → `adapter.pt`
-- **Phase 2 — LoRA Receiver:** fine-tunes `Qwen2.5-3B-Base` to decode framed latent injections into English → `lora_receiver.pt`
+- **Phase 2 — LoRA Receiver:** fine-tunes `Qwen2.5-0.5B-Base` with rank-16 LoRA on `q_proj`/`v_proj` to decode framed latent injections into English → `lora_receiver.pt`
 
 ### Or Run the Steps Manually
 
@@ -69,10 +85,10 @@ libucks init --local /path/to/your/repo --train --epochs 5
 libucks init --local /path/to/your/repo
 
 # 2. Train (both phases)
-libucks train-adapter --repo /path/to/your/repo --no-teacher --train-receiver --epochs 10
+libucks train-adapter --repo /path/to/your/repo --no-teacher --train-receiver --epochs 5
 
 # 3. Re-train receiver only (after a major refactor)
-libucks train-adapter --repo /path/to/your/repo --receiver-only --epochs 15
+libucks train-adapter --repo /path/to/your/repo --receiver-only --epochs 5
 ```
 
 ### Start the MCP Server
@@ -102,7 +118,7 @@ Add to `.mcp.json` at your project root:
 ### Query from the Terminal (No Server Required)
 
 ```bash
-libucks query --repo /path/to/your/repo "How does the authentication middleware work?"
+libucks query "How does the authentication middleware work?" --repo /path/to/your/repo
 ```
 
 ### Keep Memory Fresh (Git Hooks)
@@ -125,15 +141,15 @@ V1 has a fundamental information bottleneck. Every Librarian-to-Translator excha
 Librarian → reason() → English string → Translator → synthesize → English string
 ```
 
-A hidden state in a 3B parameter model carries ~40,000 bits of information per position. A token carries ~15 bits. Every English round-trip throws away **99.96% of the model's internal representation**.
+A hidden state in a 0.5B parameter model carries thousands of bits of information per position. A token carries ~15 bits. Every English round-trip throws away the vast majority of the model's internal representation.
 
 **V2 eliminates the intermediate text encoding.**
 
-Librarians return raw `torch.Tensor` hidden states from `Qwen2.5-3B-Instruct`. The Translator is the only component that ever decodes — and it decodes using a LoRA-finetuned `Qwen2.5-3B-Base` **receiver model**, not the Instruct model.
+Librarians return raw `torch.Tensor` hidden states from `Qwen2.5-0.5B-Instruct`. The Translator is the only component that ever decodes — and it decodes using a LoRA-finetuned `Qwen2.5-0.5B-Base` **receiver model**, not the Instruct model.
 
-**Why Base, not Instruct, for the receiver?** The Instruct model was RLHF'd on ChatML templates. Injecting arbitrary continuous vectors into it causes "format repair" hallucinations. The Base model has no such conditioning. LoRA on `q_proj`/`v_proj` (rank 4, ~2M trainable params) teaches it to read framed latent injections as meaningful input.
+**Why Base, not Instruct, for the receiver?** The Instruct model was RLHF'd on ChatML templates. Injecting arbitrary continuous vectors into it causes "format repair" hallucinations. The Base model has no such conditioning. LoRA on `q_proj`/`v_proj` (rank 16, ~2M trainable params) teaches it to read framed latent injections as meaningful input.
 
-**The injection protocol:**
+**The injection protocol** (Interlat §3.2):
 
 ```
 inputs_embeds = [e(<bop>), h_1, ..., h_K, e(<eop>), query_tokens, answer_tokens]
@@ -141,7 +157,7 @@ inputs_embeds = [e(<bop>), h_1, ..., h_K, e(<eop>), query_tokens, answer_tokens]
 
 `<bop>` and `<eop>` recycle Qwen's native `<|im_start|>` / `<|im_end|>` tokens. No vocabulary resize. No new embeddings. The frame looks structurally identical to what the model has processed billions of times. The LoRA delta teaches it what the latents mean.
 
-**Training objective:**
+**Training objective** (Interlat §3.3):
 
 ```
 L_total = L_task − λ_sep · L_sep
@@ -150,15 +166,13 @@ L_task  = CrossEntropy(generated_tokens | framed_latents)   # teacher forcing
 L_sep   = JSD(logits_correct_latent ‖ logits_wrong_latent)  # separation signal
 ```
 
-Query dropout (50% of steps train without the query prefix) forces the receiver to decode from the latent alone — preventing the model from ignoring the latent entirely and collapsing to memorised Q→A mappings.
+Query dropout (50% of steps train without the query prefix) forces the receiver to decode from the latent alone — preventing the model from ignoring the latent entirely and collapsing to memorised Q→A mappings. **If `sep` stays at 0.0000 past epoch 3, the latent is being ignored — stop and check query dropout.**
 
 **Curriculum mixing** bridges the token and latent manifolds during training:
 
 ```
 H^(r) = [token_embeds_1..⌊r·K⌋] ⊕ [latents_⌊r·K⌋+1..K]    r ~ U[0,1]
 ```
-
-Ablation: removing curriculum mixing drops decode success from **70% → 33%**.
 
 ---
 
@@ -175,8 +189,6 @@ Aggregates N variable-length Librarian tensors into a fixed `(K=32, D)` soft-pro
 ---
 
 ### Git-Hook Driven Updates — Zero AI Cost Per Commit
-
-The **Watchdog** is a pure-Python process with zero AI inference. It never stalls, never OOMs, and can be restarted independently of every other component.
 
 `libucks serve` does **not** start the Watchdog. The primary update path is:
 
@@ -212,9 +224,7 @@ affinity(i, j) = clip(
 )
 ```
 
-Import detection uses `ast.parse` + `ast.walk` — no subprocess, no language server. This keeps logically coupled code in the same bucket even when surface-text embeddings diverge. A `middleware.py` chunk that imports `jwt_utils` stays co-located with `jwt_utils.py` even if they describe syntactically different operations.
-
-**`ContextCondenser`** — a zero-inference, pure-AST component — produces a token-budget-safe digest for each INIT prose-generation call. Priority: module docstrings → function/class signatures → body lines → hard truncation at 200 tokens. The encoder's 256-token hard limit is never exceeded.
+Import detection uses `ast.parse` + `ast.walk` — no subprocess, no language server.
 
 ---
 
@@ -261,7 +271,7 @@ When a bucket exceeds its token threshold (`mitosis_threshold`, default 20,000 t
          └─────────┬─────────┘
                    │
          ┌─────────▼─────────┐
-         │     WATCHDOG      │  ← OS events + git diff, zero AI
+         │  GIT HOOK SOCKET  │  ← post-commit → Unix socket → StartupRecovery
          └─────────┬─────────┘
                    │
          ┌─────────▼─────────┐
@@ -281,6 +291,25 @@ When a bucket exceeds its token threshold (`mitosis_threshold`, default 20,000 t
 
 ---
 
+## PoC Status
+
+The current implementation is a working proof of concept with known limitations:
+
+| Component | Status |
+|---|---|
+| Bucket indexing (init, routing, storage) | ✅ Production-quality |
+| Git hook pipeline (commit → re-index) | ✅ Working end-to-end |
+| MCP server (libucks_query, libucks_status) | ✅ Working |
+| Multi-repo support | ✅ Validated on libucks-self + click |
+| CommunicationAdapter training | ✅ Stable (cross-bucket cos ~0.57) |
+| LoRA receiver training | ✅ Trains, sep > 0 |
+| Answer factual grounding | ⚠️ Hallucination ceiling — 0.5B model + small datasets produce plausible but often wrong answers |
+| Mitosis (bucket splitting) | ✅ Implemented, not stress-tested |
+
+The routing and pipeline mechanics are correct. The answer quality limitation is a model capacity / training data problem, not an architectural one. Upgrading to `Qwen2.5-1.5B` or generating 400+ QA pairs per repo are the two paths to grounded answers.
+
+---
+
 ## Configuration
 
 `.libucks/config.toml` — lives inside the target repository (gitignored):
@@ -288,9 +317,9 @@ When a bucket exceeds its token threshold (`mitosis_threshold`, default 20,000 t
 ```toml
 [model]
 strategy           = "latent"           # "text" (V1) | "latent" (V2)
-local_model        = "Qwen/Qwen2.5-3B-Instruct"
-base_model         = "Qwen/Qwen2.5-3B"
-device             = "mps"              # "auto" | "cpu" | "cuda" | "mps"
+local_model        = "Qwen/Qwen2.5-0.5B-Instruct"
+base_model         = "Qwen/Qwen2.5-0.5B"
+device             = "auto"             # "auto" | "cpu" | "cuda" | "mps"
 quantization       = "none"             # "none" | "4bit" | "8bit"
 anthropic_model    = "claude-haiku-4-5-20251001"
 
@@ -298,11 +327,6 @@ anthropic_model    = "claude-haiku-4-5-20251001"
 novelty_threshold  = 0.35
 top_k              = 3
 mitosis_threshold  = 20000
-init_bucket_size   = 2000
-
-[paths]
-bucket_dir         = ".libucks/buckets"
-registry_file      = ".libucks/registry.json"
 ```
 
 All fields have sane defaults. An empty or missing config file is valid.
@@ -315,7 +339,7 @@ All fields have sane defaults. An empty or missing config file is valid.
 |---|---|
 | `libucks init --local <path> [--train] [--no-teacher] [--epochs N]` | Index a repo. Optionally train in one shot. |
 | `libucks train-adapter --repo <path> [--no-teacher] [--train-receiver] [--receiver-only] [--epochs N]` | Train adapter and/or LoRA receiver. |
-| `libucks query --repo <path> "question"` | Run a query directly. Bypasses MCP, no timeout. |
+| `libucks query "question" --repo <path>` | Run a query directly. Bypasses MCP, no timeout. |
 | `libucks serve` | Start the MCP server over stdio. |
 | `libucks install-hooks --repo <path>` | Append git post-commit hooks. Never overwrites. |
 | `libucks use <path>` | Set the active repo for `libucks serve`. |
@@ -335,6 +359,7 @@ Issues and PRs are welcome. Before opening a PR:
 - Run `pytest tests/unit/` — all tests must be green.
 - Read `ARCHITECTURE.md` §4 (Latent Space Interface Constraint) before touching anything in `libucks/thinking/`.
 - The `Translator` is the **only** component permitted to call `decode()`. This boundary is non-negotiable.
+- LoRA must always be injected with the same rank used during training (currently `r=16`). If you change the rank, you must retrain from scratch.
 
 ---
 
