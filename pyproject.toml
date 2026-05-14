@@ -31,7 +31,7 @@ train = [
     "anthropic>=0.40",
 ]
 latent = [
-    "torch==2.4.1; sys_platform == 'linux' or (sys_platform == 'darwin' and platform_machine == 'arm64')",
+    "torch>=2.11.0; sys_platform == 'linux' or (sys_platform == 'darwin' and platform_machine == 'arm64')",
     "torch>=2.2,<=2.2.2; sys_platform == 'darwin' and platform_machine == 'x86_64' and python_version < '3.13'",
     "bitsandbytes>=0.43; sys_platform == 'linux'",
     "bitsandbytes>=0.43; sys_platform == 'darwin' and platform_machine == 'arm64'",
@@ -50,6 +50,7 @@ dev = [
 
 [project.scripts]
 libucks = "libucks._cli:cli"
+
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
