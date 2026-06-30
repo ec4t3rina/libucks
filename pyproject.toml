@@ -58,5 +58,7 @@ testpaths = ["tests"]
 markers = [
     "slow: marks tests that load the embedding model (deselect with '-m not slow')",
     "gpu: marks tests that require a real model and GPU (deselect with '-m not gpu')",
+    "eval: marks Phase 1 quality/grounding evaluation against a repo's .libucks state (run with '-m eval'; not collected by default)",
+    "smoke: marks Phase 4-C cache-augmentation smoke tests that load Qwen 2.5-3B (run with '-m smoke')",
 ]
 

@@ -43,3 +43,6 @@ class QueryEvent(BaseModel):
 
 class CreateBucketEvent(BaseModel):
     seed_content: str
+    source_file: Optional[str] = None
+    start_line: Optional[int] = None
+    end_line: Optional[int] = None

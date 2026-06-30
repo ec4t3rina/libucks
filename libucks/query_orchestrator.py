@@ -32,7 +32,7 @@ class QueryOrchestrator:
         self._stale_checker = stale_checker
         self._reindex_fn = reindex_fn
 
-    async def query(self, text: str) -> List[Representation]:
+    async def query(self, text: str) -> List[tuple[str, Representation]]:
         embedding = self._embed_fn(text)
         bucket_ids = self._agent.route(embedding, self._top_k)
         if not bucket_ids:
@@ -62,4 +62,4 @@ class QueryOrchestrator:
             return await librarian.handle(event)
 
         results = await asyncio.gather(*(_query_one(bid) for bid in bucket_ids))
-        return [r for r in results if r is not None]
+        return [(bid, r) for bid, r in zip(bucket_ids, results) if r is not None]

@@ -38,6 +38,7 @@ from libucks.models.events import (
 from libucks.storage.bucket_registry import BucketRegistry
 
 if TYPE_CHECKING:
+    from libucks.chunk_retriever import ChunkRetriever
     from libucks.librarian import Librarian
 
 log = structlog.get_logger(__name__)
@@ -49,10 +50,12 @@ class CentralAgent:
         registry: BucketRegistry,
         config: Config,
         embed_fn: Optional[Callable[[str], np.ndarray]] = None,
+        chunk_retriever: Optional["ChunkRetriever"] = None,
     ) -> None:
         self._registry = registry
         self._config = config
         self._embed_fn = embed_fn
+        self._chunk_retriever = chunk_retriever
 
         self._diff_queue: asyncio.Queue[DiffEvent] = asyncio.Queue()
         self.create_bucket_queue: asyncio.Queue[CreateBucketEvent] = asyncio.Queue()
@@ -76,7 +79,15 @@ class CentralAgent:
     # ------------------------------------------------------------------
 
     def route(self, query_embedding: np.ndarray, top_k: int) -> List[str]:
-        """Return up to top_k bucket_ids by cosine similarity descending."""
+        """Return up to top_k bucket_ids by cosine similarity descending.
+
+        Default = centroid cos. If a ChunkRetriever is injected, the routing
+        becomes: centroid pre-filter to top-(2k) buckets, then re-rank by
+        max chunk-cos within each candidate. Per-bucket aggregation is MAX
+        (not mean) — a bucket containing one highly relevant chunk should
+        outrank a bucket whose centroid is closer to the query average but
+        whose chunks are all off-topic.
+        """
         centroids = self._registry.get_all_centroids()
         if not centroids:
             return []
@@ -84,8 +95,20 @@ class CentralAgent:
         matrix = np.stack([centroids[bid] for bid in bucket_ids])  # (N, dim)
         similarities = matrix @ query_embedding                      # (N,)
         k = min(top_k, len(bucket_ids))
-        top_indices = np.argsort(similarities)[::-1][:k]
-        return [bucket_ids[int(i)] for i in top_indices]
+
+        if self._chunk_retriever is None:
+            top_indices = np.argsort(similarities)[::-1][:k]
+            return [bucket_ids[int(i)] for i in top_indices]
+
+        pre_k = min(2 * k, len(bucket_ids))
+        pre_indices = np.argsort(similarities)[::-1][:pre_k]
+        candidates = [bucket_ids[int(i)] for i in pre_indices]
+        scored = [
+            (bid, self._chunk_retriever.max_chunk_score(bid, query_embedding))
+            for bid in candidates
+        ]
+        scored.sort(key=lambda t: t[1], reverse=True)
+        return [bid for bid, _ in scored[:k]]
 
     def is_novel(self, query_embedding: np.ndarray) -> bool:
         """True if max cosine similarity < (1 - novelty_threshold)."""
@@ -157,9 +180,29 @@ class CentralAgent:
         content = "\n".join(hunk.added_lines)
         embedding = self._embed(content)
 
-        if self.is_novel(embedding):
-            log.info("central_agent.novel_diff", lines=len(hunk.added_lines))
-            await self.create_bucket_queue.put(CreateBucketEvent(seed_content=content))
+        # Spawn a new bucket only for substantial novel subjects. Small novel
+        # diffs route to the nearest existing bucket; HealthMonitor's coherence
+        # mitosis splits things later if pressure builds. Prevents one-file
+        # buckets that fragment the index.
+        est_tokens = max(1, int(len(content) * 0.25))
+        if (
+            est_tokens >= self._config.routing.min_bucket_seed_tokens
+            and self.is_novel(embedding)
+        ):
+            log.info(
+                "central_agent.novel_diff",
+                lines=len(hunk.added_lines),
+                tokens=est_tokens,
+                file=hunk.file,
+            )
+            await self.create_bucket_queue.put(
+                CreateBucketEvent(
+                    seed_content=content,
+                    source_file=hunk.file,
+                    start_line=hunk.new_start,
+                    end_line=hunk.new_end,
+                )
+            )
             return
 
         top = self.route(embedding, top_k=1)

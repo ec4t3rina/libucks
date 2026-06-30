@@ -119,6 +119,7 @@ async def serve() -> None:
                         quantization=cfg.model.quantization,
                         bnb_4bit_compute_dtype=cfg.model.bnb_4bit_compute_dtype,
                         device=cfg.model.device,
+                        base_model_dtype=cfg.model.base_model_dtype,
                     )
                     print(f"[libucks] base receiver loaded: {cfg.model.base_model}", file=sys.stderr)
 
@@ -133,7 +134,42 @@ async def serve() -> None:
                         strategy._mgr.get_base_model().load_state_dict(_lora_state, strict=False)
                         print(f"[libucks] LoRA receiver weights loaded from {lora_path}", file=sys.stderr)
 
-                agent = CentralAgent(registry, cfg, embed_fn=embedder.embed)
+                from libucks.chunk_retriever import ChunkRetriever
+                chunk_retriever = ChunkRetriever(
+                    cache_dir=bucket_dir / "chunk_emb_cache",
+                    embedder=embedder,
+                    store=store,
+                )
+                agent = CentralAgent(
+                    registry, cfg, embed_fn=embedder.embed,
+                    chunk_retriever=chunk_retriever,
+                )
+
+                # Build the CommunicationAdapter + Translator BEFORE Librarians
+                # so each Librarian can be given a Translator reference. Without
+                # it, Librarian._handle_update falls through to the
+                # `updated_prose = current_prose` branch and prose never updates
+                # on commit — silently breaking the self-evolving demo loop.
+                adapter = None
+                if cfg.model.strategy == "latent":
+                    from libucks.thinking.communication_adapter import CommunicationAdapter
+                    from libucks.thinking.model_manager import ModelManager as _MM
+                    from transformers import AutoConfig as _AC
+                    _adapter_device = _MM._resolve_device(cfg.model.device)
+                    _enc_dim  = _AC.from_pretrained(cfg.model.local_model).hidden_size
+                    _base_dim = _AC.from_pretrained(cfg.model.base_model).hidden_size
+                    adapter = CommunicationAdapter(hidden_dim=_enc_dim, output_dim=_base_dim,
+                                                   output_len=cfg.model.output_len)
+                    adapter.load_saved_weights(bucket_dir / "adapter.pt")
+                    _adapter_dtype = strategy._mgr.get_base_model().dtype
+                    adapter = adapter.to(device=_adapter_device, dtype=_adapter_dtype)
+
+                translator = Translator(
+                    strategy, adapter=adapter, store=store,
+                    hybrid=cfg.model.hybrid_retrieval,
+                    verbatim_max_chars=cfg.model.hybrid_verbatim_max_chars,
+                    chunk_retriever=chunk_retriever,
+                )
 
                 librarians: dict[str, Librarian] = {}
                 for bucket_id in registry.get_all_centroids():
@@ -144,26 +180,13 @@ async def serve() -> None:
                         strategy=strategy,
                         embedder=embedder,
                         mitosis_threshold=cfg.routing.mitosis_threshold,
+                        repo_path=repo_path,
+                        translator=translator,
+                        chunk_retriever=chunk_retriever,
                     )
                     librarians[bucket_id] = lib
                     agent.register_librarian(bucket_id, lib)
 
-                adapter = None
-                if cfg.model.strategy == "latent":
-                    from libucks.thinking.communication_adapter import CommunicationAdapter
-                    from libucks.thinking.model_manager import ModelManager as _MM
-                    from transformers import AutoConfig as _AC
-                    _adapter_device = _MM._resolve_device(cfg.model.device)
-                    _enc_dim  = _AC.from_pretrained(cfg.model.local_model).hidden_size
-                    _base_dim = _AC.from_pretrained(cfg.model.base_model).hidden_size
-                    adapter = CommunicationAdapter(hidden_dim=_enc_dim, output_dim=_base_dim)
-                    adapter.load_saved_weights(bucket_dir / "adapter.pt")
-                    # Read dtype from the already-loaded base model rather than guessing from
-                    # device. ModelManager loads Qwen in float16 on MPS and float32 on CPU.
-                    _adapter_dtype = strategy._mgr.get_base_model().dtype
-                    adapter = adapter.to(device=_adapter_device, dtype=_adapter_dtype)
-
-                translator = Translator(strategy, adapter=adapter)
                 return embedder, strategy, agent, librarians, adapter, translator
 
             embedder, strategy, agent, librarians, adapter, translator = \
@@ -177,6 +200,7 @@ async def serve() -> None:
             from libucks.health_monitor import HealthMonitor
             from libucks.merging_service import MergingService
             from libucks.mitosis import MitosisService
+            from libucks.novel_bucket_service import NovelBucketService
             from libucks.query_orchestrator import QueryOrchestrator
             from libucks.stale_checker import StaleChecker
             from libucks.startup_recovery import StartupRecovery
@@ -190,6 +214,9 @@ async def serve() -> None:
                     store=store,
                     librarians=librarians,
                     extractor=extractor,
+                    central_agent=agent,
+                    embedder=embedder,
+                    min_bucket_seed_tokens=cfg.routing.min_bucket_seed_tokens,
                 )
                 current_head = await recovery.run()
                 if current_head is not None:
@@ -257,6 +284,24 @@ async def serve() -> None:
             asyncio.ensure_future(health_monitor.run())
 
             # ------------------------------------------------------------------
+            # NovelBucketService: drains CentralAgent.create_bucket_queue and
+            # spawns new buckets when StartupRecovery (or WatchdogService, if
+            # opted in) detects substantial novel content. Subjects emerge as
+            # new buckets here; HealthMonitor splits existing ones from inside.
+            # ------------------------------------------------------------------
+            novel_bucket_svc = NovelBucketService(
+                store=store,
+                registry=registry,
+                embedder=embedder,
+                agent=agent,
+                strategy=strategy,
+                translator=translator,
+                mitosis_threshold=cfg.routing.mitosis_threshold,
+                repo_path=repo_path,
+            )
+            asyncio.ensure_future(novel_bucket_svc.run())
+
+            # ------------------------------------------------------------------
             # StaleChecker + reindex callback (Phase 6-C JIT invalidation).
             # ------------------------------------------------------------------
             stale_checker = StaleChecker(registry=registry, store=store, repo_path=repo_path)
@@ -283,6 +328,7 @@ async def serve() -> None:
 
             _state["orchestrator"] = orchestrator
             _state["translator"] = translator
+            _state["embedder"] = embedder
             print("[libucks] ready", file=sys.stderr)
 
         except Exception as exc:
@@ -330,14 +376,22 @@ async def serve() -> None:
         if name == "libucks_query":
             orchestrator = _state["orchestrator"]
             translator = _state["translator"]
+            embedder = _state["embedder"]
             query_text = arguments["query"]
             top_k = int(arguments.get("top_k", cfg.routing.top_k))
             orchestrator._top_k = top_k
 
             print(f"[libucks] query: routing '{query_text[:60]}' (top_k={top_k})", file=sys.stderr, flush=True)
-            representations = await orchestrator.query(query_text)
+            query_embedding = embedder.embed(query_text)
+            pairs = await orchestrator.query(query_text)
+            bucket_ids = [bid for bid, _ in pairs]
+            representations = [rep for _, rep in pairs]
             print(f"[libucks] query: got {len(representations)} representations", file=sys.stderr, flush=True)
-            answer = await translator.synthesize(query_text, representations)
+            answer = await translator.synthesize(
+                query_text, representations,
+                bucket_ids=bucket_ids,
+                query_embedding=query_embedding,
+            )
             print(f"[libucks] query: synthesis complete ({len(answer)} chars)", file=sys.stderr, flush=True)
             return [types.TextContent(type="text", text=answer)]
 

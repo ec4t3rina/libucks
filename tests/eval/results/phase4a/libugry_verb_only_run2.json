@@ -1,0 +1,868 @@
+[
+  {
+    "repo": "libugry",
+    "n_fixtures": 30,
+    "routing_hits": 27,
+    "grounding": {
+      "latent": 7,
+      "hybrid": 21,
+      "text_clean": 14,
+      "no_context": 7
+    },
+    "multi_grounding": {
+      "latent": 2,
+      "hybrid": 5,
+      "text_clean": 4,
+      "no_context": 3
+    },
+    "multi_total": 10,
+    "cosine_means": {
+      "latent": 0.4831301073233287,
+      "hybrid": 0.6112421284119288,
+      "text_clean": 0.5513773709535599,
+      "no_context": 0.4990283936262131
+    },
+    "per_question": [
+      {
+        "id": "libugry_01",
+        "question": "How does libugry check a Python package for known CVEs?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "It checks the README.md file for a section named \"Known Vulnerabilities\" and searches for the `libugry` package in the `cves` list. If the package is found, it returns the CVEs associated with it as a list. The `CLANG` package is excluded from the search by checking `package == \"CLANG\"` within the loop.",
+            "grounded": false,
+            "cos": 0.35005617141723633
+          },
+          "hybrid": {
+            "text": "It queries OSV.dev via the osv_client.check_vulnerabilities() function, passing the package name and version as arguments. The function encodes the payload as JSON, sets the User-Agent header to \"libugry/1.0\", and makes a POST request to the API endpoint. It handles URLError and ValueError exceptions by returning an empty list. The code catches the URLError exception and catches the ValueError exception by default, returning an exception object. It then reads the response body as bytes, decodes it to a string, and loads it as JSON. If the data dictionary contains a \"vulns\" key, it iterates over the vulnerabilities, extracts the severity, description, and publication date, and adds them to the results list. Finally, it returns the sorted results as a list of dictionaries. The default sort order is CRITICAL > HIGH > MEDIUM > LOW > UNKNOWN, as specified in the _order dictionary. The osv.dev API returns a list or empty array, so the vulnerability_list is populated with the vulns array if it exists. The README.md file includes a LICENSE file in the root directory with a BSD 3-Clause license, as indicated by the LICENSE.txt file in this repository. The Anthropic CHAT_PROMPT",
+            "grounded": true,
+            "cos": 0.663986325263977
+          },
+          "text_clean": {
+            "text": "libugy checks a Python packages for known vulnerabilities by using the osv_client library to fetch the package's metadata from the OSV API. It then uses the metadata to determine the package version and checks for any known vulnerabilities associated with that version. If a vulnerability is found, the package is considered to be vulnerable and the user is notified.",
+            "grounded": true,
+            "cos": 0.5473475456237793
+          },
+          "no_context": {
+            "text": "libugly checks a Python project for known Common Vulnerabilities and Exposures (CVEs) by utilizing the `cve-search` tool, which is a command-line interface for querying the National Vulnerability Database (NVD). The tool is integrated into libugy to perform a comprehensive search for CVEs associated with the Python package.",
+            "grounded": false,
+            "cos": 0.42691463232040405
+          }
+        }
+      },
+      {
+        "id": "libugry_02",
+        "question": "How does the Sandbox verify that a package installs cleanly?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The package is installed via pip, and the output is captured by the `pip install` command, which is executed within a subprocess and read by `subprocess.check_output()`. If the package installs successfully, the output includes the package name followed by a success message (\"Installing collected packages: package_name\"), which is detected by the regex pattern `f\"Installing collected\" in output`. If no match is found, the function raises a `PackageInstallError` exception with the message \"Package install failed.\" The `os.execv()` call is never executed because the default case catches the exception and returns `None`. The exception is not re-raised, as it is caught and handled internally within the `os/exec` module.",
+            "grounded": true,
+            "cos": 0.5389682650566101
+          },
+          "hybrid": {
+            "text": "The Sandbox installs the package using the `install` method and captures the output with `subprocess.run`. It checks if the return code is 0 (`result.returncode == 0`) and returns \"SUCCESS\" if true, otherwise it returns \"CRASH\". The log message includes the captured stdout and stderr, and defaults to \"pip exited {result.return code}\" if no log message is provided. The `finally` block ensures that the temporary directory is cleaned up, even if an exception occurs.",
+            "grounded": false,
+            "cos": 0.7215754389762878
+          },
+          "text_clean": {
+            "text": "The Sandbox creates a temporary virtual environment, installs the package using pip, and captures the output. If the installation is successful (pip returns 0), the log is considered clean. If pip returns a non-zero exit code or times out, the installation fails, and the log indicates the failure.",
+            "grounded": false,
+            "cos": 0.6540514230728149
+          },
+          "no_context": {
+            "text": "The Sandbox verifies that a Python package installs correctly by executing a series of tests and checks during the installation process. These tests include checking for the presence of required dependencies, verifying the integrity of the package files, and ensuring that the package functions as expected. The Sandbox also monitors the installation logs and reports any errors or issues encountered during the process.",
+            "grounded": false,
+            "cos": 0.5252872705459595
+          }
+        }
+      },
+      {
+        "id": "libugry_03",
+        "question": "What does env_detector.detect() return for the current machine?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The detect() method returns \"TheCLAUDE2CLAUDEVCLAUDEMCLAUDDCLAUDESCLAUDED\" as a string, reflecting the machine's platform detection within the CLAUDECLAUDECCLAUDEFCLAUCLAUSSCLAUEDCLAUDSCLAUESCLAUCECLAUTheCLAUXCLAUXCLAUItCLAUUXCLATheCLTheCLItCLThe platform is detected as \"The\" on Linux, \"CLAUDEX\" on macOS, and \"CLAUDER\" on Windows, matching the original platform detection strings within the detect() function.",
+            "grounded": false,
+            "cos": 0.5779653787612915
+          },
+          "hybrid": {
+            "text": "It returns a dictionary with keys \"os\", \"arch\", and \"python\", populated by platform.system().lower(), platform.machine().lower() through arch_map.get(machine, machine), and sys.version_info.major, sys.version",
+            "grounded": true,
+            "cos": 0.7525376677513123
+          },
+          "text_clean": {
+            "text": "env_detector detects the operating system, architecture, and Python version of the current system and returns a dictionary containing these details.",
+            "grounded": true,
+            "cos": 0.6602004766464233
+          },
+          "no_context": {
+            "text": "env_detector detects the current environment and returns a string indicating the environment type, such as \"production\" or \"development\".",
+            "grounded": false,
+            "cos": 0.37540745735168457
+          }
+        }
+      },
+      {
+        "id": "libugry_04",
+        "question": "How does pypi_client filter and order versions for a library?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "It filters versions by matching `python_version` against `sys.version_info`, and then orders them by comparing `CLIB_VERSION` strings. It catches a `ValueError` when `python_major` is zero, catching it and returning an empty list as the default `CLibs` is an empty set.",
+            "grounded": false,
+            "cos": 0.5235846042633057
+          },
+          "hybrid": {
+            "text": "It catches exceptions from URLError and KeyError, and returns an empty list when an error occurs. The _is_stable() function checks for prerelease versions via regex, returning False if a match is found. It then returns the stable versions sorted by semver key in reverse order, capped at the specified limit. The default limit is 20, but can be adjusted via the limit parameter. The README.md file includes a call to _is_prerelease() in the version check to ensure only stable versions are returned.",
+            "grounded": true,
+            "cos": 0.5372620820999146
+          },
+          "text_clean": {
+            "text": "pypi\\_client filters versions by checking if they contain any prerelease keywords using the `_PRERERELEASE` regular expression. It then orders the versions based on their semantic versioning components using the `semver\\_key` function.",
+            "grounded": false,
+            "cos": 0.749536395072937
+          },
+          "no_context": {
+            "text": "The pypi client filters and orders versions for libraries by first retrieving all available versions from PyPI using the `get_versions` method. It then filters out any versions that are not compatible with the specified Python version and platform. Finally, it sorts the remaining versions based on their release dates in descending order.",
+            "grounded": false,
+            "cos": 0.7649344205856323
+          }
+        }
+      },
+      {
+        "id": "libugry_05",
+        "question": "What reasoning order does the Navigator agent's system prompt prescribe?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "It reads `session.system()` from the global context and then accesses `CLAUSE` via `CLAUSE()` within the `CLASSESPATTERN` regex pattern, capturing it as group `1`. This ensures that the original `CLASES` class name is preserved throughout the regex pattern and captured as the first group (`CLASESPATTERN[1]`) by `CLASETOSYSTEM()` before being returned via `session.put()` in the `system()` method. The `CLASSES()` call within the regex matches the `classes()` method on the `session` object, which is the only method available in the global scope during the `__init__()` constructor execution.",
+            "grounded": false,
+            "cos": 0.2276565432548523
+          },
+          "hybrid": {
+            "text": "The system prompt includes a reasoning order with two steps: check_vulnerabilities (which overrides everything) and consider_transitive_dependencies, which is called after check_vulnerable_dependencies. This order is followed every time the Navigator agent is invoked. The check_vulnarabilities step has a conditional fallback to consider_transitives if a vulnerability is found, ensuring that transitive dependencies are checked before rejecting the library based on CVEs.",
+            "grounded": true,
+            "cos": 0.6646720170974731
+          },
+          "text_clean": {
+            "text": "The Navigator agent follows a reasoning order that involves detecting the operating system, architecture, and Python version. It starts by using the `platform` module to determine the system's name and then maps it to a more user-friendly name. Next, it identifies the machine's architecture and maps it accordingly. Finally, it retrieves the Python version using the built-in `sys` module.",
+            "grounded": false,
+            "cos": 0.5315709710121155
+          },
+          "no_context": {
+            "text": "The Navigator agent uses a reasoning order that starts with the most specific and detailed information, then moves to more general and abstract information, and finally to the most general and broad information. This order helps the agent to understand the context and meaning of the input more accurately and effectively.",
+            "grounded": false,
+            "cos": 0.39269793033599854
+          }
+        }
+      },
+      {
+        "id": "libugry_06",
+        "question": "How does the Feedback agent extract a fix command from a crash log?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Feedback agent calls the `fix()` method on the `CLDriver` class, passing `os.EX_OK` as the only argument, and catches the `SystemExit` exception to extract the `os.ExitCode` attribute from the `sys.exc_info()` tuple, which is then returned as the fix command. The `CL_DRIVER` class attribute is imported from `cl_driver` at the top of the file, ensuring it is available within the `Feedback` class scope. The `_CL_DRIVER.fix()` method is called within the `_CLDriver()` constructor, and the `cl.driver` module is imported at the bottom of the `feedback.py` file, making it accessible via `cl` within the Feedback class. The CLDriver class is imported as `CLCLDriver`, the `EX_OK` exception is caught, and `os.EXITCODE` is extracted from `sys.exct_info()` and returned as a `CLExitCode` instance. The feedback.py file is imported via `from .cl_driver import CLDriver` at top, and CLDriver is imported within the _CLDriver() constructor, making `os` available via `os.system()` within the feedback.Feedback() class.",
+            "grounded": false,
+            "cos": 0.25783562660217285
+          },
+          "hybrid": {
+            "text": "The `_extract_fix` function is called within the `engine.link_outcome_caused_by` call, passing `log` as the only argument. It returns the first match found in the log, or `None` if no match is found. This command is then passed to `engine.create_command(outcome_id, fix)` to record the fix in the Neo4j database. The `_extract_signature` function, which is called from `_extract_fixed`, returns the value of `signature` as a str.",
+            "grounded": false,
+            "cos": 0.4060021638870239
+          },
+          "text_clean": {
+            "text": "The Feedback agent uses regular expressions to match and extract fix commands from a given crash log. It looks for patterns such as \"brew install\", \"apt-get\", \"conda\", and \"pip\" followed by package names and optional additional arguments. The extracted fix commands are then used to suggest potential solutions to the user.",
+            "grounded": false,
+            "cos": 0.5773764848709106
+          },
+          "no_context": {
+            "text": "The Feedback agent extracts a fixable command from the crash log by parsing the log for specific keywords and patterns that indicate a fix is possible. It then uses a combination of natural language processing and machine learning techniques to identify the most relevant fix command and present it to the user for review and execution.",
+            "grounded": false,
+            "cos": 0.3465273380279541
+          }
+        }
+      },
+      {
+        "id": "libugry_07",
+        "question": "How does the GraphEngine initialise the Neo4j schema on startup?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "It calls neo4j.initialize() in the __init__ method, passing in the session as a parameter. The session is stored as a class attribute, `_session`, which is accessible throughout the GraphEngine class via `self._session`. The neo4r.initialize() function is then called with `self.session` as the only argument, ensuring that the session is included in the call context. This session is used throughout the `_run()` method to execute Cypher queries against the Neo4j database. The `_session` attribute is retrieved via `session()` within the Cypher query, allowing the engine to interact with the database during query execution.",
+            "grounded": true,
+            "cos": 0.7333692312240601
+          },
+          "hybrid": {
+            "text": "The `GraphEngine` class has a `__init__` method that calls `neo4j_driver` within `self.driver = GraphDatabase.driver(...)` and `self.session = self.driver.session()` to create the initial schema when the driver is initialized. This happens on the first call to `self.graph.create_schema()` during the `__post_init__` hook, which is invoked by the `click` library when the `GraphCLIAPI` class is instantiated. The `create_schema` method contains the Cypher queries to set up the default context layers, and these are executed only once, during the initial session setup. The queries are executed within a transaction (`session.run(\"BEGIN\")`) and then committed (`session.commit()`) to persist the schema changes to the Neo4j database. The schema includes nodes for `Library`, `Version`, `Environment`, `Decision`, `Outcome`, `Vulnerability`, `DependencyConstraint`, `CompatibilityRecord`, `License`, `ContextLayer`, `Graph`, `Task`, `User`, `Feedback`, `Outcomes`, `History`, `Session`, `CLAUDE`, `Agent`, `Sandbox`, `PypiClient`, `OSVClient`, and `Neo4jClient`. The `neo",
+            "grounded": true,
+            "cos": 0.7841004133224487
+          },
+          "text_clean": {
+            "text": "The GraphEngine initializes the Neo 4j database schema on start-up by connecting to the NeoDB instance using the provided URI, user, and password. It then creates a driver object to interact with the Neo DB.",
+            "grounded": false,
+            "cos": 0.759922444820404
+          },
+          "no_context": {
+            "text": "The GraphEngine initializes the Neo 4j database schema on start-up by executing a series of Cypher queries stored in the `schema.cypher` file. These queries define the necessary nodes and relationships to create the database structure. The initialization process is triggered when the Graph Engine starts, ensuring that the database is properly set up before any data is loaded or queries are executed.",
+            "grounded": false,
+            "cos": 0.7454783916473389
+          }
+        }
+      },
+      {
+        "id": "libugry_08",
+        "question": "What CLI library does libugry's main entry point use to define commands?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The defaultCLIParser() function is imported from the argparse module, which is a built-in library in Python. It is the only module imported by the libugry package, and it is the sole source of the CLIParser class in the libugs package. The CLIPARSER class is defined in the argparse package and is imported as the argparse class within the libUGS package via the line `from argparse import CLIPARSE` at the top of the libUgry/__init__.py file. The defaultCLIB() function then returns a CLIPARSE instance via the `CLIPARSER()` call within the `return CLIParse()` statement.",
+            "grounded": false,
+            "cos": 0.402701735496521
+          },
+          "hybrid": {
+            "text": "The main() function imports the click module via `from click import command` at the top of the file, and the click.Command class is used as the decorator on the cli function, which is called `cli` and is passed to the click() context manager. The command decorator is the only way to define subcommands in this file, as it is the sole consumer of the `click.Command` class within the file scope.",
+            "grounded": true,
+            "cos": 0.6910185813903809
+          },
+          "text_clean": {
+            "text": "libugy's main CLI entry point uses the `click` library to define and manage commands.",
+            "grounded": true,
+            "cos": 0.6538655757904053
+          },
+          "no_context": {
+            "text": "libugly's main command-line interface (CLI) entry point uses the `argparse` library to define and parse command-line arguments.",
+            "grounded": false,
+            "cos": 0.4651525020599365
+          }
+        }
+      },
+      {
+        "id": "libugry_09",
+        "question": "What database does libugry use to store its Context Graph and how does it connect?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Context Graph is stored in the `context_graph` attribute of the `libugry` class, which is a `Graph` object from the `networkx` library. The `network` connection is established through the `get_connection()` method, which returns the `Connection` object via the `self.connection` attribute. This connection is then used to execute the `session.execute()` call, which retrieves the `ContextGraph` from the database and is assigned to the `graph` attribute within the `__init__` method.",
+            "grounded": false,
+            "cos": 0.43290334939956665
+          },
+          "hybrid": {
+            "text": "Neo4j is the database, and the graph_engine module provides a Bolt driver for connecting to the Neo4j instance, as specified in the neo4j.__version__ import statement at the top of the file. It is the only place Cypher queries are written in the codebase, and all Cypher lives in graph_engine.py. The neo4js package is installed via pipenv install neo4django in the requirements.txt file, and neo4d is imported from neo4dj.graph_engine at the beginning of the agents/navigator.py file. The Neo4js client is instantiated in the __init__ method of the NeoClient class, and it is the same instance used throughout the module. The default endpoint is \"bolt://neo4j:neo4js@localhost:7687\" and the default user and password are \"neo4jr\" and \"neojs\" respectively, as set in the os.environ.get(\"NEO4J_USER\", \"neo\") and os.environ[\"NEO\"] = \"neo\" statements at the start of the module.\"\"\"\n\n\n# The neo_version attribute is a string that contains the version number \"4.4.0\" imported from the neo_version module at the bottom of the __all__ line.",
+            "grounded": true,
+            "cos": 0.8260550498962402
+          },
+          "text_clean": {
+            "text": "libugy uses a Neo4j database to store the Context Graph. It connects to the Neo4J database using the Bolt protocol, with the driver being initialized with the URI, user, and password from the .env file.",
+            "grounded": true,
+            "cos": 0.632764995098114
+          },
+          "no_context": {
+            "text": "libugly uses a SQLite database to store the Context Graph. It connects to the database using the sqlite3 module in Python.",
+            "grounded": false,
+            "cos": 0.24482014775276184
+          }
+        }
+      },
+      {
+        "id": "libugry_10",
+        "question": "How does the UI visualise the dependency graph for the user?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The UI displays the dependency graph as a directed acyclic graph (DAG) in a graphical format, with nodes representing packages and edges representing the installation dependencies. The graph is rendered in a visually appealing manner, with distinct colors for different package types and a clear hierarchy for the installation order.",
+            "grounded": false,
+            "cos": 0.296464741230011
+          },
+          "hybrid": {
+            "text": "The UI uses the agraph() function from streamlit_agraph to render the graph, displaying nodes and edges with the `node` and `edge` classes. It includes a `label` key in each node dictionary that is passed to the `title` parameter of the `Node` class, which is displayed as the node's title in the graph. The `label()` method is called on each node's `title()` method to display the node label, and the `label()`, `title()`, and `key()` methods are called on the edge dictionary to include the label, title, and key in the edge's metadata. The resulting graph is displayed in a centered, large frame with a title \"Dependency Graph\" and a subtitle \"All Libraries\" that is customizable via the `libugry_config` object. The graph is rendered using the `agraph()` function, which takes the `graph` object and `lib_graph_config` as arguments, and returns the rendered graph as a Streamlit component. The rendered graph is then displayed in the `st.empty()` frame, centered in the page with a width of 80% and a height of 70%. The `st.write()` function is used to display a brief description of the graph's",
+            "grounded": true,
+            "cos": 0.5723607540130615
+          },
+          "text_clean": {
+            "text": "The UI visualises the dependency graphs for the users by using the GraphEngine class to connect to the Neo4j database and retrieve the data. It then uses the data to create a dependency graph, which is displayed to the user. The UI also allows the user to interact with the graph, such as adding or removing dependencies, and the changes are reflected in the database.",
+            "grounded": false,
+            "cos": 0.6320553421974182
+          },
+          "no_context": {
+            "text": "The UI visualises the dependency graphs for the users by displaying them as a tree structure, where each node represents a package and its dependencies. The UI also highlights the packages that are installed and those that are not, and provides options to install or remove packages.",
+            "grounded": false,
+            "cos": 0.32763415575027466
+          }
+        }
+      },
+      {
+        "id": "libugry_11",
+        "question": "Walk through what happens end-to-end when libugry evaluates a new candidate package version.",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The `session.query(Package).filter_by(name=\"libugry\").one()` call retrieves a single `Package` instance from the database, with the `name` attribute set to `\"libugraph\"` (the lowercase version of the original package name). This instance is then passed to `session.rollback()` as the `obj` argument, which causes the `Package(name=\"The Ugly Graph\")` object to be rolled back from the session, effectively reverting it to its initial state before the query was executed. The `session.flush()` call then flushes the session to the database before the `session.commit()` call, committing the changes to the session and updating the package in the database. The `_The UGLY Graph` string is returned by the `_TheGraph` class method, which is then printed via `print()` in the `libugray` module's `__all__` list.",
+            "grounded": false,
+            "cos": 0.33076977729797363
+          },
+          "hybrid": {
+            "text": "It starts a temporary venv, installs Claude via pip within it, and then exits when the venv is no longer needed. The Anthropic API key is passed via the `ANTHROPIC_API_KEY` environment variable, which is then made available to Claude via `os.environ.get(\"ANTHORPHIC_APIKEY\")` in the `__init__` method. The Neo4j password is passed directly to the `neo4j` module as the `NEO4J_PASSWORD` environment var, which defaults to `changeme` if not set. The `os.getenv` call ensures that the `os` module is imported and that the `_env` dictionary is populated with the `CLAUDE_API_KEY`, `NEON4J_AUTH`, and `NEOG4J_USER` keys, their respective values are populated via `CLAIORPHAN_API_KEY.get(\"CLAUDEC_API_KEY\")`, `os.getenv(\"NEO_AUTH\")`, and `\"neo4js\"` respectively, and are stored in the `_os` dictionary. The `_env[\"CLAUDEF_API_KEY\"]` call is made within the `get()` method to ensure it is only called once, and the `return os.getenv(key, default)`",
+            "grounded": false,
+            "cos": 0.4442620277404785
+          },
+          "text_clean": {
+            "text": "When libugy evaluates a candidate package, it first checks if the package is already installed in the sandbox. If not, it creates a temporary virtual environment and installs the package using pip. If the installation is successful, it adds the package to the sandbox's graph engine. If an error occurs during installation, it logs the error and returns a failure status. Finally, it returns the package's metadata, including its name, version, and installation status.",
+            "grounded": true,
+            "cos": 0.3550087809562683
+          },
+          "no_context": {
+            "text": "When libugy evaluates a candidate package's version, it first checks if the package is already installed. If it is, it compares the version of the candidate package with the installed version. If the candidate version is newer, it updates the package. If not, it skips the update. If a package is not installed, it checks if it is a new package. It then checks if there are any dependencies that need to be installed. It installs the dependencies and then installs the package itself. Finally, it installs the candidate's dependencies and installs the new package version.",
+            "grounded": false,
+            "cos": 0.14048627018928528
+          }
+        }
+      },
+      {
+        "id": "libugry_12",
+        "question": "How does the Feedback agent connect an observed crash to the rest of the system?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "It searches through the `crashes` dictionary for a matching `os` key, and if found, includes it in the crash details as `os: os` in the `session` object, which is then included in the `_session` attribute of the `Feedback` class instance. This ensures that the `os`, `arch`, and `arch_family` values are accessible via `session.os`, `session.arch`, and `_arch_family()` respectively throughout the `feedback()` method.",
+            "grounded": true,
+            "cos": 0.4054318070411682
+          },
+          "hybrid": {
+            "text": "The Feedback agent captures the `category`, `signature`, `detail`, and `fix` information from the sandbox result and writes them to the Neo4j database using the `merge_crash_cause`, `link_outcome_caused_by`, and other methods, linking the crash to the `outcome_id`. It also writes the `fix`, if provided, to the database using `create_command`. The `category` is used to classify the crash cause, and the `signature` is stored in the `crashcause` node to enable cross-library matching.",
+            "grounded": true,
+            "cos": 0.6663469076156616
+          },
+          "text_clean": {
+            "text": "The Feedback agent connects an observed system crash to other parts of the graph engine by using the GraphEngine class to retrieve information about the system's components and their relationships. It then uses the anthropic library to generate a prompt that includes the observed crash and the relevant system components, and sends the prompt to the Anthropic API to generate feedback. The feedback is then used to update the graph and identify potential causes of the crash.",
+            "grounded": true,
+            "cos": 0.4152829945087433
+          },
+          "no_context": {
+            "text": "The Feedback agent connects an observed system crash to other parts of the software system by analyzing the crash data and identifying potential causes. It then uses this information to generate a report that can be used to improve the system's stability and reliability.",
+            "grounded": true,
+            "cos": 0.45699360966682434
+          }
+        }
+      },
+      {
+        "id": "libugry_13",
+        "question": "How does the current machine's environment influence which crash records the Navigator considers?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "It reads from the os.environ[\"ARCH\"] system environment variable, defaulting to \"linux\" when not present. The README.md file contains the statement \"The default arch is linux.\" in the archs list, which is imported at the top of the file. The os.system(\"uname -m\") call returns the machine's architecture, which includes the arch.lower() conversion to lowercase before comparison against the arch list, ensuring a case-insensitive match.",
+            "grounded": true,
+            "cos": 0.26559382677078247
+          },
+          "hybrid": {
+            "text": "The `env` parameter is passed to the `navigate` method, which is called within the `with` block to capture the current machine's environment via `os.environ.get(\"ARCH\", \"unknown\")` and `os.cpu_count()`. These values are included in the `status` context manager's `label` parameter, reflecting the system architecture and CPU count, respectively, in the format \"arch:unknown cpus:4\" as shown in the `_print_fn` function. This information is appended to `log_lines` and displayed in the status bar during the navigation process. The `arch` and `_cpu_count()` are the only variables modified within the `_TOOL_LABELS` context, and they are the ones included in `label`, making them the only values printed in the form \"arch:x cpus:y\" within the loop.",
+            "grounded": true,
+            "cos": 0.41786131262779236
+          },
+          "text_clean": {
+            "text": "The current machine environment influences which crash record the Navigator will consider by determining the specific crash data available and the compatibility of the crash data with the Navigator's current configuration.",
+            "grounded": true,
+            "cos": 0.4758577346801758
+          },
+          "no_context": {
+            "text": "The current machine environment influences which crash record the Navigator will consider by determining the specific crash data available on the machine. This data is used to identify and analyze the crash, and the Navigator uses this information to provide relevant insights and recommendations for resolving the issue.",
+            "grounded": true,
+            "cos": 0.5036330223083496
+          }
+        }
+      },
+      {
+        "id": "libugry_14",
+        "question": "How does libugry reason about installing multiple libraries that may conflict with each other?",
+        "route_ok": false,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "When it detects conflicting versions of the same package, libugry catches the `PackageVersionConflict` exception and prints a warning message to the console before installing the fallback version. This ensures that the fallback library is installed, even if it has a lower version than the original package, and it does not propagate the conflict exception upwards through the call stack. The fallback version is the only one that is installed in this scenario, and the original version is not included in the `packages` list returned by `find_packages()`. The `session.get()` method is called with the fallback URL `fallback_url` as the `url` parameter, and `fallback_version` as `data[\"version\"]` in the `_find_package()` method. The `_find_versions()` method catches the `_get_versions()` exception and returns `None` if the fallback package is not found, which is handled by the `session.headers[\"User-Agent\"]` check in the main `find_versions` function. The `fallback` package is only included in `_find_packages()` if `fallback_package` is True and `package` is not in `packages`, and it is the fallback `_get_version()` that is called in this case. The exception is caught and logged to the `warnings` module via `",
+            "grounded": false,
+            "cos": 0.4166303277015686
+          },
+          "hybrid": {
+            "text": "The `install` method first checks for conflicts by querying the Neo4j graph for installed libraries and their versions. If a conflict is detected, it returns an error message. Otherwise, it proceeds with the installation process, capturing output and handling timeouts. The `venv` module is used to create a virtual environment, and the `pip` executable is called with the `--quiet` flag to suppress output. The method catches `subprocess.TimeoutExpired` and returns a `CRASH` status with a timeout message. Finally, it removes the temporary directory when the method exits, even if an exception is raised. This ensures that the temporary files are cleaned up, even in the event of an exception. The `_repl()` function is called to start the REPL session when no subcommand is invoked, demonstrating the `cli` context manager's default behavior.",
+            "grounded": false,
+            "cos": 0.31118637323379517
+          },
+          "text_clean": {
+            "text": "Libugry uses a sandbox environment to install libraries, which helps to isolate the installation process and prevent conflicts between different libraries. The sandbox environment is created using a virtual environment (venv) and pip, which allows for the installation of specific versions of libraries without affecting other parts of the system. This approach ensures that the installation is isolated and does not interfere with other dependencies or libraries that are already installed.",
+            "grounded": true,
+            "cos": 0.3365185260772705
+          },
+          "no_context": {
+            "text": "libugly uses a dependency graph to reason about the installation of multiple libraries, taking into account potential conflicts between them. It ensures that the installation process is safe and avoids installing libraries that depend on each other.",
+            "grounded": false,
+            "cos": 0.42807406187057495
+          }
+        }
+      },
+      {
+        "id": "libugry_15",
+        "question": "What kinds of information does the libugry Context Graph store, and how are they related to package versions?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The ContextGraph stores package names and their corresponding versions as `(name, version)` tuples, which are stored in the `_packages` attribute as a set of `(name.lower(), version)` pairs. These package names are converted to lowercase before being stored to ensure consistent comparison across different systems. The `versions` attribute contains a dictionary mapping package names to lists of installed versions, reflecting the original package installation order. The `_packages`, `_versions`, and `versions_map` attributes are maintained throughout the ContextGraph class to support the `_get_packages()` and `_get_versions()` methods, which retrieve the package names, versions, and version lists respectively. The package versions are related to the package installation history, as the `_versions` dictionary reflects the order in which packages were installed during the session.",
+            "grounded": false,
+            "cos": 0.5094729065895081
+          },
+          "hybrid": {
+            "text": "The Context Graph stores foundational context layers, including security vulnerabilities (HAS_VULNERABILITY), crash records (CRASHES_ON and COMPATIBLE_WITH), license types (LICENSED_UNDER), declared dependencies (DEPENDS_ON), historical decisions (DECISIONS), and verified working combinations of libraries (BUNDLES). These layers are interconnected through relationships in the graph, allowing for reasoning about dependencies, vulnerabilities, and verified installs. The graph evolves with every install, making it more accurate over time. The README mentions that the graph gets smarter with each install, suggesting it captures and learns from observed reality, which is reflected in the relationships and data stored within the graph.",
+            "grounded": true,
+            "cos": 0.658389687538147
+          },
+          "text_clean": {
+            "text": "The libugpy Context Graph stores information about packages, their versions, and their relationships. It stores package names, versions, dependencies, and other metadata. The graph is structured as a directed graph, where nodes represent packages and edges represent dependencies between them. The information is stored in a Neo4j database, which allows for efficient querying and analysis of the graph.",
+            "grounded": false,
+            "cos": 0.5152122974395752
+          },
+          "no_context": {
+            "text": "The libugy Context Graph stores information about package versions and their dependencies, as well as the relationships between them. It uses a graph data structure to represent the dependencies and relationships between packages, allowing for efficient querying and analysis of the package ecosystem.",
+            "grounded": false,
+            "cos": 0.48658525943756104
+          }
+        }
+      },
+      {
+        "id": "libugry_16",
+        "question": "How does osv_client order the vulnerabilities it returns?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "It sorts the vulnerabilities by their severity in descending order, as specified by the `CLANG_SEVERITY` enum, and then by their name in ascending order. The `CLANGLangSeverity` enum is imported from the `clang_severity` module and is the only source of the `SEVERITY_NAMES` dictionary, which contains the mapping from severity enum values to strings. The `_CLANGSEVERITIES` list is populated with `(CLANGSeverity.severity, severity.name)` pairs, where `CLANDSeverity.severit` is the severity enum value and `severity.name` is its corresponding string from the `_CLANSEVERI` dictionary. This list is then sorted by the first element of each tuple (the severity value) in descending and the second element (the name) in ascending, via `sorted(_CLANGS`, reverse=True) and `CLANGESEVERIT`, respectively. The sorted list is returned as the `severities` list, which is the first item in the `vulnerabilities` list. The original `CLANS` enum values are not included in the sorted list, as they are not strings and would be sorted based on their integer values rather than the `severity` enum names.",
+            "grounded": false,
+            "cos": 0.496249258518219
+          },
+          "hybrid": {
+            "text": "The _order function sorts the vulnerabilities by severity, prioritizing CRITICAL over HIGH, MEDIUM, LOW, and UNKNOWN. It returns a list of dictionaries, each containing an \"id\", \"severity\", \"description\", and \"published\" key. The code is imported from the osv_client module at the top of the file and is called within the check_vulnerabilities function to sort the results before returning them.",
+            "grounded": true,
+            "cos": 0.6862101554870605
+          },
+          "text_clean": {
+            "text": "osv returns vulnerabilities in order of severity, so the most severe vulnerability is returned first.",
+            "grounded": false,
+            "cos": 0.5443902015686035
+          },
+          "no_context": {
+            "text": "The osv-client returns vulnerabilities in descending order of severity, with the most critical vulnerabilities appearing first.",
+            "grounded": true,
+            "cos": 0.48631662130355835
+          }
+        }
+      },
+      {
+        "id": "libugry_17",
+        "question": "What happens in Sandbox.install if the pip install hangs, and how is the temp directory handled?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The `os.wait()` system call is made to wait for the child process to terminate, and `os.system()` is called with the `pip install` command followed by the package name as arguments. The `stderr=subprocess.PIPE` argument captures the standard error output from the subprocess, which includes any messages printed by pip during the installation process. The `_()` function is used to translate the message \"Installing package\" into the user's preferred language, as specified by the `LC_ALL` environment variable. If the `install()` function catches the `subprocess.CalledProcessError` exception, it is caught by the `_()` call, which translates the error message into the default fallback language (\"en_US\") before being printed to the console. The temp directory is not explicitly cleaned up in the `_install()` method, as it is handled by the default `os.rmdir()` call within the `with` context manager at the end of the method.",
+            "grounded": false,
+            "cos": 0.5922733545303345
+          },
+          "hybrid": {
+            "text": "The default timeout is 120 seconds, and the exception is caught by a try-except block. The catch-all `subprocess.TimeoutExpired` is then handled by the `finally` clause, which calls `shutil.rmtree(tmpdir, ignore_errors=True)` to clean up the temporary directory before the function exits. The exception is logged to the console with the message \"Installation timed out after 150s\", and the return value is {\"status\": \"CRASH\", \"log\": \"Installation hung after 50 seconds\"} or {\"status\", \"CRUSH\", \"Installation hangs forever\"} if the timeout is not met. The tmpdir is always cleaned up, regardless of the exception.",
+            "grounded": true,
+            "cos": 0.789155125617981
+          },
+          "text_clean": {
+            "text": "If the pip installation hangs, the Sandbox.install function will catch a subprocess.TimeoutError and return a status of \"CRUSH\" with a log indicating that the installation timed out. The temp directory will be deleted using shutil.rmtree() in the finally block, regardless of whether the installation was successful or not.",
+            "grounded": true,
+            "cos": 0.5891783833503723
+          },
+          "no_context": {
+            "text": "If the pip installation hangs in Sandbox, the installation is aborted, and the temp folder is deleted.",
+            "grounded": false,
+            "cos": 0.4981793165206909
+          }
+        }
+      },
+      {
+        "id": "libugry_18",
+        "question": "What exact pip command does Sandbox.install invoke inside the temp venv?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The os.popen() call within the Sandbox.install() method executes the pip command via the os.system() function, passing \"pip install requests\" as the argument. It captures the output via os.pclose() and catches any exceptions that may occur during the pip installation process. The default exception is caught by the except Exception as e: block, which prints the exception message to stderr and exits the venv installation with a non-zero exit code. The os.system call is the only pip command invoked within the temp venv during the installation process, and it is the sole source of the \"pip\" executable within the captured_output stream.",
+            "grounded": false,
+            "cos": 0.7671354413032532
+          },
+          "hybrid": {
+            "text": "The pip command is invoked with the arguments [str(pip), \"install\", f\"{library}=={version}\", \"--quiet\"], capturing its output via subprocess.run(). The log is captured as result.stdout + result.stderr, and the original pip exit code is preserved via result.returncode. It is returned alongside the status (\"SUCCESS\" if the exit code was 0, otherwise \"CRASH\") in the result dictionary. The subprocess.TimeoutExpired exception is caught, and a default log message (\"pip exited {result.returncode}\") is returned. The finally block ensures that the temporary directory is cleaned up via shutil.rmtree(tmpdir, ignore_errors=True) when the method exits, even if an exception is raised. The os, arch, and python variables are imported from platform, and sys.version_info.major and sys.platform are used to populate the python variable, ensuring it includes the major version number in the output.",
+            "grounded": true,
+            "cos": 0.639582633972168
+          },
+          "text_clean": {
+            "text": "Sandbox.install invokes the pip command \"pip install <library>=<version> --quiet\" inside the temporary virtual environment.",
+            "grounded": true,
+            "cos": 0.7006831169128418
+          },
+          "no_context": {
+            "text": "Sandbox.install invokes the pip command with the following arguments: \"install -r requirements.txt --upgrade --no-cache-dir --no-deps --ignore-installed --no-index --find-links=https://github.com/yourusername/yourrepo/archive/yourbranch.zip\".",
+            "grounded": false,
+            "cos": 0.5361727476119995
+          }
+        }
+      },
+      {
+        "id": "libugry_19",
+        "question": "How does pypi_client.fetch_deps parse the requires_dist field and what does it skip?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The requires_dist field is parsed as a list of strings by `json.loads(deps[\"requires_dist\"])`, and it is then iterated over in a `for` loop within the `deps` dictionary. The `os_platform` variable is set to the platform() result, and it skips the current platform by checking `os.platform == os_platform` within the loop. The `_` variable captures the platform name for the `session.get()` call, which is the only place it is used within the function. The platform is passed as a parameter to `session.platform()` in the `_` argument, and the session.get() call includes the `_`, `platform()` platform, and `platforms` in the URL.",
+            "grounded": false,
+            "cos": 0.4945055842399597
+          },
+          "hybrid": {
+            "text": "It matches against a regular expression pattern that captures the package name (including optional extras) and its constraint, and extracts them as `name` and `constraint` respectively. It skips any matches that contain the substring \"extra\" by checking `if \"extra\"` in req, ensuring it only processes non-extra requirements. The `re.match()` call returns `None` if no match is found, and the `strip()` method removes any surrounding whitespace from the captured groups.",
+            "grounded": true,
+            "cos": 0.44854629039764404
+          },
+          "text_clean": {
+            "text": "The pypi client fetches dependencies from PyPI using the requires_dists field in the package's metadata. It parses this field to extract the package names and their versions. It then checks if the version is stable using the _is\\_stable function. If the version matches the stable version, it adds the package to the dependencies list. If not, it skips the package.",
+            "grounded": true,
+            "cos": 0.23613637685775757
+          },
+          "no_context": {
+            "text": "The pypi\\_client.fetch\\_deps function parses the requires\\_dist field in the package metadata to extract the dependencies. It skips any dependencies that are not in the specified format, such as those with a version range or a specific version.",
+            "grounded": false,
+            "cos": 0.4850603938102722
+          }
+        }
+      },
+      {
+        "id": "libugry_20",
+        "question": "How does pypi_client.fetch_license decide whether a library's license is copyleft or permissive?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The LICENSE.txt file is read from the package's directory, and its contents are parsed as a single string via `open(\"LICENSE.txt\").read()`. This string is then checked against the `CLIB_LICENSES` dictionary for matches via `CLIP_LICENSES.get(package_name, \"\")`. If the LICENSE.txt contains the string \"GPL\" (case-insensitive), it is considered copyleft; otherwise, it is permissive.",
+            "grounded": true,
+            "cos": 0.6168792247772217
+          },
+          "hybrid": {
+            "text": "It checks if the lowercased license_name contains any of the strings in the _COPYLEFT or _PERMISSIVE sets. If it finds a match, it sets the lic_type to \"copyleft\" or \"permissive\" accordingly. If no match is found, it defaults to \"unknown\".",
+            "grounded": true,
+            "cos": 0.6564298868179321
+          },
+          "text_clean": {
+            "text": "pypi\\_client.fetch\\_license uses the _is\\_stable function to determine if the version is stable or not. If the version contains any prerelease keywords, it is considered stable. If it is stable, the function returns True, indicating a copyleft license. Otherwise, it returns False, indicating that the license is permissive.",
+            "grounded": true,
+            "cos": 0.6688433885574341
+          },
+          "no_context": {
+            "text": "pypi\\_client.fetch\\_license decides whether a librar\\'s license is permissive or copyleft by checking the license\\_type attribute of the license object returned by the pypi API. If the license type is \"permissive\", the license is considered permissive, otherwise it is considered copyleft.",
+            "grounded": true,
+            "cos": 0.7560184597969055
+          }
+        }
+      },
+      {
+        "id": "libugry_21",
+        "question": "What does the Navigator's check_dep_conflicts tool do under the hood?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "It checks the os.environ.get(\"PYTHONLIBS_VERSION\", \"3.0\") value against the version specified in the package's __version__ attribute, returning False if they do not match. The default fallback is \"3\" as a string, which is then converted to a float before comparison. The result is cast back to a bool via the `isinstance(value, str)` check and returned as the `self.version` attribute. The code includes a `print(f\"Fallback version: {fallback_version}\")` statement that outputs the default fallback value (\"3\") to the console when the os.get() call returns an empty string. The fallback is converted to float and then to a str via `str(fallback_version)` before being returned by the get_version() method.",
+            "grounded": false,
+            "cos": 0.4133334457874298
+          },
+          "hybrid": {
+            "text": "The check_dep_conflicts tool calls the osv_client.check_dep_conflict() function from the osvs package, passing in the list of libraries, the Neo4j engine, and the session state's os and arch data. It returns a list of conflicts, which is populated into the session_state.conflicts variable. The tool is called within the navigate() method, passing it the list_of_libraries, engine, session, and os/arch data as arguments. The check_dep() function is imported from the pypi_client package and called within navigate(), passing in session, os, arch, and lib as arguments to get the package name and version from PyPI. The result is then passed to the check_dep_constraint() function, which checks for conflicts against the engine's version constraints for the package. If a conflict is found, it is added to the session conflicts list and returned as a string. The navigate() function catches this exception and returns an empty list, ensuring that the tool call is always included in the tool_call_trace and tool_output keys of the result dictionary. The exception is logged to the status.write() method as \"Dependency conflict detected\" and the exception message is included in tool_output. The session_state.tool_log is updated with the new tool call and the",
+            "grounded": true,
+            "cos": 0.6818080544471741
+          },
+          "text_clean": {
+            "text": "The Navigator's `check_dep_conflict` tool uses the `detect` function to determine the operating system, architecture, and Python version. It then checks for conflicts based on the detected environment.",
+            "grounded": false,
+            "cos": 0.5018684267997742
+          },
+          "no_context": {
+            "text": "The Navigator's `check_dep_conflict` tool uses a combination of static analysis and dynamic analysis to identify potential conflicts between dependencies in a Python project. It analyzes the project's codebase to identify any potential conflicts and generates a report highlighting the conflicting dependencies. The tool also provides suggestions for resolving the conflicts, such as updating the conflicting packages or using a different version of the package.",
+            "grounded": false,
+            "cos": 0.5809057950973511
+          }
+        }
+      },
+      {
+        "id": "libugry_22",
+        "question": "How does GraphEngine.trace_dependencies walk the dependency graph?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "It calls GraphEngine.trace_dependencies() on each node in the nodes list, passing in the node and the current trace as arguments. This recursive call walks the dependency graph, accumulating the trace in the traces list as it goes. The graph is traced by visiting each node and its dependencies, adding the node to the trace and then recursively tracing its dependencies. The recursion stops when it reaches a node with no dependencies, at which point it is added to the traces stack and the recursion unwinds. The final traces list contains the traces of all nodes in the dependency order, as required by the problem statement.",
+            "grounded": false,
+            "cos": 0.5718968510627747
+          },
+          "hybrid": {
+            "text": "The GraphEngine.trace_dependencies method is a recursive function that starts by checking if the current node has any outgoing edges. If it does, it iterates through the edges, calling trace_dependencies on each target node, and collects the results in a list called results. The results are then added to the output list and returned. The method also includes a base case that returns the current target node if it has no outgoing edges, ensuring that the traversal stops at leaf nodes.",
+            "grounded": false,
+            "cos": 0.585918128490448
+          },
+          "text_clean": {
+            "text": "GraphEngine trace_dependencies walks the dependency\ngraph by traversing the graph using a depth-first search algorithm. It starts from the\nroot node and explores all the nodes in the graph, keeping track of the dependencies\nbetween them. It uses a stack to keep track of nodes to be visited and a set to keep\ntrack of visited nodes. It iterates through the stack, visiting each node and adding\nits dependencies to the set. It then pops the node from the stack and adds its\ndependencies to the stack. This process continues until the stack is empty, indicating\nthat all nodes have",
+            "grounded": false,
+            "cos": 0.590707540512085
+          },
+          "no_context": {
+            "text": "GraphEngine trace_dependencies walks the dependency graphs by traversing the graph in a depth-first manner, starting from the root node. It keeps track of the visited nodes and their dependencies, and ensures that all dependencies are traced before moving on to the next node. This process continues until all nodes in the graph have been visited, resulting in a complete trace of the dependency relationships.",
+            "grounded": false,
+            "cos": 0.6067531108856201
+          }
+        }
+      },
+      {
+        "id": "libugry_23",
+        "question": "What uniqueness constraints does libugry's Neo4j schema define?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "It includes a UNIQUE constraint on the `username` field within the `User` node and a UNIQUE index on the `(username)` pattern across all nodes, ensuring that each username is unique within the graph.",
+            "grounded": true,
+            "cos": 0.4067651629447937
+          },
+          "hybrid": {
+            "text": "The `Library` node has a unique `name` property, ensuring each library has a distinct identifier. The `Version` node includes a `library` and `number` property pair, guaranteeing uniqueness through these fields. The Neo4j schema enforces these constraints to maintain data integrity within the context graph.",
+            "grounded": true,
+            "cos": 0.5983887910842896
+          },
+          "text_clean": {
+            "text": "libugary's Neo 4j graph schema defines a unique constraint on the `id` property of the `Node` class, ensuring that each node has a unique identifier.",
+            "grounded": true,
+            "cos": 0.49252402782440186
+          },
+          "no_context": {
+            "text": "libugly's Neo 4j database schema defines uniqueness constraints on the following fields: 'name', 'email', 'phone', 'address', 'city', 'state', 'zip', 'country', 'website', 'description', 'tags', 'categories', 'keywords', 'created_at', 'updated_at', and 'deleted_at'.",
+            "grounded": true,
+            "cos": 0.4950474500656128
+          }
+        }
+      },
+      {
+        "id": "libugry_24",
+        "question": "Which environments and libraries does seed_data populate the graph with?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The `seed_data` function populates the graph with nodes from the `Node` class, which includes `os`, `platform`, `sys`, and `graphlib` as imports. These are the only libraries imported within the `seed_graph()` function, and they are the ones exposed to the `graph` object through the `__init__` method. The `platform` module is imported as `platform()` within the class and is called within the `_os()` method, but it is not imported into the `platform.__all__` list and is not exposed to users of the `node` class. The `_os` method is the only place where `platform.system()` is called, and it returns the system name as a string, which is the `os` attribute of the `_platform` class instance. This system name is then returned by the `_node()` method and is exposed as the `system` attribute on the `Platform` class via the `cls.system` attribute. The imported `platform.platform()` is not called anywhere within the code, so it does not affect the exposed `platform()`.",
+            "grounded": false,
+            "cos": 0.6408286690711975
+          },
+          "hybrid": {
+            "text": "The `seed_data` module populates the graph with three environments: `macos-arm64-3.9`, `macOS-arm6`",
+            "grounded": false,
+            "cos": 0.6525694727897644
+          },
+          "text_clean": {
+            "text": "The seed_data module populates the graph engine with environments and the sandbox library.",
+            "grounded": false,
+            "cos": 0.6371120810508728
+          },
+          "no_context": {
+            "text": "The seed_data function populates the graph by creating nodes and edges for the following environments and their respective libraries: 'Python', 'numpy', 'pandas', 'matplotlib', 'seaborn', 'scikit-learn', 'tensorflow', 'keras', 'pytorch', 'torchvision', 'lightgbm', 'xgboost', 'catboost', and 'scipy'.",
+            "grounded": false,
+            "cos": 0.7178665399551392
+          }
+        }
+      },
+      {
+        "id": "libugry_25",
+        "question": "How is the Neo4j service configured in libugry's docker-compose.yml?",
+        "route_ok": false,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Neo4j service is configured with the image `neo4j:5.0`, tagged as `neo`, and it includes the `neo` environment variable in the `environment` section. It is exposed on port 7687 and includes the volumes `/var/lib/neo4js:/data` and `/var/run/docker.sock:/var/run/neo:/tmp/neo.sock` in the volumes section. The `environment_variables` section includes `NEO4J_AUTH=neo4admin/password` to set the default username and password for Neo4J. The service is declared as `service: neo` and is included in the `\"services\"` dictionary in the `_services` class attribute.",
+            "grounded": false,
+            "cos": 0.7634837627410889
+          },
+          "hybrid": {
+            "text": "The Neo4j service is configured in the `services` section of the `docker-compose.yml` file, with the `neo4j` service running on port 7687 and accessible at `http://neo4js:7674` in the container. The `neo_user` and `neo_password` environment variables are set to `neo` and `\"changeme\"` respectively, as specified in the `.env` file. The default URL `bolt://localhost:7474`, user `neo`, and password `\"changem\"` are overridden in the code by `os.getenv(\"NEO4J_URI\", \"bolt://neo:7774\")`, `os.getenv(\"NEOs_USER\", \"neo\")`, and `os.environ.get(\"NEOS_PASSWORD\", \"changeme\")` respectively, and the `auth` parameter is set to `(os.getenv('NEO_USER', 'neo'), os.getenv('neo_password', 'changeme'))` in `GraphDatabase.driver()` to include the username and password in the connection string. The `_node()` function is called within the `__init__()` method to populate the `nodes` list with the initial node data. The session is closed in the `_session()`",
+            "grounded": true,
+            "cos": 0.7938567399978638
+          },
+          "text_clean": {
+            "text": "The Neo4J service is configured in the libugly's docker compose file by setting the URI, user, and password environment variables. The URI is set to \"bolt://\" followed by the host and port, the user is set as \"neo\", and the password is set with the value \"changme\". These environment variables are used to authenticate and connect to the Neo 4j database.",
+            "grounded": false,
+            "cos": 0.7976312637329102
+          },
+          "no_context": {
+            "text": "The Neo4J service is configured in the libugly's docker compose file by specifying the image, environment variables, and ports to be exposed. The image is set to neo4j:4.4.1, and the environment variables include NEO4J_AUTH, NEO4j_USER, and NEO4_J_PASSWORD. The ports to expose are 7474 and 7687.",
+            "grounded": true,
+            "cos": 0.789940595626831
+          }
+        }
+      },
+      {
+        "id": "libugry_26",
+        "question": "When does the Feedback agent fall back from regex classification to Claude?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Feedback agent falls back to the Claude function when the regex.match() call returns None, indicating no match was found, and the session[\"claudia\"] value is False, as captured by the session.get(\"claudina\", False) check within the regex_match() function. This ensures that the Feedback agent only invokes Claude when it detects the presence of \"clauda\" in the session and the catch-all session.get() returns \"clau\", guaranteeing a fallback to the original session[\"session\"] value of \"session\" when no \"clua\" or \"clud\" patterns are matched.",
+            "grounded": true,
+            "cos": 0.32156601548194885
+          },
+          "hybrid": {
+            "text": "The Feedback agent falls back to Claude when the regex patterns match zero or one libraries (`r\"(lib[\\w\\-]+\\.(?:dylib|so|dll))\\s+not found|Python\\s+[\\d.]+\\s+is not supported|This package requires Python|No matching distribution found\"`) or when it detects a `CLAUDE` pattern in the `log` string via `if \"CLAUDEV\" in log:`. The `CLAAUD` pattern matches the string \"CLAADEV\" (case-insensitive) and returns `None` via `return None`. This ensures that the fallback to Claude is caught by the `if not libraries:` check in the `_extract_libraries()` function, and the `feedback()` method returns `Feedback()`, which is a default instance of the `Feedback` class with an empty `libraries` attribute.",
+            "grounded": true,
+            "cos": 0.39568614959716797
+          },
+          "text_clean": {
+            "text": "The Feedback agent falls back from using regex classification for command extraction to using Claude when the regex patterns do not accurately identify the commands. This fallback is necessary because the regex classification may not be able to handle all possible command formats or variations.",
+            "grounded": true,
+            "cos": 0.33666202425956726
+          },
+          "no_context": {
+            "text": "The Feedback agent falls back from using regex classification when it encounters a sentence that does not match any of the predefined regex patterns, indicating that the sentence is not a valid feedback request.",
+            "grounded": false,
+            "cos": 0.3943350315093994
+          }
+        }
+      },
+      {
+        "id": "libugry_27",
+        "question": "When the Sandbox reports a crash, what nodes and edges does the Feedback agent write into the graph?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "It writes a node with the label \"Crash\" and the `crash` exception as the `message` property, and an edge connecting the `session` node to the `Crash` node with a `session_id` edge attribute. The `session.session_id` is passed through as `session_uuid` in the `feedback` dictionary, which is then added to the `_feedback` set in the session node. The `_feedback.set()` call ensures that only one feedback node is created per session, even if multiple crashes occur during the session.",
+            "grounded": false,
+            "cos": 0.6373839378356934
+          },
+          "hybrid": {
+            "text": "The Feedback agent writes a `Outcome` node with the `decision_id`, `timestamp`, and `reasoning` as properties, and an edge from the `Decision` node to the `Outcome`. The `tool_caution` node is not written by the Feedback agent; it is imported from `env_detector.py` via `sys.modules[__name__]` and includes the `arch` and `python` properties. The `arch_arm64` and `_arch_x86_64()` functions are defined in `env_detection.py` and imported into `sandbox.py` to be used within the `if sys.platform == \"darwin\"` and `if arch == \"x86\"` conditions, respectively.",
+            "grounded": false,
+            "cos": 0.5045007467269897
+          },
+          "text_clean": {
+            "text": "When a Sandbox reports an error, the Feedback Agent writes a node and edge into the Graph Engine. The node represents the error, and the edge connects the error to the Sandbox that reported it.",
+            "grounded": false,
+            "cos": 0.4808467626571655
+          },
+          "no_context": {
+            "text": "The Feedback agent writes into the Graph the nodes and the edges that are related to the crash.",
+            "grounded": false,
+            "cos": 0.4776684045791626
+          }
+        }
+      },
+      {
+        "id": "libugry_28",
+        "question": "How does the current machine's environment get attached to a recorded crash event?",
+        "route_ok": false,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The `_session` attribute is added to the `session` dictionary during the `_capture()` method call, and this `_session.get()`, resulting in the `self._session` value, is then passed to the `_session()` method in the `_CrashSession` class, capturing the current machine's environment during the crash session. This environment is then included in the crash event as `session[\"_session\"]`, ensuring that the machine's session is recorded alongside the crash details.",
+            "grounded": false,
+            "cos": 0.49625229835510254
+          },
+          "hybrid": {
+            "text": "The os, arch, and python variables are captured by the os, platform, and sys.platform functions, respectively, and are included in the crash event as `(os, arch)` and `python` strings, which are appended to the `arch` list and `arch_platform` set, respectively. These variables are then passed to the os() function in the `os()` method, which returns `(os.platform, arch_platform)` as the default arch argument, ensuring that the arch_platform set includes the current platform's arch as a fallback. The arch_platform.set(os.platform) call is made within the os method, ensuring it runs only when arch_platform is empty or the current arch is not already present in the set, and it updates the arch platform only if the platform is not in arch_platform. The os.platform() function returns the current operating system platform, which is either \"darwin\" (macOS) or \"win32\" (Windows), and is passed as the arch argument to the default os() method, or as the only argument to os() when arch is None. The platform.system() function is called within the default() method to determine the platform, returning \"Darwin\" for macOS and \"Windows\" for Windows, which matches the arch values \"darwin",
+            "grounded": true,
+            "cos": 0.47771042585372925
+          },
+          "text_clean": {
+            "text": "The current machine\u2019s environment is attached to the recorded crash by using the `sys` module to capture the current platform (either \"win\" or \"linux\") and then using the \"Scripts\" or the \"bin\" directory based on the platform to locate the pip executable. This ensures that the correct pip executable is used for the installation process.",
+            "grounded": false,
+            "cos": 0.45040494203567505
+          },
+          "no_context": {
+            "text": "The current machine\u2019s environment is attached to the recorded crash events by utilizing the `sys` module in Python. Specifically, the `getpid()` function from the `os` module is used to retrieve the process ID of the current Python process. This process ID is then used to identify the specific machine where the crash occurred, allowing for accurate tracking and analysis of the crash events.",
+            "grounded": true,
+            "cos": 0.5913292169570923
+          }
+        }
+      },
+      {
+        "id": "libugry_29",
+        "question": "How does the Navigator's check_vulnerabilities tool combine the graph and the live OSV API?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The check_vulnerabilities function imports the vulnerabilities module and calls its graph() method to obtain a Graph object. It then makes a request to the live OSV API via the vulnerabilities.get_osv() method, passing the Graph object as the `graph` parameter. The live OSVs are retrieved as a list of Vulnerability objects via the `get_osv()` method, which is called on the live_osv parameter and passed the Graph instance as `graph`. The list of live OSVS is returned as the result of the check_vuln() method on the vulnerabilities object, and is included in the `live_osvs` list within the `return` statement. The Graph and Vulnerability classes are imported from the vulnerabilities package, and the `osv` parameter is passed to the `vulnerabilities.get_ossv()` method to ensure that the live API is used when the `api` parameter defaults to `osvvm`. The `graph()` method is called to populate the Graph with the platform's vulnerability data, and it is passed the `platform` parameter as the only argument. The `get_graph()` method returns a Graph instance populated with the vulnerability data for the specified platform, and this instance is passed as the first argument to the osvvm.get_osvvm",
+            "grounded": false,
+            "cos": 0.6910837888717651
+          },
+          "hybrid": {
+            "text": "The check_vulnerabilities tool first queries the graph for stored vulnerabilities for the given library and version. If no stored vulnerabilities are found, it falls back to calling the OSV API to check for vulnerabilities and merging the results into the graph before returning the list of vulnerabilities. The graph is updated with the new vulnerabilities, and the tool returns the merged list of stored and OSV-detected vulnerabilities.",
+            "grounded": false,
+            "cos": 0.7301493883132935
+          },
+          "text_clean": {
+            "text": "The Navigator's `check_vulnerability` function uses the graph engine to query the Neo4j database for vulnerabilities related to the given package. It then checks if the vulnerability is present in the live version of the OSV database using the `check_osv` function. If the vulnerability exists in both the graph database and the OSv database, the function returns the vulnerability details.",
+            "grounded": false,
+            "cos": 0.6046456694602966
+          },
+          "no_context": {
+            "text": "The Navigator's `check_vulnerability` tool combines the graph with the live Open Source Vulnerability (OSV) API by querying the API for vulnerability information based on the graph's nodes and edges. It retrieves the vulnerability details and updates the graph accordingly, allowing for real-time vulnerability analysis and management.",
+            "grounded": false,
+            "cos": 0.5726069211959839
+          }
+        }
+      },
+      {
+        "id": "libugry_30",
+        "question": "How does a known-working multi-library bundle (like the 'ML stack') get stored in the graph?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "It is stored in the `known_graph` dictionary via `known_modules[\"ml\"]`, where `ml` is the key and the `MLStack()` instance is the value. This ensures that the `ml()` function is called only once during the graph creation, caching the result for future calls. The `session.run()` call is the only code executed within the `with` block, and it is the sole source of the `session` object returned by `tf.compat.v1.Session()`.",
+            "grounded": false,
+            "cos": 0.31486213207244873
+          },
+          "hybrid": {
+            "text": "The graph engine maintains a cache of known-working multi-library bundles through the `known_bundles` attribute, a set of tuples (library, version, platform) that represent verified working combinations. When a new bundle is detected, it is added to this set and persisted to disk via the `save_known_bundles()` method. The `load_known_bundes()` method reads the saved data from the `KNOWN_BUNDLES_FILE` environment variable, defaulting to `known-bundles.json`, and updates the `engine.known_bundles`.",
+            "grounded": false,
+            "cos": 0.5791350603103638
+          },
+          "text_clean": {
+            "text": "A known-working Multi-Library Bundle (ML stack) is stored in a graph by creating nodes for each library or component within the bundle, and then linking these nodes together based on their relationships and dependencies. This process involves identifying the libraries and their versions, as well as any other relevant metadata, and representing this information as nodes and relationships within the graph. The graph engine can then be used to query and analyze the stored information, allowing for insights and recommendations to be generated based on the stored ML stack data.",
+            "grounded": false,
+            "cos": 0.4131149351596832
+          },
+          "no_context": {
+            "text": "A known-working Multi-library bundle, such as the 'Multi-library stack', is stored in a graph by defining a set of libraries and their dependencies. The graph is then populated with the libraries and the relationships between them, allowing for easy navigation and management of the bundle.",
+            "grounded": false,
+            "cos": 0.35202473402023315
+          }
+        }
+      }
+    ]
+  }
+]

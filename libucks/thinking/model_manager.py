@@ -102,6 +102,7 @@ class ModelManager:
         quantization: str = "none",
         bnb_4bit_compute_dtype: str = "float32",
         device: str = "auto",
+        base_model_dtype: str = "float16",
     ) -> None:
         """Load the Base receiver model for latent injection (Interlat-Lite decoder).
 
@@ -142,7 +143,12 @@ class ModelManager:
                 _do_sequential_mps_quant = True
             else:
                 if quantization == "none":
-                    kwargs["torch_dtype"] = torch.float16
+                    # Per-repo dtype: fp16 is safe for ~0.5B receivers; 1.5B+
+                    # overflow fp16 on activations → NaN loss → silent training
+                    # failure. Users opt into bf16 via base_model_dtype in
+                    # .libucks/config.toml when scaling up.
+                    _resolved_dtype = _DTYPE_MAP.get(base_model_dtype, torch.float16)
+                    kwargs["torch_dtype"] = _resolved_dtype
 
         self._base_model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
         if _do_sequential_mps_quant:

@@ -223,7 +223,7 @@ class LatentStrategy(ThinkingStrategy):
 
         return hidden
 
-    async def decode(self, result: "torch.Tensor", query: str = "") -> str:  # noqa: ARG002
+    async def decode(self, result: "torch.Tensor", query: str = "", verbatim: str = "") -> str:  # noqa: ARG002
         """Convert an adapter soft-prompt into natural language via the trained Base receiver.
 
         This is the Interlat-Lite decoder. It:
@@ -306,6 +306,20 @@ class LatentStrategy(ThinkingStrategy):
                 framed = torch.cat(
                     [bop_embed.view(1, -1), soft_prompt, eop_embed.view(1, -1)], dim=0
                 )  # (K+2, d)
+
+                # Hybrid retrieval: prepend verbatim source code embeddings
+                # before <bop>. Truncated at 2048 tokens — under 7% of Qwen's
+                # 32K context. Source code grounds the soft prompt's
+                # cross-bucket reasoning at the identifier level.
+                if verbatim:
+                    v_enc = tokenizer(
+                        verbatim, return_tensors="pt", truncation=True,
+                        max_length=2048, add_special_tokens=False,
+                    )
+                    v_ids = v_enc["input_ids"].squeeze(0).to(device)
+                    v_embeds = embedding_layer(v_ids).to(model_dtype)
+                    framed = torch.cat([v_embeds, framed], dim=0)
+                    _log(f"decode: hybrid verbatim prepended ({v_ids.shape[0]} tokens)")
 
                 # Append query tokens — matches training frame exactly.
                 # Truncated to 32 tokens to bound sequence length.

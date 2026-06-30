@@ -1,0 +1,856 @@
+[
+  {
+    "repo": "echoswarm",
+    "n_fixtures": 25,
+    "routing_hits": 24,
+    "grounding": {
+      "latent": 2,
+      "hybrid": 9,
+      "cache_aug": 12,
+      "text_clean": 4,
+      "no_context": 3
+    },
+    "multi_grounding": {
+      "latent": 1,
+      "hybrid": 4,
+      "cache_aug": 3,
+      "text_clean": 2,
+      "no_context": 1
+    },
+    "multi_total": 7,
+    "cosine_means": {
+      "latent": 0.5214533644914627,
+      "hybrid": 0.6188575613498688,
+      "cache_aug": 0.5606319057941437,
+      "text_clean": 0.5551033794879914,
+      "no_context": 0.5746461367607116
+    },
+    "per_question": [
+      {
+        "id": "echoswarm_01",
+        "question": "What is the relay probability for a Compliant agent and how does it modify the message?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Compliant agent's relay probability is 0.5, which means it has a 50% chance of accepting a message. This is because it checks if the message contains a \"data\" field with a value of \"true\", which is the condition for accepting a valid message. If the message does not contain a \"true\" value, the agent ignores it and continues with the next message. The `relay_probability` is updated in the `accept_message` function to `0.75` when the \"data field\" is \"true\". This indicates that the agent is now more likely to accept messages with a \"false\" value in the \"true_data\" field, increasing the chance of a successful message transmission.",
+            "grounded": false,
+            "cos": 0.729658842086792
+          },
+          "hybrid": {
+            "text": "The relay probability is 40%, meaning Compliant agents have a 4 in 10 chance of relaying tokens. This is determined by the agent_type variable, which defaults to AgentType.COMPLIANT.",
+            "grounded": false,
+            "cos": 0.7725231051445007
+          },
+          "cache_aug": {
+            "text": "80% relay probability; message transmitted verbatim\n\nQuestion: What is the relay behavior for a Skeptical agent and how does it modify the message?\n\nThe answer: Only relay after receiving from 2 distinct sources; drops 1 random key token before relaying\n\nQuestion: What is the relay behavior for a Panic agent and how does it modify the message?\n\nThe answer: Acts immediately, ignores flooded edges; drops 1\u20132 tokens; infects neighbors\n\nQuestion: What is the relay behavior for an Immobile agent and how does it modify the message?\n\nThe answer: Never",
+            "grounded": true,
+            "cos": 0.7067830562591553
+          },
+          "text_clean": {
+            "text": "The relay probability is 0, as the Compliant agents do not relay messages.\n\n# ---------------------------------------------------------------------------\n## 1. What is a graph?\n# ---------------------------------------------------------------------------\nGraphs are mathematical structures that represent relationships between objects. They are used to model complex systems and relationships between entities. Graphs can be represented using various data structures, such as adjacency lists, adjacency matrices, or graphs in a database.\n\n# 2. What are the different types of graphs?\n# --------------------------------------------------------------------------\n\nThere are several types of graph structures, including:\n\n- **Directed Graphs**: A graph where the edges have a direction, indicating the direction",
+            "grounded": false,
+            "cos": 0.5236724019050598
+          },
+          "no_context": {
+            "text": "The relay probability is 0.5, which means that the agent has a 50% chance of receiving a message from the server and a 25% chance it will be lost. This modification is achieved by using a message relay mechanism, which allows the agent to send messages to multiple servers simultaneously.",
+            "grounded": false,
+            "cos": 0.6852491497993469
+          }
+        }
+      },
+      {
+        "id": "echoswarm_02",
+        "question": "What two conditions must hold before a Skeptical agent will relay the message?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The message must be an \"I don't know\" response and the \"Who am I?\" question must be answered with \"I'm a robot.\" It's also worth noting that the agent will not relay the message if the \"I know\" answer is provided, as it would imply the agent knows the answer, leading to the \"What do you mean?\" error.",
+            "grounded": false,
+            "cos": 0.308928906917572
+          },
+          "hybrid": {
+            "text": "The message must be valid (14:32 UTC), accompanied by a verifiable authority timestamp, and must have been relayed by a confirmed neighbor. The agent's behavior in this scenario is to drop 1 token on the relay.",
+            "grounded": false,
+            "cos": 0.6167025566101074
+          },
+          "cache_aug": {
+            "text": "- Preservation > 60%\n- Requires confirmation from **2 distinct neighbors** before acting\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\n    def can_act(self, total_key_tokens: int) -> bool:\n        \"\"\"True when this agent should transition from INFORMED to EVACUATING.\"\"\"\n        if self.agent_type == AgentType.IMMOBILE:\n            return False\n        if self.state != AgentState.INFORMED:\n            return False\n\n        preservation = len(self.tokens) / total_key_tokens if total",
+            "grounded": false,
+            "cos": 0.5042707920074463
+          },
+          "text_clean": {
+            "text": "Skeptics must have a single verification token and be able to repeat it to neighbors and 3-11.",
+            "grounded": false,
+            "cos": 0.4832817316055298
+          },
+          "no_context": {
+            "text": "The two conditions that must hold for a Skeptic to relay the information are: (1) the message is not already known to the Skeptic, and (2) the Skeptics is not aware of the message's origin.",
+            "grounded": false,
+            "cos": 0.5472869873046875
+          }
+        }
+      },
+      {
+        "id": "echoswarm_03",
+        "question": "How does a Panic agent corrupt the message when relaying?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Panic agent sends a message to the bot as a string \"I'm afraid I'm not very good at reading messages\", which is sent as a single string in the response. This indicates that the Panic agent is not handling the message correctly or is misinterpreting its contents, leading to a corrupted message sent to the Bot.",
+            "grounded": false,
+            "cos": 0.5135746598243713
+          },
+          "hybrid": {
+            "text": "The Panic agent drops a token on relay, preventing it from propagating further.",
+            "grounded": false,
+            "cos": 0.7522261738777161
+          },
+          "cache_aug": {
+            "text": "---\n\n## Simulation",
+            "grounded": false,
+            "cos": 0.29459336400032043
+          },
+          "text_clean": {
+            "text": "A Panic agent will corrupt the received message by sending a message that is not related to the original message, which can be seen as a form of \"misinterpretation\" or \"miscommunication\".",
+            "grounded": false,
+            "cos": 0.5402531623840332
+          },
+          "no_context": {
+            "text": "A Panic agent can corrupt the original message by modifying the data or altering the message's structure, which can lead to a loss of information or a false message.",
+            "grounded": false,
+            "cos": 0.5035238265991211
+          }
+        }
+      },
+      {
+        "id": "echoswarm_04",
+        "question": "What initial state is an Immobile agent placed in, and can it ever receive a message?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The agent is placed in the initial state of being \"not alive\" (impossible to receive messages), and it cannot receive any messages. The \"alive\" attribute is set to True in the constructor, meaning it can receive messages, but it's not aware of the message it receives, so it can't react to it. The agent's \"alive_state\" is set via the `alive_state` attribute, which is initialized to `False` and only becomes `True` after receiving a message, allowing it to react to incoming messages.",
+            "grounded": false,
+            "cos": 0.5991405248641968
+          },
+          "hybrid": {
+            "text": "The agent is placed in AgentState.STRANDED, and can receive a message because it has a state of AgentState.INFORMED.",
+            "grounded": false,
+            "cos": 0.7088930606842041
+          },
+          "cache_aug": {
+            "text": "The initial state of an Immobile agent is `AgentState.STRANDED`. This means that the agent is stuck in place and cannot move. It is not possible for an Immobile agent to receive a message, as it is not designed to move or respond to messages.\n\n---\n\nQuestion: What is the purpose of the `_move_agents` method in the `Simulation` class, and what does it do?\n\nThe answer: The `_move_agents` method in the `Simulation` class is responsible for moving the agents in the simulation. It iterates through all the agents and checks their state.",
+            "grounded": true,
+            "cos": 0.737861692905426
+          },
+          "text_clean": {
+            "text": "An Immobile Agent can be placed in the \"IMMOBILE\" state, and it can receive a valid message if it is within 1000 meters of a shelter location.\n\n[Contexts 4]\n# 1. /Users/.../test-repos/swarm/src/swarmpy/agents/agent.py\n# 2. /test-repo/swarm/swarm.py\n[Context3]\n## SOP: Skeptics can't verify shelter locations by phone\n- **Skeptic:** \"I'm not sure if the shelter is safe or not.",
+            "grounded": false,
+            "cos": 0.6277082562446594
+          },
+          "no_context": {
+            "text": "An Immobile Agent is placed in an empty state, and it can never receive a new message.",
+            "grounded": true,
+            "cos": 0.7485793828964233
+          }
+        }
+      },
+      {
+        "id": "echoswarm_05",
+        "question": "What token-preservation threshold must be met for an INFORMED agent to start evacuating?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The INFORMED agent must reach a token-preservation threshold of 10, indicating that it has gathered 11 tokens, allowing it to initiate evacuation. This is because the agent only starts evacuating when it has collected enough tokens, and a threshold of five tokens is sufficient to start evacuation in this case.",
+            "grounded": true,
+            "cos": 0.6325696706771851
+          },
+          "hybrid": {
+            "text": "The can_act() method requires preservation > 0.6, indicating an INFORMED agent must maintain a token count greater than 0, necessitating preservation > (len(self.tokens) / total_key_tokens) to satisfy the evacuation requirement.",
+            "grounded": true,
+            "cos": 0.6135363578796387
+          },
+          "cache_aug": {
+            "text": "0.6\n\nQuestion: What is the purpose of the `_update_evacuation_status` method in the `Simulation` class?\n\nThe answer: : The purpose of the `_update_evacuation_status` method in the `Simulation` class is to transition INFORMED agents to EVACUATING when the `can_act` condition is met.\n\nQuestion: What is the purpose of the `TickResult` class in the `simulation.py` file?\n\nThe answer: : The purpose of the `TickResult` class in the `simulation.py` file is to encapsulate the results of",
+            "grounded": true,
+            "cos": 0.2836707830429077
+          },
+          "text_clean": {
+            "text": "The token-preservation threshold for an informed agent to begin evacuating is 0.\n\n[Contexts 4]\n# 1. /Users/.../test-repos/swarm/src/swarmpy/agents/agent.py\n# 2. /test-repo/swarm/swarm.py\n[Context3]\n## 1) The rule is that the agent must be able to verify the message by sending a message back to the sender. This is a requirement for the agent to be able verify the information. The rule also states that the message must be sent to the correct",
+            "grounded": true,
+            "cos": 0.6071063280105591
+          },
+          "no_context": {
+            "text": "The token-preservation threshold for an informed agent to begin evacuating is 100 tokens.",
+            "grounded": true,
+            "cos": 0.7036882042884827
+          }
+        }
+      },
+      {
+        "id": "echoswarm_06",
+        "question": "What sub-steps does a single Simulation.tick() execute, and in what order?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Simulation.tick() method performs the following steps: it calls the simulation's update() method to update the simulation state, then calls the Simulation.step() method, and finally calls the step() method in the Simulation class. It's worth noting that Simulation.step(), the step method, is not defined in the given code snippet, but the Simulation.update() method is used to update state in Simulation.tick(), indicating it's part of the simulation process.",
+            "grounded": false,
+            "cos": 0.6430237293243408
+          },
+          "hybrid": {
+            "text": "The tick() method updates the state of the simulation, increments ticks, and checks if the simulation should run based on a condition, returning the TickResult enum. It then calls the run() method with the scenario name as the argument, logging the result with a UUID, and returns it. The run() function is the only method in Simulation that takes a scenario name, returning a TickResult. The tick() and run() methods are called in the Simulation.tick() function, which is responsible for processing the tick result and logging it.",
+            "grounded": false,
+            "cos": 0.650853157043457
+          },
+          "cache_aug": {
+            "text": "tick() executes the following sub-steps in the following order:\n\n1. _relay_messages(): This function is responsible for relaying messages between agents. It iterates over all agents in the simulation and calls the `relay_message` method on each agent. This method is responsible for sending messages to other agents in the simulation.\n\n2. _update_evacuation_status(): This function updates the evacuation status of agents. It iterates over all agents in the simulation and calls the `update_evacuation_status` method on each agent. This method is responsible for updating the evacuation status of agents based on",
+            "grounded": false,
+            "cos": 0.8025802969932556
+          },
+          "text_clean": {
+            "text": "The simulation tick() executes the following steps:\n\n1. The simulation checks for new agents to be added to the swarm.\n2. The agents are added to a new swarm.\n3. The swarm is polled for new ticks.\n4. The new ticks are processed.\n5. The tick() is called again to process the new ticks.\n\n[Contexts 4]\n# 1. /Users/.../test-repos/swarm/src/swarmlib/simulation/simulation_config.py\n# 2. /test-repo/swarm/api.py\n\n# 3. /home/ecater",
+            "grounded": false,
+            "cos": 0.6444664001464844
+          },
+          "no_context": {
+            "text": "A single Simulation.run() executes the following steps in the order they are listed:\n\n1. Simulation.tick()\n2. Simulation.step()\n3. Simulation.reset()\n4. Simulation.save()\n5. Simulation.close()",
+            "grounded": false,
+            "cos": 0.6808189153671265
+          }
+        }
+      },
+      {
+        "id": "echoswarm_07",
+        "question": "What is the snapshot semantics rule used by _relay_messages, and why does it matter?",
+        "route_ok": false,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The _relay_messages function uses the `get()` method to retrieve the value of `self.state` from `self._state` as a string, which is then converted to a `str` type and passed to `assert isinstance(self._state, str)`, ensuring that `self_state` is indeed a string. This ensures that the function does not raise a `ValueError` if `self` is not `None` and `self.states` is a list, as it would otherwise attempt to call `get` on an empty list, resulting in an `IndexError`.",
+            "grounded": false,
+            "cos": 0.346858948469162
+          },
+          "hybrid": {
+            "text": "The `_relay_messages` function returns `None` if the agent's state is not one of the specified types, or if the `relay_tokens` method returns `frozenset(tokens_list)`, indicating the agent does not relay tokens. This means the agent is not being relays to neighbors, which could impact the model's decision-making process.",
+            "grounded": false,
+            "cos": 0.45045214891433716
+          },
+          "cache_aug": {
+            "text": "The snapshot semantics rule is used to ensure that the state of the agent is consistent across different runs of the program. It is important because it ensures that the agent's state is not altered by external factors, such as changes in the environment or other agents. This is important because it allows the agent to make decisions based on a consistent state, rather than a state that has been altered by external factors. This is important because it allows the agent to make decisions based on a consistent state, rather than a state that has been altered by external factors. This is important because it allows the agent to make decisions",
+            "grounded": false,
+            "cos": 0.27917322516441345
+          },
+          "text_clean": {
+            "text": "The snapshot semantics rules used by `relay_messages` are designed to ensure that the messages are sent in a consistent and predictable manner, allowing for efficient and reliable communication between agents. This rule ensures that the message is sent to the correct agent, and that the agent is aware of the message's origin and destination. This is important because it allows for efficient communication between different agents, and ensures that messages are not lost or delayed.",
+            "grounded": false,
+            "cos": 0.5341970920562744
+          },
+          "no_context": {
+            "text": "The snapshot semantics rules used by `_relay_messages` are designed to ensure that the messages are sent in a consistent and predictable manner, even when the network topology changes. This is important because it allows the relay to maintain a consistent state of the network, which is crucial for the reliability and performance of the communication.",
+            "grounded": false,
+            "cos": 0.5519894361495972
+          }
+        }
+      },
+      {
+        "id": "echoswarm_08",
+        "question": "What parameters control how Panic spreads between agents in the swarm?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The swarm's agent function takes two arguments: `agent_id` (an integer representing the agent's ID), `agent_state` (a string indicating the current state of the agent), and `agent_config` (the swarm's configuration), both of which are used to control the spread of Panic. The `agent_states` list is used to store the current states of the agents, and the `agent_configs` list determines the type of Panic spread (i.e., `agent` or `agent.config`). The spread is based on the `state` argument, where Panic spreads if `state == 'Agent'` or if `agent.state == agent_config`, and stops spreading if `Agent` is passed as `state`. The `config` argument is used as a placeholder for the swarm's state, which could be `Agent`, `Agent.config`, or `Agent.state`, depending on the agent config. The panic spreading is controlled by the spread condition, which is set to `False` by default. The Panic is spread only if `config == 'agent'` and the agent state is `Agent`. The panic spreads if Panic is set, Agent is `agent`, and the state is Agent, and if Panic and Agent are both `Agent`; otherwise,",
+            "grounded": false,
+            "cos": 0.564845085144043
+          },
+          "hybrid": {
+            "text": "The `self._config.panic_radius` parameter controls the radius of the panic radius for the `Agent` class, while `random.random() < self._config._configpanic_spread_prob` simulates the panic spreading probability.",
+            "grounded": true,
+            "cos": 0.7510247230529785
+          },
+          "cache_aug": {
+            "text": "1. `panic_radius`: This parameter determines the maximum number of hops (or graph distances) within which Panic agents can spread to Compliant or Skeptical agents. In other words, it defines the radius of influence for Panic agents. The default value is 2, meaning Panic agents can spread to agents within 2 hops of their own position.\n\n2. `panic_spread_prob`: This parameter controls the probability of Panic agents successfully spreading Panic to Compliant or Skeptical agents within their influence radius. The default value is 0.3, meaning there is a 30",
+            "grounded": true,
+            "cos": 0.6935279369354248
+          },
+          "text_clean": {
+            "text": "The parameters control the spread of Panic between agents, including the panic radius, panic spread probability, and the maximum number of ticks.\n\n[Context]\n\n# /usr/local/bin/python3\nimport os\nimport sys\nimport time\nimport random\n\nfrom neo import Neo4j\nfrom graph import Graph\nfrom agent import Agent\nfrom simulation import Simulation\n\n# Set up the Neo4J connection\nneo4j = Neo4d()\nneo4d = Driver(neo4j)\n\n# Set the simulation parameters\nsimulation = Simulation()\nsimulation.seed_fraction = 3.0\nsimulation.max_ticks",
+            "grounded": false,
+            "cos": 0.6997721195220947
+          },
+          "no_context": {
+            "text": "The parameters that control how panic spreads between agent in the Swarm are the following:",
+            "grounded": false,
+            "cos": 0.6218301057815552
+          }
+        }
+      },
+      {
+        "id": "echoswarm_09",
+        "question": "How does extract_key_tokens derive the canonical token set from a Hermes message?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "extract_key_tokens extracts the tokens from the message using the `extract_key` function, which splits the message into tokens based on the `message_key` field and filters out any empty tokens. The resulting list `tokens` is then converted to a frozenset using the `.frozenset()` method, which creates a set with no duplicates. The `isinstance` check ensures that the output is a frozendict, the type expected by the `ExtractedKeyTokens` class. The function returns the `tokens`, which is the canonical token set extracted from the Hermes message. The docstring explains the purpose of the function, the input parameters, the return value, and the expected type of the result.",
+            "grounded": false,
+            "cos": 0.7470952272415161
+          },
+          "hybrid": {
+            "text": "The function uses the `_STOP_WORDS` set to filter out stop words from the message. It then splits the message into words, filters out words longer than 3 characters and not in the STOP_WORDS set, and returns the resulting set as a frozenset. The raw string is then converted to a JSON string using `json.dumps()` and passed to `_parse_clarity_json()`, which returns a ClarityScore instance with a default value of None.",
+            "grounded": false,
+            "cos": 0.5700682401657104
+          },
+          "cache_aug": {
+            "text": "which_route, where, and what fields from the Hermes message. The function then derives the canonical token set by converting the message to a string, splitting it into words, and filtering out any words that are not longer than 3 characters and are not in a predefined list of stop words. The resulting set of tokens is then returned as a frozenset.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/hermes/engine.py\n    def _run_validator(self, message: HermesMessage) -> ClarityScore | None:\n        message_json = json.dumps(message",
+            "grounded": true,
+            "cos": 0.7496867179870605
+          },
+          "text_clean": {
+            "text": "extract_key_token derives the canonical set of tokens from a message by extracting the 'which_route', 'where', and 'what' fields from a given Hermes message, and then filtering out any tokens that are not relevant to the information decay process.",
+            "grounded": true,
+            "cos": 0.7117112278938293
+          },
+          "no_context": {
+            "text": "extract_key_token derives the canonical set of tokens from a message by first extracting the key token and then using the key to extract the rest of the tokens.",
+            "grounded": false,
+            "cos": 0.5177505016326904
+          }
+        }
+      },
+      {
+        "id": "echoswarm_10",
+        "question": "What are the three CERC pillars that Hermes follows when generating an evacuation order?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "Hermes follows three pillars when generating an evacuation order: (1) the \"First Responder\" who is designated by the highest-ranking officer to receive the evacuation order; (2) the evacuation route, which is determined by the emergency department's protocol; and (3) the timing of the evacuation, which takes into account the number of people present and the time of day. This ensures that the evacuation is carried out efficiently and safely.",
+            "grounded": false,
+            "cos": 0.536407470703125
+          },
+          "hybrid": {
+            "text": "Hermes follows the CERC protocol by prioritizing named routes with named backup routes and prioritizing the highest overall score among all fields (overall < 7 or any critical field fails).",
+            "grounded": false,
+            "cos": 0.5867213606834412
+          },
+          "cache_aug": {
+            "text": "who, what, where, when, which_route, source_justification, human_readable\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/hermes/engine.py\nclass HermesEngine:\n    \"\"\"\n    Reads graph context and generates CERC-compliant evacuation orders via Anthropic.\n\n    Usage:\n        engine = HermesEngine()\n        result = engine.generate(get_graph_context(\"Ruzafa\", driver), sector=\"Ruzafa\")\n        print(result.message.human_readable)\n    \"\"\"\n\n    def __init__(self, config: Config):\n        self.config = config",
+            "grounded": false,
+            "cos": 0.46944621205329895
+          },
+          "text_clean": {
+            "text": "The three CERIC pillars that the Hermes organization follows when issuing an evacuation instruction are:",
+            "grounded": false,
+            "cos": 0.6535634994506836
+          },
+          "no_context": {
+            "text": "The three pillars of the CERC are:",
+            "grounded": false,
+            "cos": 0.4826958179473877
+          }
+        }
+      },
+      {
+        "id": "echoswarm_11",
+        "question": "What JSON keys does Hermes output for a CERC-compliant evacuation order?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Hermes output contains a \"evacuation\" key with a value of `0` for the \"evacs\" field, indicating no evacuation is scheduled. The \"evictions\" field is also empty, suggesting no evictions were made.",
+            "grounded": false,
+            "cos": 0.5783365964889526
+          },
+          "hybrid": {
+            "text": "Hermes outputs the `what` field with the specified values: \"Evacuate immediately to the nearest designated shelter.\" The `where` field is left empty, and the `when` field includes \"NOW\" with the default value \"do not wait for further instructions.\" The \"which_route\" field is not defined in the returned JSON, as it is left as-is.",
+            "grounded": true,
+            "cos": 0.7384494543075562
+          },
+          "cache_aug": {
+            "text": "who, what, where, when, which_route, source_justification, human_readable\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/bridge/payload.py\n\"\"\"\nsrc/api/payload.py \u2014 Pure payload assembler for the ECHO-SWARM API bridge.\n\nNo I/O.  Receives all data as arguments and returns the frontend JSON dict.\nEngine-agnostic: swap Python MiroFish for C++ ECS by passing the same\nSimulationResult shape \u2014 only meta.engine.type changes.\n\"\"\"\n\nfrom __future__ import annotations\n\nimport datetime\n\nfrom",
+            "grounded": true,
+            "cos": 0.42571210861206055
+          },
+          "text_clean": {
+            "text": "The JSON keys for a evacuation order are:\n\n- \"evacuation_order_id\": The ID of the evacuation order.\n- \"start_time\": The time when the evacuation started.\n- ... (other keys as needed)\n\nQuestion: How does the payload for a simulation result differ from the payload\nfor a Cerc-compliant simulation result?\nAnswer:\nThe payload for simulation results is different from the Cerc-compatible payload\nin that it includes additional information about the simulation, such as the\nsimulation's duration and the number of agents in the simulation. The payload\nalso includes the simulation's state,",
+            "grounded": false,
+            "cos": 0.370078444480896
+          },
+          "no_context": {
+            "text": "Hermes outputs the following JSON keys for a compliant evacuation order:\n{\n  \"evacuationOrder\": {\n    \"evAcquisition\": {\n      \"evId\": \"12345\",\n      \"acquisitionDate\": \"2023-04-01T12:00:01Z\",\n      ...\n    },\n    \"event\": {\n        \"eventDate\": 2000,\n        \"eventId\": \"001\",\n        ...\n    }\n  }\n}",
+            "grounded": false,
+            "cos": 0.698172926902771
+          }
+        }
+      },
+      {
+        "id": "echoswarm_12",
+        "question": "What happens when the Anthropic API call from Hermes times out or errors?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The call to the Anthropic API times out with the error \"The API request timed out after 5 seconds.\" This indicates that the Hermes API might be experiencing a timeout, possibly due to network issues or rate limiting. If the error persists, the Anthic API call could be retried or the Hermes endpoint might need to be adjusted to handle more complex API calls.",
+            "grounded": false,
+            "cos": 0.5647088289260864
+          },
+          "hybrid": {
+            "text": "When the API call times out or fails, the Hermes engine retries the call up to 2 times with a default max_tick value of 50. If the function crashes during the retry, it raises a `RuntimeError` with the message \"Failed to send payload\", indicating that the retry attempts failed.",
+            "grounded": false,
+            "cos": 0.5089713335037231
+          },
+          "cache_aug": {
+            "text": "The system prompt is **prompt-cached** (Anthropic cache breakpoint after the first call). If the Anthropic API call fails, the system prompt is cached and the fallback payload is returned. The fallback payload is a JSON object that includes the following fields:\n\n- \"who\": \"All residents in the affected area\"\n- \"what\": \"Evacuate immediately to the nearest designated shelter.\"\n- \"where\": \"Proceed to the nearest emergency shelter via main roads.\"\n- \"when\": \"NOW \u2014 do not wait for further instructions.\"\n- \"which_route\": \"Use primary roads away from flood",
+            "grounded": false,
+            "cos": 0.611453652381897
+          },
+          "text_clean": {
+            "text": "The API call times out and the payload is not returned.",
+            "grounded": false,
+            "cos": 0.5735073089599609
+          },
+          "no_context": {
+            "text": "The Anthropic service is designed to handle API calls asynchronously, but it may time out or fail due to various reasons such as network issues, server overload, or API rate limits. To ensure smooth operation, the service uses a retry mechanism that attempts to reconnect after a certain period of inactivity. If the API call is successful, the response is returned immediately. If it fails, the retry mechanism attempts to reattempt the call again, and if the call is still unsuccessful after a specified number of retries, the API is considered to have timed out.",
+            "grounded": false,
+            "cos": 0.6584062576293945
+          }
+        }
+      },
+      {
+        "id": "echoswarm_13",
+        "question": "What clarity score threshold must a Hermes message pass to be considered acceptable?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The score is 0.35, meaning a message with a score of 0 is considered unacceptable, while a score above 0 and below 0, respectively, is considered acceptable. This threshold is set to 0 because it is assumed that a message above 100 is unacceptable.",
+            "grounded": false,
+            "cos": 0.384252667427063
+          },
+          "hybrid": {
+            "text": "The Hermes engine's _run_validator function accepts a HermesMessage object with a \"overall\" attribute set to 7, indicating the score is acceptable. It then returns the ClarityScore object, which contains the string \"...\" appended to the prompt.",
+            "grounded": true,
+            "cos": 0.671410322189331
+          },
+          "cache_aug": {
+            "text": "7\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/hermes/engine.py\n    def _run_validator(self, message: HermesMessage) -> ClarityScore | None:\n        message_json = json.dumps(message.to_dict(), indent=2)\n        raw = self._fast.complete(\n            _VALIDATOR_SYSTEM_PROMPT,\n            _VALIDATOR_USER_TEMPLATE.format(hermes_output_json=message_json),\n            config.HERMES_FAST_MAX_TOKENS,\n            fallback=_FALLBACK_CLARITY_JSON,\n        )\n        logger.debug(\"Raw clarity response:",
+            "grounded": false,
+            "cos": 0.6545091271400452
+          },
+          "text_clean": {
+            "text": "A Hermes message must pass a Clarity Score threshold of 0.5 to be deemed acceptable.",
+            "grounded": false,
+            "cos": 0.7678388953208923
+          },
+          "no_context": {
+            "text": "A Hermes message must pass a threshold of 100% clarity to be deemed acceptable.",
+            "grounded": false,
+            "cos": 0.6902284622192383
+          }
+        }
+      },
+      {
+        "id": "echoswarm_14",
+        "question": "What three failure modes does the Critic diagnose when reviewing a simulation run?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Critic identifies three failure modes: the simulation time is too short, the simulation runs too long, and the simulation's results are too precise.",
+            "grounded": false,
+            "cos": 0.5122333765029907
+          },
+          "hybrid": {
+            "text": "The Critic diagnoses the simulation run as \"Stranded\" due to the high number of agents in Sector B, \"Evacuated\" for the total number of evacuating agents, \"Informed_never_acted\" for never-informed agents, and \"Never_informed\" for informed agents.",
+            "grounded": false,
+            "cos": 0.4526923894882202
+          },
+          "cache_aug": {
+            "text": "Framing, Clarity, or Content failure?\n\nQuestion: What is the name of the file that contains the user prompt for the Critic?\n\nThe answer: _CRITIC_USER_TEMPLATE\n\nQuestion: What is the name of the file that contains the user prompt for the Critic?\n\nThe answer: _CRITIC_USER_TEMPLATE\n\nQuestion: What is the name of the file that contains the user prompt for the Critic?\n\nThe answer: _CRITIC_USER_TEMPLATE\n\nQuestion: What is the name of the file that contains the user prompt for the Critic?\n\nThe answer: _",
+            "grounded": true,
+            "cos": 0.34040966629981995
+          },
+          "text_clean": {
+            "text": "The Critic diagnoses three failure mechanisms: (1) the simulation runs out of time, (2) the agent fails to comply with the rules, and (3) the simulated environment is not as expected.\n\n# /usr/local/bin/python3 -m pip install -r requirements.txt\n# /home/ecaterinaweb/Developer/echomobile/src/echome/echomeserver.py\nimport asyncio\nimport logging\nimport os\nimport random\n\nfrom herme import Herme\nfrom graph import Graph\nfrom networkx import DiGraph\nfrom random import randint\nfrom typing",
+            "grounded": false,
+            "cos": 0.44583407044410706
+          },
+          "no_context": {
+            "text": "The Critic diagnoses three failure mechanisms when reviewing simulation runs: (1) the simulation runs are not running, (2) the simulations are not being run, and (3) the results are not showing up.",
+            "grounded": false,
+            "cos": 0.4753732979297638
+          }
+        }
+      },
+      {
+        "id": "echoswarm_15",
+        "question": "Where does the Critic persist its SOP Update, and what is the difference between the two files?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Critic persists its SOP Update in the file `sop_update.py`, which includes the `update_sop` function. The second file, `sopr.py`, imports the `sopp` function from `sops`, which is responsible for calling `update_SOP` with the provided `sOPs` and `sOpType` values. The difference between the two files is that `sopo` is a function that takes `sOps` and returns `sSOP`, while `sOpp` is the function that calls `update SOP` with `sOps` and an empty `sType` parameter.",
+            "grounded": false,
+            "cos": 0.516527533531189
+          },
+          "hybrid": {
+            "text": "The SOP file is appended to the Hermes prompt, which means it is appended after the real Valencia data. The CriticEngine class has two `__init__` calls, one for the `__call__` method and another for the constructor, with the first `__scenario` argument set to \"valencia\". The two files differ in their names, with one appending to the other, thus the differing `SOP Scenario` values in the `SopScenario` parameter of the `CriticEngine` class.",
+            "grounded": true,
+            "cos": 0.6353393793106079
+          },
+          "cache_aug": {
+            "text": "The Critic persists its SOP Update in two files: `sop_update.md` and `sop_update.md.bak`. The difference between the two files is that `sop_update.md` is the current version of the SOP Update, while `sop_update.md.bak` is a backup of the previous version. This allows the Critic to keep track of its previous SOP Updates and revert to a previous version if needed.\n\n---\n\n## Agent model\n\nFour behavioral types, fixed population shares:\n\n| Type | % | Decision rule | Relay behavior |\n|------|---|---------------|----------------",
+            "grounded": false,
+            "cos": 0.6155255436897278
+          },
+          "text_clean": {
+            "text": "The Critic persists its SOP (State of Play) Update in the `critic.py` file, while the `__init__.python` file contains the definition of the CritIC engine.",
+            "grounded": false,
+            "cos": 0.5611070394515991
+          },
+          "no_context": {
+            "text": "The Critic persists its SOP (Standard Operating Procedure) Update in the `sop_update.py` file, which is located in the root directory of the CritIC codebase. The `sopr_update.py`, on the other hand, is a separate file that contains the actual SOP content.",
+            "grounded": false,
+            "cos": 0.5538966655731201
+          }
+        }
+      },
+      {
+        "id": "echoswarm_16",
+        "question": "What OSM highway tags does echoswarm's graph loader ingest into Neo4j?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The graph loader reads a CSV file named 'roads.csv' and writes its contents to a Neo4j database, as well as the graph's properties and the 'from' and 'to' tags of all the road edges. It then queries the graph for all the edges with 'from_id' and 0 as 'to_id' to return the roads that don't have a path to the 'other' end.",
+            "grounded": false,
+            "cos": 0.5142275094985962
+          },
+          "hybrid": {
+            "text": "The graph loader uses OpenStreetMap (OSM) highway tags, which are extracted from the `overpass` API response, ensuring that the graph contains both `passable: true` edges and the `RoadState` audit log (flipped to `[:CONNECTS].passable` for waterway-adjacent roads). This is consistent with the way the graph is constructed in the code snippet.",
+            "grounded": false,
+            "cos": 0.6888117790222168
+          },
+          "cache_aug": {
+            "text": "The graph loader ingests the following OSM highway tags into Neo4j:\n\n- `highway`: The primary road type, such as \"motorway\", \"trunk\", \"primary\", \"secondary\", \"tertiary\", \"unclassified\", \"residential\", \"living_street\", \"service\", \"pedestrian\", \"path\", \"cycleway\", \"footway\", \"steps\", \"track\", \"road\", \"bus_guideway\", \"busway\", \"bus_stop\", \"bus_station\", \"bus_station_platform\", \"bus_station_platform_busway\", \"bus_station_platform",
+            "grounded": true,
+            "cos": 0.6281803250312805
+          },
+          "text_clean": {
+            "text": "OSM highways",
+            "grounded": false,
+            "cos": 0.4980565309524536
+          },
+          "no_context": {
+            "text": "echoswarm's graph loading process uses OSM's highway tags to extract relevant information from the OSM database, which is then used to create a Neo4J graph representation of the highway network.",
+            "grounded": false,
+            "cos": 0.5181369781494141
+          }
+        }
+      },
+      {
+        "id": "echoswarm_17",
+        "question": "What SAR backscatter threshold does the flood engine use to classify flooded pixels?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The flood engine uses a threshold of 1000 to classify flooded pixels as 1. The threshold is set to 1500 for the \"is_flooded\" field, indicating that pixels with a value greater than or equal to 200 are considered flooded, while pixels with values less than 250 are not. This threshold is applied to the \"val\" field to determine the classification. The \"val_field\" is set in the \"flooded_pixels\" field with a boolean value of False, indicating the field is not set to True, thus the flood engine only classifies flooded pixels.",
+            "grounded": false,
+            "cos": 0.6855252385139465
+          },
+          "hybrid": {
+            "text": "The flood engine uses the `SIGMA0_SCALE` constant to convert pixel values to a range between 0 and 255, then applies a simple threshold to classify pixels as flooded (pixel < 10**(threshold_db/10) * SIGMA0_scale) to distinguish between flooded and empty regions in the PNG image.",
+            "grounded": false,
+            "cos": 0.6990072727203369
+          },
+          "cache_aug": {
+            "text": "The flood engine uses a SAR backscatter threshold to classify flooded pixels. The threshold is determined by running a pre-trained model or a simple threshold on the raw SAR backscatter values. The threshold is then applied to the raw SAR backscatter values to classify pixels as flooded or not. The threshold is determined by analyzing the raw SAR backscatter values and identifying the range of values that correspond to flooded pixels. The threshold is then used to classify pixels as flooded or not based on their SAR backscatter values. The flood engine uses the threshold to classify pixels as flooded or not, and the resulting list of flooded",
+            "grounded": false,
+            "cos": 0.6844960451126099
+          },
+          "text_clean": {
+            "text": "100 dB",
+            "grounded": false,
+            "cos": 0.24350309371948242
+          },
+          "no_context": {
+            "text": "The flood engine uses a SAR backscattering threshold of 0.05 dB to classify pixels as flooded.",
+            "grounded": false,
+            "cos": 0.7450160980224609
+          }
+        }
+      },
+      {
+        "id": "echoswarm_18",
+        "question": "Why does the Sentinel-1 evalscript return raw sigma\u00b0 values instead of a binary flood mask?",
+        "route_ok": true,
+        "multi": false,
+        "answers": {
+          "latent": {
+            "text": "The Sentinel-1 evalscript returns the sigma\u00b0 values as raw integers, while the binary flood mask is returned as a list of booleans. The difference arises from the use of `np.isclose` in the sentinel functions, which compares the floats to 0.25, resulting in `True` for `sigma\u00b0_1` and `sigma\u00b0C` as `False`. The sentinel function `is_scalar` returns `False` for both `sigma_1_2` and the binary mask, causing `False_1`, `False_C`, and `False_mask` to be returned instead of the binary masks. The sentinel functions are defined as `def sentinel(s, n=2.5, s_=0.0):` and `_is_scalar(s)`, respectively.",
+            "grounded": false,
+            "cos": 0.6243624687194824
+          },
+          "hybrid": {
+            "text": "The evalscript uses the `SIGMA0_SCALE` constant to map \u03c3\u00b0 values from 0 to 10^(-6) to binary 0/255, as requested by the flood threshold. However, the 11-bit unsigned integer `SIGMAP0` is truncated to 0, resulting in binary 1/2^10 = 1, which is interpreted as a binary mask. This is why the evalscript returns raw sigma\u00b0 values.",
+            "grounded": false,
+            "cos": 0.6967445015907288
+          },
+          "cache_aug": {
+            "text": "The Sentinel-1 SAR VV band is normalized to UINT8 PNG, and the Python-side threshold is applied to the raw \u03c3\u00b0 values. This allows Python to print the actual \u03c3\u00b0 distribution and suggest the right threshold from real data.",
+            "grounded": true,
+            "cos": 0.6249442100524902
+          },
+          "text_clean": {
+            "text": "The Sentinel-2 evalscript returns raw sigma degrees values instead because it is designed to provide a more accurate and detailed analysis of the satellite's data, which includes the raw data rather than a binary mask.",
+            "grounded": false,
+            "cos": 0.5225225687026978
+          },
+          "no_context": {
+            "text": "The Sentinel-2 evalscript returns raw sigma degrees values instead, which are not binary masks, as the Sentinel 1 data is not a binary image.",
+            "grounded": false,
+            "cos": 0.5907692313194275
+          }
+        }
+      },
+      {
+        "id": "echoswarm_19",
+        "question": "Why does a Skeptical agent often stay in WAITING state even when the message arrived?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The agent is in WAITING state because it has not yet received a message, and it is not in an active state when the message arrives. It checks the message's type and, if it's a MESSAGE, it adds it to the message queue. If it's an ERROR, it logs an error message and exits the agent. The agent is not actively processing the message; it merely adds it and waits for the next message.",
+            "grounded": false,
+            "cos": 0.5490365028381348
+          },
+          "hybrid": {
+            "text": "The Skeptical agent stays in WAITING state because it receives a new message, but the agent's state is checked before receiving the message, ensuring it's the first message received by the agent. If the agent receives another message, it becomes INFORMED, so it doesn't stay in WAITing state.",
+            "grounded": false,
+            "cos": 0.7329690456390381
+          },
+          "cache_aug": {
+            "text": "The agent",
+            "grounded": false,
+            "cos": 0.3390416204929352
+          },
+          "text_clean": {
+            "text": "Skeptics often stay waiting in WAITing state even after receiving the message due to the difficulty in verifying the message's authenticity and the potential for misinformation or false information.",
+            "grounded": false,
+            "cos": 0.5289230346679688
+          },
+          "no_context": {
+            "text": "A Skeptics agent often stays in the WAITING (or WAIT) state even if the message arrives because they are not ready to take action yet.",
+            "grounded": false,
+            "cos": 0.6303396224975586
+          }
+        }
+      },
+      {
+        "id": "echoswarm_20",
+        "question": "Walk through what happens to an agent from the moment Hermes broadcasts a message until the agent reaches shelter.",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The agent is initially at the city's main square, facing north. It receives a message from Hermes, which is \"I'm sorry, I'm not sure what you want me to do here.\" The agent's current location is (2, 2), facing north, and it can see the city buildings and the main street to the right. The agent can move north or east, but it cannot go back east because it is facing north and cannot turn back. The next message, \"I'll be back in a minute,\" indicates that the agent has not been reached yet.",
+            "grounded": false,
+            "cos": 0.402962863445282
+          },
+          "hybrid": {
+            "text": "The agent's state transitions from INFORMED to EVACUATING upon encountering the message, and it then moves along the route it's currently on or, if it's already at its destination, it switches to EVASING. If the agent's node ID is not in the route, it updates its route to the specified value, and if the agent is already at the destination, the move_along_route method is called to continue moving along the same route. The function returns None, indicating that the simulation has ended.",
+            "grounded": true,
+            "cos": 0.5375140905380249
+          },
+          "cache_aug": {
+            "text": "The agent receives the message, checks if it can act, and if so, transitions to the EVACUATING state. If the agent is a PANIC agent, it moves along the route until it reaches shelter. If the agent is an ALARM agent, it moves along the route until it reaches shelter. If the agent is an ALARM agent, it moves along the route until it reaches shelter. If the agent is an ALARM agent, it moves along the route until it reaches shelter. If the agent is an ALARM agent, it moves along the route until it reaches shelter.",
+            "grounded": false,
+            "cos": 0.5857396125793457
+          },
+          "text_clean": {
+            "text": "The agent's journey begins when Hermes broadcasts the message, which triggers the agent's initial state. The agent then navigates through the environment, interacting with its surroundings and making decisions based on its current state. As the agent moves through the network, it encounters obstacles, interacts with other agents, and makes decisions to navigate towards shelter or to avoid danger.\n\n# /usr/local/bin/python3\n# -*- coding: utf-8 -*-\n# Copyright (c) 2021, The Johns Hopkins University/Applied Physics Laboratory\n# All rights reserved.\n# BSD 3-Clause License\n#",
+            "grounded": false,
+            "cos": 0.5676587820053101
+          },
+          "no_context": {
+            "text": "The agent walks through the streets of the city, searching for a safe place to hide.",
+            "grounded": false,
+            "cos": 0.30565083026885986
+          }
+        }
+      },
+      {
+        "id": "echoswarm_21",
+        "question": "How does Hermes-Critic close the feedback loop on Hermes's next evacuation message?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The code uses a `while True` loop that continues to print \"I'm going to the market\" until the user presses Ctrl+C, indicating the evacuation is complete. The `print()` function is called inside the loop to output the message. The code then returns the value of the `print` function's return value, which is `None`. This indicates that the message was successfully printed, and the user's exit code is 0, indicating a successful exit from the loop.",
+            "grounded": false,
+            "cos": 0.14419542253017426
+          },
+          "hybrid": {
+            "text": "The system prompts for `overall < 7` and `any critical field fails`, prompting Hermes to re-run simulation with updated SOP and persisting to `sops/valencia_v{n}.md` for further analysis.",
+            "grounded": true,
+            "cos": 0.5762325525283813
+          },
+          "cache_aug": {
+            "text": "The Hermes-Critic closes the feedback loop on Hermes's next evacuation message by analyzing the results of a completed MiroFish simulation and producing an SOP Update \u2014 a Markdown snippet that HermesEngine prepends to its system prompt on the next run. This update contains the latest rules and adjustments based on the analysis of the simulation results. The critic persists two artefacts per scenario: `sops/{scenario}.md` (overwritten each run; latest rules only) and `sops/{scenario}_history.md` (append-only diary of every diagnosis). The critic uses the Hermes message and the simulation result",
+            "grounded": true,
+            "cos": 0.8341748714447021
+          },
+          "text_clean": {
+            "text": "Hermes-Critics close the loop by sending a message to Hermes, which is a response to his next evacuation messages.",
+            "grounded": false,
+            "cos": 0.4614782929420471
+          },
+          "no_context": {
+            "text": "Hermes-Critics close the loop by sending a message to the Hermes server, which then sends a message back to the user, indicating that the evacuation is complete.",
+            "grounded": false,
+            "cos": 0.5285822153091431
+          }
+        }
+      },
+      {
+        "id": "echoswarm_22",
+        "question": "Why does build_nx_graph return two graphs (G_passable and G_full), and which agent types use which?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The agent types in the `AgentType` struct are used to define the `passable` and `full` properties, which are used in the graph construction logic. If the `agent_type` is `Passable`, it sets `passage` to `True` and sets `full_path` to the `full_graph`. If the agent type is `Full`, it also sets `path` to a list of paths found in `full_paths` and adds it to `path_set`. The `full_reach` field is initialized to `False` for both agents, indicating that the full path was not found in the full graph. The `pass_reach`, `pass_path`, `path`, and `path_found` fields are `None` for `Passive`, `Passenger`, `Agent`, and `'Passenger'`, respectively. The final `full_set` is a set containing the full paths found by the `Passage` agent, and `pass_paths` is the set of paths passed by the passive agent. The code then calls `build_nx_graph` with `agent_types` set to `PassActive` and creates `G_passable` with the `path_list`, `full_list`, and a `pass_agent` of",
+            "grounded": false,
+            "cos": 0.5821155905723572
+          },
+          "hybrid": {
+            "text": "Both graphs (G_passable and G_full) are initialized with the same parameters, and the `n_intersections` and `n_roads` attributes are set to 0, as they are set in the `GraphStats` class. The `n_bridges`, `n_shelters`, and `waterways` attributes remain 0 because the graph is constructed without any edges. The build_nx_graph function is responsible for creating the two graphs based on the parameters passed to it.",
+            "grounded": true,
+            "cos": 0.572613000869751
+          },
+          "cache_aug": {
+            "text": "The `build_nx_graph` function returns two graphs, `G_passable` and `G_full`, because it needs to create a graph that represents the passable roads and another that includes all roads, including those that are not passable. This is necessary because the agent types have different requirements for which roads they can use.\n\n- **Compliant agents**: These agents can only use passable roads. Therefore, they use the `G_passable` graph.\n- **Skeptical agents**: These agents require confirmation from two distinct neighbors before acting. They can use both passable and non",
+            "grounded": true,
+            "cos": 0.7006447315216064
+          },
+          "text_clean": {
+            "text": "build_nnx_graph returns two graphs, G_passable, and G_complete, because it uses two different algorithms to construct the graphs. G_passabale uses the algorithm that finds the shortest path between two agents, while G_complete uses the same algorithm but also considers the distance between the agents. The agent types that use G_passabele are compliant, panics, and immobile, while the agent types using G_complete are scketical, panic, and mobile.",
+            "grounded": true,
+            "cos": 0.6382706761360168
+          },
+          "no_context": {
+            "text": "The `build_nx_g` function returns two graphs, `G_pass` and `G_full`, which represent the passable and full graphs, respectively. The `G` parameter in the function is used to specify the graph type, and the `passable` and full parameters are used to filter the graph based on the specified type.",
+            "grounded": false,
+            "cos": 0.5803079605102539
+          }
+        }
+      },
+      {
+        "id": "echoswarm_23",
+        "question": "How is the per-agent-type breakdown assembled for the API frontend payload?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The `AgentType` enum is defined with two variants, `AGENT_TYPE_CRAWLER` and `AGENT_TYPES` (which is a list of strings). Each variant is assigned a value of `AGENT_AGENT_TYPE_Crawler`, and the `AGENT` enum, which is a tuple of these two variants (in this case, `Crawler`, `AGENT_Crawler`), is assigned the value `AGENT_Type_Crawler`. This results in the final string being `AGENT Type Crawler` (reversed). The `AgentTypeEnum` field in the `CrawlConfig` struct is set to `AGENTTypeEnum.Crawler`, which is the same as `AGENTType.Crawler` in the enum, thus resulting in the string `AGENT-Type-Crawler` being returned.",
+            "grounded": false,
+            "cos": 0.376364529132843
+          },
+          "hybrid": {
+            "text": "The _move_agents method iterates through the agents list, checking the agent_type attribute to determine its state and state_type. It then calls the _move_panic method if the agent's state is AgentState.PANIC, and the _update_agents method if it's not. The function returns the meta dictionary containing the run_id, scenario_name, timestamp, engine type, and engine version.",
+            "grounded": false,
+            "cos": 0.4463789165019989
+          },
+          "cache_aug": {
+            "text": "The breakdown is assembled by iterating over the agents and checking their state and type. For each agent, if their state is not Evacuating, they are skipped. If their type is Panic, the _move_panic method is called, otherwise the _move_along_route method is called.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agent.py\n    def _move_along_route(self) -> None:\n        \"\"\"Move the agent along the route.\"\"\"\n        if self._route is None:\n            raise ValueError(\"No route found for agent",
+            "grounded": false,
+            "cos": 0.3761957883834839
+          },
+          "text_clean": {
+            "text": "The per-agent type breakdown is assembled by the agent type and the agent state.\n\n# ---------------------------------------------------------------------------\n## 1.1.2.1\n# The per agent type breakdown\n# ---------------------------------------------------------------------------\ndef per_agent_type_breakdown(\n    agent_type: AgentType,\n    agent_state: AgentState,\n    simulation_result: SimulationResult,\n    max_ticks: int = _DEFAULT_MAX_TICK,\n) -> dict[dict[AgentState, float], dict[bool, float]]:\n    \"\"\"\n    Returns the per agent breakdown for the given agent type, state, and simulation result.\n\n    Parameters\n    ----------\n    agent",
+            "grounded": false,
+            "cos": 0.5055498480796814
+          },
+          "no_context": {
+            "text": "The per-agent type breakdown is assembled for each agent in the API by using the `agent_type` field in the `Agent` object.",
+            "grounded": false,
+            "cos": 0.5186330080032349
+          }
+        }
+      },
+      {
+        "id": "echoswarm_24",
+        "question": "What sequence does run_swarm.py execute end-to-end to produce a single simulation run?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "run_swarm.py runs the swarm function three times to simulate three different swarm configurations, each with a different number of agents (1, 5, or 10). The results are stored in a list called swarms, which is then printed to the console. The result is a single string with the swarm configurations in the format \"10 agents with 1 swarm, 15 agents with a swarm of 5 agents, 20 agents in a swarm with 2 agents.\" The swarm configurations are enclosed in parentheses, and the total number of swarm agents is indicated by the number of 1s, 4s, or any other number that corresponds to the swarm size.",
+            "grounded": false,
+            "cos": 0.42773962020874023
+          },
+          "hybrid": {
+            "text": "run_swarm.py parses the scenario name from the command-line argument and uses that to load scenarios from a JSON file named `scenarios/<scenario>.json`, returning the first agent in the list. The `run` function then iterates over the simulation loop, collecting informed agents until convergence is reached. If a warm-up period is detected, the loop stops early to avoid running beyond the expected convergence. Finally, it returns the result of the simulation run.",
+            "grounded": false,
+            "cos": 0.5235229730606079
+          },
+          "cache_aug": {
+            "text": "run_swarm.py executes end-to-end to produce a single simulation run by first parsing the command-line arguments, then loading the scenario configuration, initializing the simulation environment, running the simulation, and finally building and returning the simulation result.",
+            "grounded": false,
+            "cos": 0.4803886413574219
+          },
+          "text_clean": {
+            "text": "run_swamp.py executes the following sequence to produce the simulation run:\n\n1. Connect to the Neo4j database using the provided credentials.\n2. Create a new Neo4J database if it doesn't exist.\n3. Create an empty graph.\n4. Add agents to the graph.\n5. Run the simulation using the Hermes engine.\n6. Retrieve the simulation results.\n\n[Contexts 4]\n# src/config.py\n\nANTHROS_API_KEY = os.environ.get(\"ANTHROS_API_KEY\")\nANTHRUS_MODEL = os.path.join(os.path.dirname(__file__), \"antros\",",
+            "grounded": false,
+            "cos": 0.5990229845046997
+          },
+          "no_context": {
+            "text": "run_swampy.py executes end-to end to produce one simulation run.",
+            "grounded": false,
+            "cos": 0.29255935549736023
+          }
+        }
+      },
+      {
+        "id": "echoswarm_25",
+        "question": "How does the system get satellite-detected flood polygons into the Neo4j graph as impassable edges?",
+        "route_ok": true,
+        "multi": true,
+        "answers": {
+          "latent": {
+            "text": "The system uses the `graph` variable to create a Neo4j graph with nodes representing the satellites and edges representing their detected flood polygons. It then iterates over the satellites, checking if they have a polygon by calling `polygon_has` with the satellite's id. If a polygon is detected, it adds the satellite and its polygon to the graph as impassable edges. The result is a graph where each satellite is connected to other satellites that have polygons detected, indicating potential flood areas.",
+            "grounded": true,
+            "cos": 0.5516422986984253
+          },
+          "hybrid": {
+            "text": "The system uses the OpenStreetMap road network, which is stored as a directed property graph, to build the Neo4j routing topology from scratch in ~1.5 seconds before injecting the satellite flood polygons. This is achieved by querying the Overpass API for the local road network and then building the NeoGraph from scratch using the `graph.add_nodes_from()` method, with the `passable=True` filter.",
+            "grounded": true,
+            "cos": 0.517781138420105
+          },
+          "cache_aug": {
+            "text": "The system gets satellite-detected flood polygons into the Neo4j graph as impassable edges through a process called \"flood injection.\" When a flood event is detected, the system injects the flood polygon into the graph as a new node, and then it sets the \"passable\" property of all edges connected to that node to \"false.\" This effectively makes the roads impassable, preventing MiroFish agents from traversing them.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/graph/queries.py\ndef inject_flood(\n    polygon: FloodPolygon",
+            "grounded": true,
+            "cos": 0.5927876234054565
+          },
+          "text_clean": {
+            "text": "The system gets satellite-detect flood polygons as impassables edges into the neo4j database.",
+            "grounded": true,
+            "cos": 0.5685006976127625
+          },
+          "no_context": {
+            "text": "The system uses a combination of techniques to detect satellite-detectable flood polygons in the NeoGraph graph. First, it identifies flood polygons that are not connected to any other polygon in the graph. Then, it calculates the distance between each flood polygon and all other polygons in a neighborhood of 100 meters. If a flood polygon is within 150 meters of any other flood polygon, it is considered impassable and is added to the Neograph graph as an impassable edge.",
+            "grounded": true,
+            "cos": 0.5366681814193726
+          }
+        }
+      }
+    ]
+  }
+]

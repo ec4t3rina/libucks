@@ -200,7 +200,9 @@ class LoRAReceiverTrainer:
         lr: float = 2e-4,
         warmup_steps: int = 0,
         total_steps: int = 0,
+        sep_lambda: float = _SEP_LAMBDA,
     ) -> None:
+        self.sep_lambda = sep_lambda
         # Determine the model's computation device from non-quantized parameters
         # (embed_tokens, layernorms, lm_head) before LoRA injection.  For 4-bit
         # models, quantized linear weights are uint8 buffers that may report a
@@ -311,7 +313,7 @@ class LoRAReceiverTrainer:
         # zeroing all LoRA gradients.  Running the no_grad wrong path FIRST means
         # the correct path's backward buffers are never at risk.
         logits_wrong_tgt: torch.Tensor | None = None
-        if not has_plan and _SEP_LAMBDA != 0.0:
+        if not has_plan and self.sep_lambda != 0.0:
             inputs_embeds_wrong: torch.Tensor = batch.get(
                 "inputs_embeds_wrong", torch.zeros_like(inputs_embeds)
             )
@@ -337,7 +339,7 @@ class LoRAReceiverTrainer:
 
         task_loss = F.cross_entropy(logits_tgt.float(), target_ids)
 
-        if not has_plan and _SEP_LAMBDA != 0.0:
+        if not has_plan and self.sep_lambda != 0.0:
             # ── Q=0 step: latent is the model's only context ──────────────── #
             logits_wrong_tgt = logits_all_wrong[prefix_len - 1: prefix_len - 1 + T]
             # Margin ranking loss for gradient: ReLU(margin - (c - w)).
@@ -349,7 +351,7 @@ class LoRAReceiverTrainer:
             _y0 = target_ids[0].long()
             sep = (logits_tgt[0, _y0].float() - logits_wrong_tgt[0, _y0].float().detach()).detach()
             align = torch.zeros((), device=task_loss.device, dtype=task_loss.dtype)
-            total = task_loss + _SEP_LAMBDA * _sep_loss
+            total = task_loss + self.sep_lambda * _sep_loss
         else:
             # ── Q>0 step: query present, task loss only ───────────────────── #
             # When the query is visible, L_sep at position 0 fights CE whenever

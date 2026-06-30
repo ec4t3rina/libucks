@@ -1,0 +1,136 @@
+{
+  "_meta": {
+    "repo": "click",
+    "version": 1,
+    "description": "15 hand-curated QA fixtures for the click CLI library. 10 single-bucket, 5 multi-bucket. Used by tests/eval/test_latent_vs_baseline.py to measure routing accuracy, answer grounding (keyword set match), and cosine similarity (sentence-transformers) across four pipelines: latent, text-with-LoRA, text-clean, no-context.",
+    "fields": {
+      "question": "Natural-language query as a user of click would ask it",
+      "expected_bucket_keywords": "Words that should appear in the routed bucket text (prose + chunks). Routing accuracy = majority match.",
+      "answer_keywords": "Words a correct natural-language answer should contain. Grounding = >= 50% match.",
+      "ground_truth_answer": "Short technical answer used for cosine-similarity scoring.",
+      "needs_multi_bucket": "True if a correct answer pulls content from >= 2 distinct buckets."
+    }
+  },
+  "fixtures": [
+    {
+      "id": "click_01",
+      "question": "How do I create a basic CLI command with click?",
+      "expected_bucket_keywords": ["command", "decorator", "click"],
+      "answer_keywords": ["click.command", "decorator", "function"],
+      "ground_truth_answer": "Use the @click.command() decorator on a Python function. The decorated function becomes a callable Click command. Add @click.option() and @click.argument() decorators for parameters.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_02",
+      "question": "What does the @click.option decorator do?",
+      "expected_bucket_keywords": ["option", "decorator"],
+      "answer_keywords": ["option", "flag", "parameter"],
+      "ground_truth_answer": "@click.option declares a command-line option flag for a Click command. It accepts strings like '--name' or '-n', a type, a default value, and a help string.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_03",
+      "question": "How does click.Group dispatch its subcommands?",
+      "expected_bucket_keywords": ["group", "command", "subcommand"],
+      "answer_keywords": ["group", "subcommand", "invoke"],
+      "ground_truth_answer": "Group is a MultiCommand that holds named subcommands. When invoked, it parses its own options, resolves the next argument to a subcommand name, and dispatches to that subcommand's callback.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_04",
+      "question": "What is the click Context object for?",
+      "expected_bucket_keywords": ["context", "command"],
+      "answer_keywords": ["context", "command", "parent"],
+      "ground_truth_answer": "Context carries per-invocation state for a Click command: parameter values, the parent context if any, the command being invoked, and shared resources. You access it via @click.pass_context or click.get_current_context().",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_05",
+      "question": "How do I declare a positional argument for a click command?",
+      "expected_bucket_keywords": ["argument", "decorator"],
+      "answer_keywords": ["click.argument", "positional", "required"],
+      "ground_truth_answer": "Use @click.argument('name') on a Click command. Arguments are positional and required by default. Specify nargs and type to control how values are parsed.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_06",
+      "question": "What does CliRunner do in click's testing module?",
+      "expected_bucket_keywords": ["testing", "runner"],
+      "answer_keywords": ["CliRunner", "invoke", "test"],
+      "ground_truth_answer": "CliRunner is a helper for invoking Click commands in tests. CliRunner().invoke(cmd, args) runs the command in isolation and returns a Result with captured output and exit code.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_07",
+      "question": "What is click.Path used for?",
+      "expected_bucket_keywords": ["path", "type", "file"],
+      "answer_keywords": ["Path", "filesystem", "file", "directory"],
+      "ground_truth_answer": "click.Path is a parameter type that validates filesystem paths. It accepts options like exists, file_okay, dir_okay, readable, writable, and can resolve paths or convert them to pathlib.Path.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_08",
+      "question": "How does click format the --help output for a command?",
+      "expected_bucket_keywords": ["format", "help", "usage"],
+      "answer_keywords": ["help", "format", "usage", "options"],
+      "ground_truth_answer": "Click's formatting module builds help output with a HelpFormatter that lays out a usage line, an options section, and a commands section for groups. Terminal width is detected from the environment.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_09",
+      "question": "What exception is raised when a click parameter fails validation?",
+      "expected_bucket_keywords": ["exception", "error", "parameter"],
+      "answer_keywords": ["BadParameter", "UsageError", "validation"],
+      "ground_truth_answer": "BadParameter is raised when a Click parameter value fails validation. It is a subclass of UsageError and carries the offending value, the parameter, and the context so a clear error message can be rendered.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_10",
+      "question": "How does click.prompt read user input from the terminal?",
+      "expected_bucket_keywords": ["prompt", "termui", "input"],
+      "answer_keywords": ["prompt", "input", "stdin"],
+      "ground_truth_answer": "click.prompt() reads a value from stdin after writing the prompt to stderr. It supports defaults, hidden input for passwords, type coercion, and value_proc callbacks for validation.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "click_11",
+      "question": "What is the difference between a click Option and an Argument?",
+      "expected_bucket_keywords": ["option", "argument", "parameter"],
+      "answer_keywords": ["option", "argument", "positional", "flag"],
+      "ground_truth_answer": "Options are named flags prefixed with -- or - (for example, --name) and are optional by default. Arguments are positional and required by default. Both are kinds of Parameter but follow different parsing rules.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "click_12",
+      "question": "How does the Context relate to Group subcommand invocation?",
+      "expected_bucket_keywords": ["context", "group", "subcommand"],
+      "answer_keywords": ["context", "subcommand", "parent", "invoke"],
+      "ground_truth_answer": "When a Group invokes a subcommand, it creates a child Context whose parent is the Group's own Context. The chain lets the subcommand access parent parameters via ctx.parent.params or shared state in ctx.obj.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "click_13",
+      "question": "How do parameter types and decorators work together to validate input in click?",
+      "expected_bucket_keywords": ["type", "decorator", "convert", "parameter"],
+      "answer_keywords": ["type", "convert", "ParamType", "decorator"],
+      "ground_truth_answer": "Parameter types are subclasses of ParamType that implement convert(value, param, ctx) to coerce and validate user input. Decorators like @click.option and @click.argument accept a type=... argument that names which ParamType to use; the runtime calls convert when parsing the command line.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "click_14",
+      "question": "What happens when the click parser encounters a flag option versus an option with a value?",
+      "expected_bucket_keywords": ["parser", "option", "flag"],
+      "answer_keywords": ["parser", "flag", "is_flag", "value"],
+      "ground_truth_answer": "The parser treats options declared with is_flag=True as booleans: presence sets True, absence keeps the default. count flags increment per occurrence. Value-bearing options consume the next token as the value; a non-flag option missing a value raises BadOptionUsage.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "click_15",
+      "question": "How do click's decorators connect a callback function to a Command instance?",
+      "expected_bucket_keywords": ["decorator", "command", "callback"],
+      "answer_keywords": ["decorator", "command", "callback", "function"],
+      "ground_truth_answer": "Each decorator wraps the target function. @click.command creates a Command instance whose callback is the wrapped function. @click.option and @click.argument append Parameter objects to the function's __click_params__ attribute, which @command then reads when constructing the Command.",
+      "needs_multi_bucket": true
+    }
+  ]
+}

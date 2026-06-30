@@ -590,7 +590,7 @@ class TestQueryOrchestratorIntegration:
 
         results = await orch.query("how does auth work?")
 
-        assert results == ["some representation"]
+        assert results == [(_BUCKET_ID, "some representation")]
 
     async def test_fresh_result_does_not_fire_reindex_fn(self):
         fresh = StaleCheckResult(
@@ -626,4 +626,4 @@ class TestQueryOrchestratorIntegration:
         )
 
         results = await orch.query("question?")
-        assert results == ["answer"]
+        assert results == [(_BUCKET_ID, "answer")]

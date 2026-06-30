@@ -92,6 +92,18 @@ def config():
     return Config()
 
 
+@pytest.fixture
+def permissive_config():
+    """Config with min_bucket_seed_tokens=1 so wiring tests can use tiny diffs.
+
+    Tests of the novelty/size guard interaction use the default Config() directly.
+    """
+    from libucks.config import RoutingConfig
+    cfg = Config()
+    cfg.routing = RoutingConfig(min_bucket_seed_tokens=1)
+    return cfg
+
+
 # ---------------------------------------------------------------------------
 # UPDATE path — added lines
 # ---------------------------------------------------------------------------
@@ -152,9 +164,13 @@ class TestAddedLines:
 # ---------------------------------------------------------------------------
 
 class TestNovelDiff:
-    async def test_novel_diff_emits_create_bucket_event(self, registry, config):
-        """Empty registry → every diff is novel → CreateBucketEvent."""
-        agent = CentralAgent(registry=registry, config=config, embed_fn=_embed_at(0))
+    async def test_novel_diff_emits_create_bucket_event(self, registry, permissive_config):
+        """Empty registry → every diff is novel → CreateBucketEvent.
+
+        Uses permissive_config (min_bucket_seed_tokens=1) so this stays a
+        pure wiring test. The size-guard behavior is covered separately.
+        """
+        agent = CentralAgent(registry=registry, config=permissive_config, embed_fn=_embed_at(0))
 
         await agent.post(_add_event("src/new.py", ["def brand_new(): pass"]))
         await agent.run_once()
@@ -163,17 +179,38 @@ class TestNovelDiff:
         event = agent.create_bucket_queue.get_nowait()
         assert isinstance(event, CreateBucketEvent)
         assert "brand_new" in event.seed_content
+        # Source file context now flows through so consumers can build
+        # ChunkMetadata that _find_buckets_for_file can match later.
+        assert event.source_file == "src/new.py"
 
-    async def test_novel_diff_not_delivered_to_any_librarian(self, registry, config):
+    async def test_novel_diff_not_delivered_to_any_librarian(self, registry, permissive_config):
         """Novel diff → CreateBucketEvent only, no librarian receives anything."""
         lib = Librarian("bucket_a")
-        agent = CentralAgent(registry=registry, config=config, embed_fn=_embed_at(0))
+        agent = CentralAgent(registry=registry, config=permissive_config, embed_fn=_embed_at(0))
         agent.register_librarian("bucket_a", lib)  # registered but empty registry
 
         await agent.post(_add_event("src/new.py", ["def brand_new(): pass"]))
         await agent.run_once()
 
         assert lib.queue.qsize() == 0
+
+    async def test_small_novel_diff_routes_to_nearest_bucket(self, registry, config):
+        """A novel-but-tiny diff should be absorbed into the nearest existing
+        bucket rather than spawning a single-line bucket. Default config has
+        min_bucket_seed_tokens=1500 — a one-line diff is well below it."""
+        await registry.register("bucket_a", _unit_vec(1), 100)
+        lib_a = Librarian("bucket_a")
+
+        # embed_fn returns _unit_vec(5) — far from bucket_a's centroid (unit_vec(1)),
+        # so this WOULD be novel by cosine; the size guard should still route it.
+        agent = CentralAgent(registry=registry, config=config, embed_fn=_embed_at(5))
+        agent.register_librarian("bucket_a", lib_a)
+
+        await agent.post(_add_event("src/new.py", ["def brand_new(): pass"]))
+        await agent.run_once()
+
+        assert agent.create_bucket_queue.qsize() == 0
+        assert lib_a.queue.qsize() == 1  # routed to the only existing bucket
 
 
 # ---------------------------------------------------------------------------

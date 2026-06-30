@@ -101,6 +101,7 @@ class Librarian:
         mitosis_service: Optional["MitosisService"] = None,
         repo_path: Optional[Path] = None,
         translator: Optional["Translator"] = None,
+        chunk_retriever: Optional[object] = None,
     ) -> None:
         self.bucket_id = bucket_id
         self._store = store
@@ -111,6 +112,11 @@ class Librarian:
         self._mitosis_service = mitosis_service
         self._repo_path = repo_path
         self._translator = translator
+        # Phase 4-C.1.5: when provided + LIBUCKS_LIBRARIAN_QUERY_AWARE=1,
+        # _handle_query reads the bucket via query-cos chunk rerank rather
+        # than positional truncation. Fixes the universal-architecture blind
+        # spot exposed on echoswarm (10-23 chunks per bucket).
+        self._chunk_retriever = chunk_retriever
         self.queue: asyncio.Queue[object] = asyncio.Queue()
 
     # ------------------------------------------------------------------
@@ -306,8 +312,10 @@ class Librarian:
         except FileNotFoundError:
             return ""
 
-        # Use actual code content (same as training); fall back to prose if unreadable
-        source_text = _collect_source_text(front_matter, max_chars=3000) or prose
+        # Phase 4-C.1.5: query-aware chunk selection when the gate is on
+        # and a ChunkRetriever is wired in. Falls back to positional read
+        # (preserves Phase 4-A behavior) when either is missing.
+        source_text = self._select_source_text(event.query, front_matter) or prose
 
         log.info("librarian.query", bucket_id=self.bucket_id, query=event.query[:60])
         try:
@@ -318,3 +326,44 @@ class Librarian:
 
         # Architectural rule: do NOT call decode() here.
         return result
+
+    def _select_source_text(self, query: str, front_matter, max_chars: int = 3000) -> str:
+        """Build the encoder input from the bucket's chunks.
+
+        With LIBUCKS_LIBRARIAN_QUERY_AWARE=1 and an injected ChunkRetriever +
+        embedder, ranks chunks by query-cos and fills the char budget with
+        the highest-scoring ones first. Otherwise uses the legacy positional
+        first-N-chars read (preserves Phase 4-A baseline behavior)."""
+        import os
+        gated_on = os.environ.get("LIBUCKS_LIBRARIAN_QUERY_AWARE") == "1"
+        if not gated_on or self._chunk_retriever is None or self._embedder is None:
+            return _collect_source_text(front_matter, max_chars=max_chars)
+
+        try:
+            q_emb = self._embedder.embed(query)
+        except Exception as exc:
+            log.warning("librarian.query_aware.embed_failed", bucket_id=self.bucket_id, error=str(exc))
+            return _collect_source_text(front_matter, max_chars=max_chars)
+
+        try:
+            scored = self._chunk_retriever.score_chunks(self.bucket_id, q_emb)
+        except Exception as exc:
+            log.warning("librarian.query_aware.score_failed", bucket_id=self.bucket_id, error=str(exc))
+            return _collect_source_text(front_matter, max_chars=max_chars)
+
+        parts: list[str] = []
+        total = 0
+        for meta, _score in scored:
+            content = _read_chunk_content(meta)
+            if not content:
+                continue
+            block = f"# {meta.source_file}\n{content}\n"
+            if total + len(block) > max_chars:
+                if not parts:
+                    parts.append(block[:max_chars])
+                break
+            parts.append(block)
+            total += len(block)
+        if not parts:
+            return _collect_source_text(front_matter, max_chars=max_chars)
+        return "\n---\n\n".join(parts)

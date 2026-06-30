@@ -36,6 +36,35 @@ class ModelConfig:
     device: str = "auto"
     strategy: str = "latent"
     compression_steps: int = 8
+    base_model_dtype: str = "float16"
+    """Storage dtype for the Base receiver on MPS. float16 is fine for ~0.5B
+    models; bigger models (1.5B+) may overflow fp16 and produce NaN losses
+    during LoRA training — set to 'bfloat16' for those. Options: float16,
+    bfloat16, float32. CUDA/CPU paths ignore this setting (transformers
+    auto-picks fp32 there)."""
+
+    output_len: int = 32
+    """K — number of soft-prompt tokens the CommunicationAdapter emits per
+    query. Changing this requires retraining adapter.pt and lora_receiver.pt
+    (the output_queries parameter and downstream LoRA shapes are K-dependent).
+    Larger K gives the latent path more capacity but quadratically scales
+    inter-slot attention cost. 32 is the historical default; 64 trades
+    compute for compression headroom on bigger receivers."""
+
+    hybrid_retrieval: bool = False
+    """Enable the verbatim retrieval channel alongside the latent channel.
+    When True, Translator.synthesize fetches source text from each routed
+    bucket and concatenates the embeddings before the soft prompt at decode
+    time. Latent path still does cross-bucket fusion via the
+    CommunicationAdapter; verbatim grounds identifier-level facts.
+
+    Default False: libucks runs on any repo with latent-only by default;
+    hybrid is per-repo opt-in via .libucks/config.toml."""
+
+    hybrid_verbatim_max_chars: int = 3000
+    """Total character budget for the verbatim channel, divided evenly across
+    the top-k routed buckets. 3000 ≈ 750 tokens — under 5% of a 32K context
+    window."""
 
     def __post_init__(self) -> None:
         if self.strategy != "latent":
@@ -69,11 +98,20 @@ class RoutingConfig:
     Kept separate from mitosis_threshold so INIT density can be tuned independently
     of runtime splitting behaviour."""
 
+    min_bucket_seed_tokens: int = 1_500
+    """Minimum estimated token count required to spawn a new bucket from novel
+    runtime content. Smaller diffs are routed to the nearest existing bucket
+    even when cosine-distant. Buckets are meant to represent solid subjects;
+    one-file spawns would fragment the index. HealthMonitor's coherence-driven
+    mitosis is the natural pressure valve once enough material has accumulated
+    in an existing bucket."""
+
     def __post_init__(self) -> None:
         self.novelty_threshold = float(self.novelty_threshold)
         self.top_k = int(self.top_k)
         self.mitosis_threshold = int(self.mitosis_threshold)
         self.init_bucket_size = int(self.init_bucket_size)
+        self.min_bucket_seed_tokens = int(self.min_bucket_seed_tokens)
 
         if not (0.0 < self.novelty_threshold < 1.0):
             raise ValueError(
@@ -89,6 +127,10 @@ class RoutingConfig:
         if self.init_bucket_size < 1:
             raise ValueError(
                 f"init_bucket_size must be >= 1, got {self.init_bucket_size}"
+            )
+        if self.min_bucket_seed_tokens < 1:
+            raise ValueError(
+                f"min_bucket_seed_tokens must be >= 1, got {self.min_bucket_seed_tokens}"
             )
 
 

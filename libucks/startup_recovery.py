@@ -28,13 +28,22 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 import structlog
 
 from libucks.diff.diff_extractor import DiffExtractor
-from libucks.models.events import UpdateEvent
+from libucks.models.events import CreateBucketEvent, DiffHunk, UpdateEvent
 from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
 from libucks.watchdog_service import _TRACKED_EXTENSIONS
 
 if TYPE_CHECKING:
+    from libucks.central_agent import CentralAgent
+    from libucks.embeddings.embedding_service import EmbeddingService
     from libucks.librarian import Librarian
+
+
+# Cap unmatched-file content read for novelty embedding so a huge new file
+# doesn't dominate startup; same order-of-magnitude as InitOrchestrator's
+# _MAX_FILE_BYTES guard.
+_UNMATCHED_READ_CAP = 50_000
+_TOKENS_PER_CHAR = 0.25
 
 log = structlog.get_logger(__name__)
 
@@ -54,6 +63,28 @@ def _git_rev_parse_head(repo_path: Path) -> Optional[str]:
         )
         if result.returncode == 0:
             return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def _git_show_toplevel(repo_path: Path) -> Optional[Path]:
+    """Return the git repository root for repo_path.
+
+    libucks repo_path may be a subdirectory of the git root (e.g. click's
+    `src/click/` inside the `click/` checkout). git diff --name-only returns
+    paths relative to the root, not to repo_path, so all path arithmetic that
+    resolves diff paths to absolute paths MUST be anchored to the root.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_path), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
     except Exception:
         pass
     return None
@@ -87,12 +118,27 @@ class StartupRecovery:
         store: BucketStore,
         librarians: Dict[str, "Librarian"],
         extractor: DiffExtractor,
+        central_agent: Optional["CentralAgent"] = None,
+        embedder: Optional["EmbeddingService"] = None,
+        min_bucket_seed_tokens: int = 1_500,
     ) -> None:
         self._repo_path = repo_path
         self._registry = registry
         self._store = store
         self._librarians = librarians
         self._extractor = extractor
+        # central_agent + embedder enable novelty detection on unmatched files.
+        # Both are optional so existing unit tests that don't exercise the
+        # novel-bucket path can construct StartupRecovery without them.
+        self._central_agent = central_agent
+        self._embedder = embedder
+        self._min_bucket_seed_tokens = int(min_bucket_seed_tokens)
+        # git diff returns paths relative to the git root, not repo_path. When
+        # libucks is anchored at a subdirectory of the git root (e.g. click's
+        # src/click/), naive `repo_path / rel_filepath` doubles a path component
+        # and breaks every match. Cache the root once and resolve against it.
+        _root = _git_show_toplevel(repo_path)
+        self._git_root: Path = _root if _root is not None else repo_path
 
     def _find_buckets_for_file(self, rel_filepath: str) -> List[str]:
         """Return bucket IDs that own at least one chunk from the given file.
@@ -100,9 +146,12 @@ class StartupRecovery:
         Matching is done by resolving both paths to absolute form so that
         relative-vs-absolute mismatches (common when mixing git output with
         stored absolute paths) do not cause missed updates.
+
+        rel_filepath is resolved against the git root, not repo_path, because
+        git diff --name-only emits paths relative to the root.
         """
         try:
-            abs_target = (self._repo_path / rel_filepath).resolve()
+            abs_target = (self._git_root / rel_filepath).resolve()
         except Exception:
             return []
 
@@ -167,7 +216,14 @@ class StartupRecovery:
 
             bucket_ids = self._find_buckets_for_file(rel_filepath)
             if not bucket_ids:
-                log.debug("startup_recovery.no_bucket_for_file", file=rel_filepath)
+                # Unmatched: file not owned by any existing bucket. Decide
+                # whether to spawn a new bucket (substantial + novel content)
+                # or route the content to the nearest existing bucket.
+                routed = await self._handle_unmatched_file(rel_filepath)
+                if routed:
+                    recovered_updates += 1
+                else:
+                    log.debug("startup_recovery.no_bucket_for_file", file=rel_filepath)
                 continue
 
             try:
@@ -204,3 +260,84 @@ class StartupRecovery:
             to_sha=current_head[:8],
         )
         return current_head
+
+    async def _handle_unmatched_file(self, rel_filepath: str) -> bool:
+        """Handle a changed file that no existing bucket owns.
+
+        Returns True if the file was dispatched (either enqueued as a new
+        bucket or routed to the nearest existing one); False if it was
+        skipped (deleted, empty, or no central_agent/embedder injected).
+        """
+        if self._central_agent is None or self._embedder is None:
+            return False
+
+        # rel_filepath is git-root-relative; resolve against the cached root.
+        abs_path = self._git_root / rel_filepath
+        if not abs_path.is_file():
+            # Deleted file or stat failure — nothing to route.
+            return False
+
+        try:
+            content = abs_path.read_text(errors="replace")
+        except Exception as exc:
+            log.warning("startup_recovery.unmatched_read_failed", file=rel_filepath, error=str(exc))
+            return False
+
+        if not content.strip():
+            return False
+
+        sample = content[:_UNMATCHED_READ_CAP]
+        try:
+            embedding = self._embedder.embed(sample)
+        except Exception as exc:
+            log.warning("startup_recovery.unmatched_embed_failed", file=rel_filepath, error=str(exc))
+            return False
+
+        est_tokens = max(1, int(len(content) * _TOKENS_PER_CHAR))
+        line_count = max(1, content.count("\n") + 1)
+
+        # Spawn a new bucket only for substantial novel subjects. Smaller or
+        # cosine-near content is absorbed into the nearest existing bucket;
+        # HealthMonitor's coherence-driven mitosis will split if pressure
+        # builds. Prevents one-file fragmentation.
+        if (
+            est_tokens >= self._min_bucket_seed_tokens
+            and self._central_agent.is_novel(embedding)
+        ):
+            event = CreateBucketEvent(
+                seed_content=sample,
+                source_file=rel_filepath,
+                start_line=1,
+                end_line=line_count,
+            )
+            await self._central_agent.create_bucket_queue.put(event)
+            log.info(
+                "startup_recovery.novel_file_queued",
+                file=rel_filepath,
+                tokens=est_tokens,
+                lines=line_count,
+            )
+            return True
+
+        top = self._central_agent.route(embedding, top_k=1)
+        if not top or top[0] not in self._librarians:
+            return False
+
+        bucket_id = top[0]
+        hunk = DiffHunk(
+            file=rel_filepath,
+            old_start=0,
+            old_end=0,
+            new_start=1,
+            new_end=line_count,
+            added_lines=sample.splitlines(),
+            removed_lines=[],
+        )
+        await self._librarians[bucket_id].handle(UpdateEvent(bucket_id=bucket_id, hunk=hunk))
+        log.info(
+            "startup_recovery.unmatched_routed",
+            file=rel_filepath,
+            bucket_id=bucket_id,
+            tokens=est_tokens,
+        )
+        return True

@@ -1,0 +1,216 @@
+{
+  "_meta": {
+    "repo": "echoswarm",
+    "version": 1,
+    "description": "25 hand-curated QA fixtures for echoswarm — a closed-loop crisis communication optimizer (Claude + CERC protocol + MiroFish agent swarm + Neo4j road graph + Sentinel-1 SAR flood detection). Echoswarm is the Phase 4-C target repo: a fresh, uncontaminated codebase (~4.4K LoC across 17 source files) used to A/B cache augmentation against the Phase 4-A hybrid baseline. Fixtures match the libugry_qa.json schema. Answer keywords avoid generic Python tokens — emphasis on echoswarm-specific identifiers (CERC, Hermes, MiroFish, Skeptical, panic_radius, etc.) to keep the no_context floor low.",
+    "fields": {
+      "question": "Natural-language query about echoswarm's internals",
+      "expected_bucket_keywords": "Words that should appear in routed bucket text (prose + chunk source files)",
+      "answer_keywords": "Words a correct answer should contain (case-insensitive substring match)",
+      "ground_truth_answer": "Short technical answer for cosine-similarity scoring",
+      "needs_multi_bucket": "True if answering well requires content from >= 2 distinct buckets"
+    }
+  },
+  "fixtures": [
+    {
+      "id": "echoswarm_01",
+      "question": "What is the relay probability for a Compliant agent and how does it modify the message?",
+      "expected_bucket_keywords": ["agents", "compliant"],
+      "answer_keywords": ["80%", "verbatim", "COMPLIANT"],
+      "ground_truth_answer": "Compliant agents relay with 80% probability (random.random() < 0.8) and transmit the message verbatim — no tokens are dropped or garbled before forwarding to neighbors.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_02",
+      "question": "What two conditions must hold before a Skeptical agent will relay the message?",
+      "expected_bucket_keywords": ["agents", "skeptical"],
+      "answer_keywords": ["confirmations", "2", "SKEPTICAL"],
+      "ground_truth_answer": "A Skeptical agent only relays after it has received the message from 2 distinct source agents (confirmations >= 2). When it does relay, it drops one random key token from the tokens set before forwarding.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_03",
+      "question": "How does a Panic agent corrupt the message when relaying?",
+      "expected_bucket_keywords": ["agents", "panic"],
+      "answer_keywords": ["1", "2", "garble", "PANIC"],
+      "ground_truth_answer": "A Panic agent relays immediately (no confirmation requirement) but drops a random 1 to 2 key tokens from the set before relaying — random.randint(1, 2) tokens are popped at random positions.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_04",
+      "question": "What initial state is an Immobile agent placed in, and can it ever receive a message?",
+      "expected_bucket_keywords": ["agents", "immobile"],
+      "answer_keywords": ["STRANDED", "IMMOBILE", "never"],
+      "ground_truth_answer": "Immobile agents are placed in the STRANDED state in __post_init__. They never accept messages (receive_message returns False immediately for IMMOBILE), never relay, and never act — they are a permanent dead-weight that drags down the evacuation rate baseline.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_05",
+      "question": "What token-preservation threshold must be met for an INFORMED agent to start evacuating?",
+      "expected_bucket_keywords": ["agents", "can_act"],
+      "answer_keywords": ["preservation", "0.6", "INFORMED"],
+      "ground_truth_answer": "An INFORMED agent transitions to EVACUATING when preservation (len(self.tokens) / total_key_tokens) is greater than 0.6 — i.e. at least 60% of the original key tokens are still in its message. Skeptical agents additionally require confirmations >= 2.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_06",
+      "question": "What sub-steps does a single Simulation.tick() execute, and in what order?",
+      "expected_bucket_keywords": ["simulation", "tick"],
+      "answer_keywords": ["_relay_messages", "_move_agents", "_spread_panic"],
+      "ground_truth_answer": "Simulation.tick() runs five sub-steps in order: _relay_messages (snapshot all relays, then apply), _update_evacuation_status, _move_agents, _increment_ticks, and _spread_panic. Per-tick metrics are recorded last via _compute_tick_metrics.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_07",
+      "question": "What is the snapshot semantics rule used by _relay_messages, and why does it matter?",
+      "expected_bucket_keywords": ["simulation", "relay"],
+      "answer_keywords": ["pending", "snapshot", "atomically", "one hop"],
+      "ground_truth_answer": "All relay operations for the tick are collected into a 'pending' list first (snapshot), then applied atomically to the receivers. This prevents information from propagating more than one hop per tick regardless of graph topology — without it, an agent informed mid-tick could re-relay the same tick.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_08",
+      "question": "What parameters control how Panic spreads between agents in the swarm?",
+      "expected_bucket_keywords": ["simulation", "panic"],
+      "answer_keywords": ["panic_radius", "panic_spread_prob", "2", "0.3"],
+      "ground_truth_answer": "SimulationConfig sets panic_radius=2 (graph hops within which Panic spreads to Compliant/Skeptical neighbors) and panic_spread_prob=0.3. Crucially, _spread_panic runs AFTER movement so new panickers only take effect on the next tick — no same-tick cascade.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_09",
+      "question": "How does extract_key_tokens derive the canonical token set from a Hermes message?",
+      "expected_bucket_keywords": ["simulation", "tokens"],
+      "answer_keywords": ["which_route", "where", "what", "_STOP_WORDS"],
+      "ground_truth_answer": "extract_key_tokens concatenates the Hermes message's which_route, where, and what fields, lowercases and splits on whitespace plus punctuation, then keeps only words longer than 3 characters that are not in _STOP_WORDS (a frozen set of articles and short connectives). Returns a frozenset.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_10",
+      "question": "What are the three CERC pillars that Hermes follows when generating an evacuation order?",
+      "expected_bucket_keywords": ["hermes", "CERC", "engine"],
+      "answer_keywords": ["FRAMING", "CLARITY", "CONTENT"],
+      "ground_truth_answer": "Hermes's CERC system prompt enforces three pillars: FRAMING (validate the threat and explain WHY action is needed, never minimize), CLARITY (answer Who/What/Where/When/Which route, no bureaucratic language or passive voice), and CONTENT (always cite the data source, e.g. 'Satellite imagery confirms X' to increase compliance).",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_11",
+      "question": "What JSON keys does Hermes output for a CERC-compliant evacuation order?",
+      "expected_bucket_keywords": ["hermes", "engine", "schema"],
+      "answer_keywords": ["who", "what", "where", "when", "which_route", "source_justification"],
+      "ground_truth_answer": "Hermes returns a JSON object with seven keys: who (target population), what (required action), where (destination with capacity), when (urgency level like NOW), which_route (named primary + alternative route), source_justification (data citation with timestamp), and human_readable (full plain-language combined message).",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_12",
+      "question": "What happens when the Anthropic API call from Hermes times out or errors?",
+      "expected_bucket_keywords": ["hermes", "engine", "fallback"],
+      "answer_keywords": ["fallback", "30", "timeout", "AnthropicClient"],
+      "ground_truth_answer": "AnthropicClient is constructed with timeout=30.0. Inside complete(), any exception (network error, rate limit, JSON parse failure) is logged and the method returns the provided 'fallback' string immediately so the simulation never blocks on a hung API call. The fallback payloads (_FALLBACK_CERC_JSON, _FALLBACK_CLARITY_JSON) are predefined evacuation orders.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_13",
+      "question": "What clarity score threshold must a Hermes message pass to be considered acceptable?",
+      "expected_bucket_keywords": ["hermes", "clarity", "config"],
+      "answer_keywords": ["7", "HERMES_CLARITY_PASS_THRESHOLD", "overall"],
+      "ground_truth_answer": "config.HERMES_CLARITY_PASS_THRESHOLD is 7. The Clarity Validator (a second LLM call) scores each of the 5 Ws on a 1-10 scale plus an 'overall' score; the message passes when overall >= 7. HERMES_MAX_RETRIES is 2, so Hermes will retry up to 3 times total before falling back.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_14",
+      "question": "What three failure modes does the Critic diagnose when reviewing a simulation run?",
+      "expected_bucket_keywords": ["critic", "diagnosis", "learning"],
+      "answer_keywords": ["framing", "clarity", "content", "Skeptical"],
+      "ground_truth_answer": "Hermes-Critic diagnoses one of three primary failure modes: (1) Framing — the threat lacked authority/credibility for Skeptical self-verification, (2) Clarity — route or shelter details degraded too fast through word-of-mouth hops, (3) Content — missing verifiable data points that Skeptical agents need to act alone. The output is a Markdown SOP Update with prescriptive Rule bullets.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_15",
+      "question": "Where does the Critic persist its SOP Update, and what is the difference between the two files?",
+      "expected_bucket_keywords": ["critic", "sops"],
+      "answer_keywords": ["sops", "scenario", "history", "overwritten", "append"],
+      "ground_truth_answer": "CriticEngine._persist writes to two files: sops/{scenario}.md is OVERWRITTEN every run with only the latest SOP Update (Hermes prepends this to its system prompt on the next call), and sops/{scenario}_history.md is APPEND-ONLY, recording a timestamped diary entry with run_id and evacuation_rate for every diagnosis.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_16",
+      "question": "What OSM highway tags does echoswarm's graph loader ingest into Neo4j?",
+      "expected_bucket_keywords": ["loader", "OSM", "highway"],
+      "answer_keywords": ["motorway", "primary", "secondary", "residential", "overpass"],
+      "ground_truth_answer": "The Overpass query in graph/loader.py pulls ways tagged highway~motorway|trunk|primary|secondary|tertiary|residential, plus bridges, waterway~river|stream|canal, and amenity~shelter|community_centre|school|hospital nodes. Each highway type has a default km/h in the _SPEED_KMH dict (motorway=120, primary=80, residential=30, etc.) used when OSM's maxspeed tag is missing.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_17",
+      "question": "What SAR backscatter threshold does the flood engine use to classify flooded pixels?",
+      "expected_bucket_keywords": ["flood_engine", "satellite", "SAR"],
+      "answer_keywords": ["-20", "threshold_db", "backscatter", "dark"],
+      "ground_truth_answer": "get_flooded_sectors_live defaults to threshold_db=-20.0 — the open-water standard. Flooded pixels are DARK (low SAR backscatter). The Python code computes the cutoff as int(10 ** (threshold_db / 10) * _SIGMA0_SCALE) where _SIGMA0_SCALE = 1000. For turbulent or wind-roughened flood water the threshold can be loosened to -18 or -15 dB.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_18",
+      "question": "Why does the Sentinel-1 evalscript return raw sigma° values instead of a binary flood mask?",
+      "expected_bucket_keywords": ["flood_engine", "evalscript", "satellite"],
+      "answer_keywords": ["binary", "distinguish", "distribution", "VV"],
+      "ground_truth_answer": "The evalscript outputs Math.min(Math.round(s.VV * 1000), 255) as a UINT8 PNG — raw σ° × 1000 capped at 255 — instead of a server-side threshold. The rationale: a binary mask cannot distinguish 'scene is dark everywhere and threshold is too strict' from 'image is empty', whereas the raw distribution lets Python print the actual σ° histogram and suggest the right threshold from real data.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_19",
+      "question": "Why does a Skeptical agent often stay in WAITING state even when the message arrived?",
+      "expected_bucket_keywords": ["agents", "simulation", "skeptical"],
+      "answer_keywords": ["confirmations", "2", "distinct", "preservation"],
+      "ground_truth_answer": "A Skeptical agent will only act if it has received the message from 2 distinct neighbor sources (confirmations >= 2) AND the surviving token preservation > 0.6. If the message arrives via only one neighbor, the agent stays INFORMED (not WAITING — it has received the message) and never transitions to EVACUATING. This is the two-step flow model from Katz & Lazarsfeld and is the failure mode the Critic is most likely to diagnose.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "echoswarm_20",
+      "question": "Walk through what happens to an agent from the moment Hermes broadcasts a message until the agent reaches shelter.",
+      "expected_bucket_keywords": ["agents", "simulation", "hermes"],
+      "answer_keywords": ["seed", "INFORMED", "EVACUATING", "SAFE", "route"],
+      "ground_truth_answer": "At simulation start, the seed_fraction (default 5%) of non-Immobile agents receive the Hermes key_tokens directly (source_id='hermes'). Each tick: _relay_messages snapshots all current relays and applies them, moving neighbors to INFORMED. _update_evacuation_status promotes INFORMED agents whose can_act condition holds (preservation > 0.6, plus 2 confirmations for Skeptical) to EVACUATING with a precomputed shortest_path route to the shelter_node on G_passable. _move_agents advances each EVACUATING agent one node along its route; when it reaches shelter_node its state becomes SAFE.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "echoswarm_21",
+      "question": "How does Hermes-Critic close the feedback loop on Hermes's next evacuation message?",
+      "expected_bucket_keywords": ["critic", "hermes", "sops"],
+      "answer_keywords": ["SOP", "prepend", "system prompt", "scenario"],
+      "ground_truth_answer": "After a simulation completes, CriticEngine.analyze produces a Markdown SOP Update and writes it to sops/{scenario}.md (overwriting the previous one). On the NEXT Hermes invocation, HermesEngine reads sops/{scenario}.md and prepends its contents to the CERC system prompt — so the Critic's prescriptive 'Rule:' bullets directly shape the next message. The append-only sops/{scenario}_history.md preserves the full diagnosis diary across runs.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "echoswarm_22",
+      "question": "Why does build_nx_graph return two graphs (G_passable and G_full), and which agent types use which?",
+      "expected_bucket_keywords": ["simulation", "loader", "graph"],
+      "answer_keywords": ["G_passable", "G_full", "panic", "compliant"],
+      "ground_truth_answer": "build_nx_graph returns G_passable (only edges where passable=True) and G_full (all edges including flood-blocked). Compliant and Skeptical agents route on G_passable so they avoid flooded roads when evacuating. Panic agents route on G_full — this models the well-documented phenomenon of panic overriding hazard awareness. Relay adjacency uses G_full for everyone, since message propagation isn't blocked by water.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "echoswarm_23",
+      "question": "How is the per-agent-type breakdown assembled for the API frontend payload?",
+      "expected_bucket_keywords": ["payload", "bridge", "agents"],
+      "answer_keywords": ["breakdown", "COMPLIANT", "SKEPTICAL", "PANIC", "IMMOBILE"],
+      "ground_truth_answer": "build_payload in bridge/payload.py iterates over the four AgentType enum values (COMPLIANT, SKEPTICAL, PANIC, IMMOBILE) and for each computes a dict of {total, safe, evacuating, informed, waiting, stranded} counts by filtering the agent list. The result is stored under the upper-cased type name in the 'breakdown' field of the frontend JSON payload, alongside meta and summary blocks.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "echoswarm_24",
+      "question": "What sequence does run_swarm.py execute end-to-end to produce a single simulation run?",
+      "expected_bucket_keywords": ["run_swarm", "hermes", "simulation"],
+      "answer_keywords": ["reset_flood", "inject_flood", "HermesEngine", "Simulation", "CriticEngine"],
+      "ground_truth_answer": "run_swarm.py: (1) reset_flood to make the run idempotent, (2) get flooded sectors from satellite (local cache or live CDSE), (3) inject_flood to set passable=false on intersecting edges in Neo4j, (4) build_nx_graph + find_shelter_node + spawn_agents, (5) HermesEngine.generate to produce the CERC-validated evacuation order, (6) extract_key_tokens + Simulation.run, (7) CriticEngine.analyze to write the SOP Update for the next run.",
+      "needs_multi_bucket": true
+    },
+    {
+      "id": "echoswarm_25",
+      "question": "How does the system get satellite-detected flood polygons into the Neo4j graph as impassable edges?",
+      "expected_bucket_keywords": ["flood_engine", "queries", "graph"],
+      "answer_keywords": ["polygons", "inject_flood", "passable", "Sentinel"],
+      "ground_truth_answer": "get_flooded_sectors_live (live) or get_flooded_sectors (local cache) returns a list of Shapely Polygon/MultiPolygon objects in WGS-84 from Sentinel-1 SAR backscatter. inject_flood in graph/queries.py takes the union of those polygons and runs a Cypher MATCH over CONNECTS edges, setting passable=false on any edge whose geometry intersects the flood polygon. The dual-write strategy keeps passable as a direct property on the edge so build_nx_graph can split into G_passable/G_full in one pass without re-querying.",
+      "needs_multi_bucket": true
+    }
+  ]
+}

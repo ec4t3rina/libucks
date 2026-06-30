@@ -220,6 +220,34 @@ def install_hooks_cmd(repo_path: Path | None, git_root_path: Path | None, force:
 @click.option("--lr", "lora_lr", default=2e-4, show_default=True,
               help="AdamW learning rate for LoRA receiver training. "
                    "2e-4 is standard for LoRA; 5e-5 is too small for <1000 optimizer steps.")
+@click.option("--query-dropout-rate", "query_dropout_rate", default=0.5, show_default=True,
+              help="Fraction of training steps where the query token prefix is dropped (Q=0). "
+                   "L_sep only fires on Q=0 steps, so this controls how much latent-grounding "
+                   "signal the model gets. CLAUDE.md mandates 0.5 — values < 0.2 starve L_sep "
+                   "and the latent collapses (the May-14 click weights were trained at 0.1 and "
+                   "hallucinate). Range: 0.0–1.0.")
+@click.option("--lora-r", "lora_r", default=16, show_default=True,
+              help="LoRA rank. Must match the rank used by mcp_bridge to load weights "
+                   "(currently 16). Larger r = more LoRA capacity, slower training.")
+@click.option("--lora-alpha", "lora_alpha", default=16.0, show_default=True,
+              help="LoRA scaling factor. Effective scale is alpha/r; equal alpha/r keeps "
+                   "the initial perturbation small.")
+@click.option("--qa-per-bucket", "qa_per_bucket", default=1, show_default=True,
+              help="Number of QA pairs to synthesize per bucket via the teacher. More pairs = "
+                   "more training data per epoch (qa_per_bucket=3 with 43 click buckets = 129 "
+                   "examples per epoch instead of 43). Use 3 as a starting point for the "
+                   "post-fix retraining; 5 if 3 doesn't converge.")
+@click.option("--sep-lambda", "sep_lambda", default=0.1, show_default=True,
+              help="Weight on L_sep (latent-grounding loss) in Phase 2. 0.1 is the historical "
+                   "default that works on 0.5B-1.5B receivers; larger receivers have stronger "
+                   "task priors that drown out the latent gradient at 0.1 -- bump to 0.3 or "
+                   "higher for 3B+. Range: 0.0-10.0.")
+@click.option("--hybrid-train", "hybrid_train", is_flag=True, default=False,
+              help="Phase B: train LoRA with verbatim source prepended to the input "
+                   "frame during 50% of steps (matches inference-time hybrid retrieval). "
+                   "Fixes the Q2-style decoder collapse seen when verbatim is added at "
+                   "inference but LoRA was trained without it. Requires --train-receiver "
+                   "or --receiver-only.")
 def train_adapter_cmd(
     repo_path: Path | None,
     creative: bool,
@@ -229,6 +257,12 @@ def train_adapter_cmd(
     epochs: int,
     accum_steps: int,
     lora_lr: float,
+    query_dropout_rate: float,
+    lora_r: int,
+    lora_alpha: float,
+    qa_per_bucket: int,
+    sep_lambda: float,
+    hybrid_train: bool,
 ):
     """Train the CommunicationAdapter to align Librarian latents with teacher targets.
 
@@ -248,16 +282,35 @@ def train_adapter_cmd(
     Saves trained weights to <repo>/.libucks/adapter.pt.
     """
     target = repo_path or _find_repo_root()
+    if not (0.0 <= query_dropout_rate <= 1.0):
+        raise click.ClickException(
+            f"--query-dropout-rate must be in [0.0, 1.0]; got {query_dropout_rate}"
+        )
+    if qa_per_bucket < 1 or qa_per_bucket > 10:
+        raise click.ClickException(
+            f"--qa-per-bucket must be in [1, 10]; got {qa_per_bucket}"
+        )
+    if not (0.0 <= sep_lambda <= 10.0):
+        raise click.ClickException(
+            f"--sep-lambda must be in [0.0, 10.0]; got {sep_lambda}"
+        )
     asyncio.run(_run_train_adapter(
         target, creative=creative, no_teacher=no_teacher,
         train_receiver=train_receiver, receiver_only=receiver_only, epochs=epochs,
         accum_steps=accum_steps, lora_lr=lora_lr,
+        query_dropout_rate=query_dropout_rate,
+        lora_r=lora_r, lora_alpha=lora_alpha,
+        qa_per_bucket=qa_per_bucket,
+        sep_lambda=sep_lambda,
+        hybrid_train=hybrid_train,
     ))
 
 
 async def _run_train_adapter(
     repo_path: Path, creative: bool, no_teacher: bool, train_receiver: bool,
     receiver_only: bool = False, epochs: int = 1, accum_steps: int = 8, lora_lr: float = 1e-4,
+    query_dropout_rate: float = 0.5, lora_r: int = 16, lora_alpha: float = 16.0,
+    qa_per_bucket: int = 1, sep_lambda: float = 0.1, hybrid_train: bool = False,
 ) -> None:
     from libucks.config import Config
     from libucks.thinking import create_strategy
@@ -294,7 +347,8 @@ async def _run_train_adapter(
     from transformers import AutoConfig as _AutoConfig
     _hidden_dim = _AutoConfig.from_pretrained(cfg.model.local_model).hidden_size
     _base_dim = _AutoConfig.from_pretrained(cfg.model.base_model).hidden_size
-    adapter = CommunicationAdapter(hidden_dim=_hidden_dim, output_dim=_base_dim)
+    adapter = CommunicationAdapter(hidden_dim=_hidden_dim, output_dim=_base_dim,
+                                   output_len=cfg.model.output_len)
     adapter.load_saved_weights(bucket_dir / "adapter.pt")
 
     from libucks.thinking.model_manager import ModelManager as _MM
@@ -322,7 +376,12 @@ async def _run_train_adapter(
                    f"for {epochs} epoch(s)...")
         await _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_dir,
                                    no_teacher=no_teacher, registry=registry,
-                                   accum_steps=accum_steps, lora_lr=lora_lr)
+                                   accum_steps=accum_steps, lora_lr=lora_lr,
+                                   query_dropout_rate=query_dropout_rate,
+                                   lora_r=lora_r, lora_alpha=lora_alpha,
+                                   qa_per_bucket=qa_per_bucket,
+                                   sep_lambda=sep_lambda,
+                                   hybrid_train=hybrid_train)
 
 
 async def _train_no_teacher(cfg, store, bucket_ids, adapter, epochs, bucket_dir):
@@ -414,7 +473,10 @@ async def _train_no_teacher(cfg, store, bucket_ids, adapter, epochs, bucket_dir)
 
 async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_dir,
                                no_teacher: bool = False, registry=None, accum_steps: int = 8,
-                               lora_lr: float = 1e-4):
+                               lora_lr: float = 1e-4, query_dropout_rate: float = 0.5,
+                               lora_r: int = 16, lora_alpha: float = 16.0,
+                               qa_per_bucket: int = 1, sep_lambda: float = 0.1,
+                               hybrid_train: bool = False):
     """Phase 2 (Interlat-Lite): fine-tune the Base receiver with LoRA.
 
     Loss: L_total = L_task - λ_sep * L_sep + λ_align * L_align  (λ_sep=0.1, λ_align=0.05)
@@ -451,6 +513,7 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
         quantization=cfg.model.quantization,
         bnb_4bit_compute_dtype=cfg.model.bnb_4bit_compute_dtype,
         device=cfg.model.device,
+        base_model_dtype=cfg.model.base_model_dtype,
     )
     click.echo("[libucks] Base receiver model ready", err=True)
 
@@ -512,80 +575,132 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
                 err=True,
             )
 
-    # Q&A prompt: the teacher generates a question + answer pair so the LoRA
-    # receiver learns to answer specific questions, not just describe code.
+    # Q&A prompt: the teacher generates N question/answer pairs so the LoRA
+    # receiver learns to answer varied questions about the same bucket.
     # The question becomes the query conditioning prefix; the answer is the CE target.
-    _TEACHER_QA_PROMPT = (
-        "Given this source code, write ONE question whose answer requires specific "
-        "facts from the code (function/class names, parameter signatures, constant "
-        "values, return types, control flow). The question must be ANSWERABLE only "
-        "by reading this specific code — not by generic knowledge of the topic.\n\n"
-        "Then write a concise 2-3 sentence plain English answer that explicitly "
-        "names the relevant identifiers from the code.\n\n"
-        "BAD example (too generic — answer comes from priors, not the code):\n"
-        "QUESTION: How does this module handle errors?\n"
-        "ANSWER: It catches exceptions and returns an error response to the caller.\n\n"
-        "GOOD example (answer requires the code):\n"
-        "QUESTION: What does load_config() return when the YAML file is missing?\n"
-        "ANSWER: It returns the default Config() instance built from DEFAULT_SETTINGS, "
-        "and logs a warning via logger.warning() rather than raising. The Path.exists() "
-        "check at the top of the function gates this fallback.\n\n"
-        "Format EXACTLY as:\nQUESTION: <question>\nANSWER: <answer>"
-    )
+    def _build_qa_prompt(n_pairs: int) -> str:
+        if n_pairs <= 1:
+            count_word = "ONE question"
+            pair_word = "pair"
+        else:
+            count_word = f"{n_pairs} distinct questions"
+            pair_word = "pairs"
+        return (
+            f"Given this source code, write {count_word} whose answers require specific "
+            "facts from the code (function/class names, parameter signatures, constant "
+            "values, return types, control flow). Each question must be ANSWERABLE only "
+            "by reading this specific code — not by generic knowledge of the topic. "
+            f"Make the {pair_word} cover different aspects of the code (different "
+            "functions, branches, or invariants) — do not paraphrase the same question.\n\n"
+            "Then write a concise 2-3 sentence plain English answer for each that "
+            "explicitly names the relevant identifiers from the code.\n\n"
+            "BAD example (too generic — answer comes from priors, not the code):\n"
+            "QUESTION 1: How does this module handle errors?\n"
+            "ANSWER 1: It catches exceptions and returns an error response.\n\n"
+            "GOOD example (answer requires the code):\n"
+            "QUESTION 1: What does load_config() return when the YAML file is missing?\n"
+            "ANSWER 1: It returns the default Config() instance built from DEFAULT_SETTINGS, "
+            "and logs a warning via logger.warning() rather than raising.\n\n"
+            f"Format EXACTLY (numbered 1..{n_pairs}):\n"
+            "QUESTION 1: <question>\nANSWER 1: <answer>\n"
+            + ("QUESTION 2: <question>\nANSWER 2: <answer>\n..." if n_pairs > 1 else "")
+        )
 
-    def _parse_qa(text: str, fallback_q: str, fallback_a: str):
-        """Return (question, answer) parsed from QUESTION:/ANSWER: format."""
-        q = a = None
-        for line in text.splitlines():
-            if line.startswith("QUESTION:"):
-                q = line[len("QUESTION:"):].strip()
-            elif line.startswith("ANSWER:"):
-                a = line[len("ANSWER:"):].strip()
-        # ANSWER: may span multiple lines — grab everything after the marker
-        if a is None and "ANSWER:" in text:
-            a = text.split("ANSWER:", 1)[1].strip()
-        return (q or fallback_q), (a or fallback_a)
+    _TEACHER_QA_PROMPT = _build_qa_prompt(qa_per_bucket)
+
+    def _parse_qa_pairs(text: str, n_expected: int, fallback_q: str, fallback_a: str):
+        """Parse up to n_expected QUESTION i:/ANSWER i: pairs. Returns list of (q, a).
+
+        Tolerant: missing numbers, single-pair format (QUESTION:/ANSWER:), or
+        partial responses all fall back gracefully so a teacher call that
+        returned only 2 of 3 pairs still yields 2 usable pairs.
+        """
+        import re
+        # Look for "QUESTION [optional number]:" markers; capture answer up to
+        # the next QUESTION marker or end-of-text.
+        pattern = re.compile(
+            r"QUESTION\s*(\d*)\s*:\s*(.+?)\s*ANSWER\s*\d*\s*:\s*(.+?)(?=\n\s*QUESTION\s*\d*\s*:|\Z)",
+            re.DOTALL | re.IGNORECASE,
+        )
+        pairs: list[tuple[str, str]] = []
+        for m in pattern.finditer(text):
+            q = m.group(2).strip()
+            a = m.group(3).strip()
+            if q and a:
+                pairs.append((q, a))
+            if len(pairs) >= n_expected:
+                break
+        if not pairs:
+            # Total parse failure — fall back to single placeholder pair.
+            return [(fallback_q, fallback_a)]
+        return pairs
 
     # ── Phase 1: parallel teacher API calls (I/O-bound, up to 5 concurrent) ──
+    # Cache schema (v2):  {bucket_id: {"pairs": [[q, target], ...], "source": str}}
+    # Backward compat:   legacy entries `[q, target, source]` are wrapped as
+    #                    a single-pair entry on load.
     _qa_cache_path = bucket_dir / "qa_cache.json"
-    _qa_cache: dict[str, tuple[str, str, str]] = {}  # bucket_id → (question, target, source)
+    _qa_cache: dict[str, dict] = {}
 
-    # Load persisted cache — allows re-runs after Phase 2 failures without re-fetching.
     if _qa_cache_path.exists():
         try:
             raw_cache = json.loads(_qa_cache_path.read_text())
-            _qa_cache = {k: tuple(v) for k, v in raw_cache.items()}  # type: ignore[assignment]
-            click.echo(f"[libucks] Loaded {len(_qa_cache)} Q&A pairs from cache", err=True)
+            for k, v in raw_cache.items():
+                if isinstance(v, list) and len(v) == 3 and all(isinstance(x, str) for x in v):
+                    # Legacy 3-tuple: (question, target, source)
+                    _qa_cache[k] = {"pairs": [[v[0], v[1]]], "source": v[2]}
+                elif isinstance(v, dict) and "pairs" in v:
+                    _qa_cache[k] = {
+                        "pairs": [list(p) for p in v["pairs"]],
+                        "source": v.get("source", ""),
+                    }
+                else:
+                    click.echo(f"[libucks] Skipping malformed cache entry {k!r}", err=True)
+            click.echo(
+                f"[libucks] Loaded {len(_qa_cache)} bucket Q&A entries from cache "
+                f"({sum(len(e['pairs']) for e in _qa_cache.values())} total pairs)",
+                err=True,
+            )
         except Exception as _e:
             click.echo(f"[libucks] Cache load failed ({_e}), re-fetching", err=True)
             _qa_cache = {}
 
-    uncached = [bid for bid in bucket_ids if bid not in _qa_cache]
+    # A bucket is "uncached" if it's missing OR has fewer pairs than requested.
+    uncached = [
+        bid for bid in bucket_ids
+        if bid not in _qa_cache or len(_qa_cache[bid]["pairs"]) < qa_per_bucket
+    ]
     click.echo(
-        f"[libucks] Phase 1: {len(_qa_cache)} cached, {len(uncached)} to fetch...", err=True
+        f"[libucks] Phase 1: {len(_qa_cache)} cached, {len(uncached)} to fetch "
+        f"(target {qa_per_bucket} pair(s)/bucket)...",
+        err=True,
     )
 
     if teacher_client is not None and uncached:
         _sem = asyncio.Semaphore(1)
 
-        async def _fetch_qa(bucket_id: str) -> tuple[str, str, str, str | None]:
+        async def _fetch_qa(bucket_id: str) -> tuple[str, list[tuple[str, str]], str | None]:
             front_matter, prose = store.read(bucket_id)
             source_text = _collect_source_text(front_matter, max_chars=1024) or prose or front_matter.domain_label
-            question = PERSPECTIVE_PROMPTS[0]
-            target_text = source_text
+            fallback_q = PERSPECTIVE_PROMPTS[0]
+            fallback_a = source_text or ""
+            pairs: list[tuple[str, str]] = [(fallback_q, fallback_a)]
             if source_text:
                 try:
                     async with _sem:
+                        # Token budget scales roughly with pair count; ~200 tokens/pair.
+                        max_toks = max(256, 200 * qa_per_bucket)
                         resp = await teacher_client.messages.create(
                             model=cfg.model.anthropic_model,
-                            max_tokens=256,
+                            max_tokens=max_toks,
                             messages=[{"role": "user", "content": f"{_TEACHER_QA_PROMPT}\n\n{source_text}"}],
                         )
                         await asyncio.sleep(1.2)  # stay under 50 RPM limit
                     raw = resp.content[0].text.strip()
-                    question, target_text = _parse_qa(raw, question, source_text)
+                    pairs = _parse_qa_pairs(raw, qa_per_bucket, fallback_q, fallback_a)
                     click.echo(
-                        f"  Q&A {bucket_id}: Q={question[:60]} | A={target_text[:60]}...",
+                        f"  Q&A {bucket_id}: {len(pairs)} pair(s)  "
+                        f"Q1={pairs[0][0][:50]} | A1={pairs[0][1][:50]}...",
                         err=True,
                     )
                 except (_anthropic.AuthenticationError,
@@ -600,7 +715,7 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
                         f"  Teacher call failed for {bucket_id}: {transient_exc} — using source text",
                         err=True,
                     )
-            return bucket_id, question, target_text, source_text
+            return bucket_id, pairs, source_text
 
         qa_results = await asyncio.gather(*[_fetch_qa(bid) for bid in uncached],
                                           return_exceptions=True)
@@ -610,8 +725,8 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
             if isinstance(item, Exception):
                 click.echo(f"  Skipped bucket (API error): {item}", err=True)
                 continue
-            bid, q, t, src = item
-            _qa_cache[bid] = (q, t, src)
+            bid, pairs, src = item
+            _qa_cache[bid] = {"pairs": [list(p) for p in pairs], "source": src or ""}
 
         # Persist cache so re-runs skip API calls entirely.
         try:
@@ -625,28 +740,38 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
         for bucket_id in uncached:
             front_matter, prose = store.read(bucket_id)
             src = _collect_source_text(front_matter, max_chars=1024) or prose or front_matter.domain_label
-            _qa_cache[bucket_id] = (PERSPECTIVE_PROMPTS[0], src, src)
+            _qa_cache[bucket_id] = {
+                "pairs": [[PERSPECTIVE_PROMPTS[0], src]],
+                "source": src or "",
+            }
 
     click.echo(f"[libucks] Phase 1 done — {len(_qa_cache)} Q&A pairs collected", err=True)
 
     # ── Phase 2: sequential GPU encoding (serialized by _device_lock on MPS) ──
+    # Encoding is per-bucket (latent only depends on source); training units
+    # are per-(bucket, pair) so qa_per_bucket > 1 multiplies steps per epoch.
     click.echo("[libucks] Phase 2: encoding latents sequentially...", err=True)
     bucket_soft: dict[str, torch.Tensor] = {}
-    bucket_target: dict[str, str] = {}
-    bucket_query: dict[str, str] = {}
+    bucket_pairs: dict[str, list[tuple[str, str]]] = {}  # bid → [(question, target), ...]
 
     for bucket_id in bucket_ids:
         if bucket_id not in _qa_cache:
             continue
-        question, target_text, source_text = _qa_cache[bucket_id]
+        entry = _qa_cache[bucket_id]
+        source_text = entry["source"]
+        pairs_raw = entry["pairs"]
+        pairs = [(p[0], p[1]) for p in pairs_raw]
         try:
             hidden = await latent_strategy.reason(PERSPECTIVE_PROMPTS[0], source_text)
             with torch.no_grad():
                 soft = adapter([hidden.clone().detach().to(device, model_dtype)])
             bucket_soft[bucket_id] = soft.detach()
-            bucket_target[bucket_id] = target_text
-            bucket_query[bucket_id] = question
-            click.echo(f"  encoded {bucket_id} → soft-prompt {tuple(soft.shape)}", err=True)
+            bucket_pairs[bucket_id] = pairs
+            click.echo(
+                f"  encoded {bucket_id} → soft-prompt {tuple(soft.shape)}  "
+                f"({len(pairs)} QA pair(s))",
+                err=True,
+            )
             if str(device).startswith("mps"):
                 torch.mps.empty_cache()
         except click.ClickException:
@@ -660,36 +785,48 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
 
     encoded_ids = list(bucket_soft.keys())
 
-    # Pre-flight data quality check — surface degenerate targets before wasting compute.
-    _usable = [
-        bid for bid in encoded_ids
-        if not bucket_target[bid].startswith("# /") and " " in bucket_target[bid].strip()
-    ]
-    if len(_usable) < len(encoded_ids):
-        _skipped = len(encoded_ids) - len(_usable)
-        _pct = 100 * _skipped // len(encoded_ids)
-        click.echo(
-            f"[libucks] WARNING: {_skipped}/{len(encoded_ids)} buckets ({_pct}%) have "
-            f"degenerate targets (raw source dumps or bare identifiers — teacher API "
-            f"fallback). Delete .libucks/qa_cache.json and re-run without --no-teacher "
-            f"to regenerate. Training on {len(_usable)} buckets only.",
-            err=True,
-        )
-        if len(_usable) == 0:
-            raise click.ClickException(
-                "All buckets have degenerate targets. Cannot train. "
-                "Delete .libucks/qa_cache.json and re-run without --no-teacher."
-            )
-        encoded_ids = _usable
+    # Pre-flight data quality check — drop degenerate pairs per bucket. A bucket
+    # survives if at least one of its pairs has a non-degenerate target.
+    def _is_usable(target: str) -> bool:
+        return not target.startswith("# /") and " " in target.strip()
 
-    # Initialise LoRA receiver trainer now that encoded_ids is final.
+    for bid in list(bucket_pairs.keys()):
+        bucket_pairs[bid] = [(q, t) for (q, t) in bucket_pairs[bid] if _is_usable(t)]
+        if not bucket_pairs[bid]:
+            del bucket_pairs[bid]
+
+    encoded_ids = [bid for bid in encoded_ids if bid in bucket_pairs]
+    if not encoded_ids:
+        raise click.ClickException(
+            "All buckets have degenerate targets. Cannot train. "
+            "Delete .libucks/qa_cache.json and re-run without --no-teacher."
+        )
+
+    # Build flat list of training units: each (bucket_id, question, target_text)
+    # is one optimizer step. _total_opt_steps reflects unit count, not bucket count.
+    _training_units: list[tuple[str, str, str]] = [
+        (bid, q, t) for bid in encoded_ids for (q, t) in bucket_pairs[bid]
+    ]
+    click.echo(
+        f"[libucks] {len(encoded_ids)} usable buckets × pairs = "
+        f"{len(_training_units)} training units per epoch",
+        err=True,
+    )
+
+    # Initialise LoRA receiver trainer now that unit count is final.
     # Warmup: 5% of total steps (floor 5). 20% was too long — wasted the first epoch
     # at near-zero lr when we need every step to count on small datasets.
-    _total_opt_steps = max(1, (epochs * len(encoded_ids)) // accum_steps)
+    _total_opt_steps = max(1, (epochs * len(_training_units)) // accum_steps)
     _warmup_steps = max(5, _total_opt_steps // 20)
     trainer = LoRAReceiverTrainer(
-        base_model, lora_r=16, lora_alpha=16.0, lr=lora_lr,
+        base_model, lora_r=lora_r, lora_alpha=lora_alpha, lr=lora_lr,
         warmup_steps=_warmup_steps, total_steps=_total_opt_steps,
+        sep_lambda=sep_lambda,
+    )
+    click.echo(
+        f"[libucks] LoRA trainer ready  lora_r={lora_r}  lora_alpha={lora_alpha}  "
+        f"query_dropout_rate={query_dropout_rate}  sep_lambda={sep_lambda}",
+        err=True,
     )
 
     # Compute W_a alignment matrix once (LatentMAS §A.1, ridge regression).
@@ -792,23 +929,64 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
             err=True,
         )
 
+    # ── Phase B: hybrid-train verbatim cache ────────────────────────────────
+    # When --hybrid-train is set, precompute per-bucket verbatim source token
+    # ids once. At each training step, with p=0.5 the verbatim is prepended to
+    # BOTH the correct and wrong inputs_embeds frames so the LoRA learns to
+    # share attention between the soft prompt and a real text prefix — fixing
+    # the Q2-style decoder collapse seen at inference when hybrid retrieval
+    # injects verbatim into a LoRA that has never seen it.
+    # Per-bucket char budget 1000 ≈ 250 tokens, matching inference where
+    # 3000 chars / top-k=3 buckets ≈ 1000 chars per bucket.
+    bucket_verbatim_ids: dict[str, "torch.Tensor"] = {}
+    if hybrid_train:
+        from libucks.thinking.training.data_generator import _collect_source_text as _cst
+        click.echo("[libucks] hybrid-train: pre-tokenising verbatim source for each bucket...", err=True)
+        for _bid in bucket_ids:
+            try:
+                _fm, _ = store.read(_bid)
+                _text = _cst(_fm, max_chars=1000)
+            except Exception:
+                _text = ""
+            if _text:
+                _enc = base_tok(_text, return_tensors="pt", truncation=True,
+                                max_length=256, add_special_tokens=False)
+                _ids = _enc["input_ids"].squeeze(0).long().to(device)
+                if _ids.shape[0] > 0:
+                    bucket_verbatim_ids[_bid] = _ids
+        click.echo(
+            f"[libucks] hybrid-train: cached verbatim for "
+            f"{len(bucket_verbatim_ids)}/{len(bucket_ids)} buckets",
+            err=True,
+        )
+
     all_task: list[float] = []
     all_sep: list[float] = []
     all_task_q0: list[float] = []   # task loss on query-dropped steps (latent-only)
     all_task_q1: list[float] = []   # task loss on query-present steps
 
+    # Best-checkpoint tracking: sep can dip in late epochs from margin
+    # saturation + lr decay. We want the highest-sep weights, not the final
+    # ones, since the final weights aren't always best for downstream decoding.
+    _best_mean_sep: float = -float("inf")
+    _best_lora_state: dict | None = None
+    _best_epoch: int = -1
+
     for epoch in range(epochs):
         _epoch_task_q0: list[float] = []
         _epoch_sep_q0:  list[float] = []
         _epoch_task_q1: list[float] = []
-        for i, bucket_id in enumerate(encoded_ids, 1):
+        # Shuffle units each epoch so the same bucket's pairs don't cluster
+        # adjacent in the optimizer trajectory.
+        _epoch_units = list(_training_units)
+        random.shuffle(_epoch_units)
+        for i, (bucket_id, unit_question, target_text) in enumerate(_epoch_units, 1):
             try:
                 soft_prompt = bucket_soft[bucket_id]          # (K, D)
-                target_text = bucket_target[bucket_id]
 
-                # Skip degenerate targets: raw source dumps (teacher API fallback)
-                # and bare identifiers (teacher echoed back the bucket name).
-                # These produce CE loss of 10–16 nats and poison the gradient.
+                # Skip degenerate targets defensively: the pre-flight filter
+                # already dropped these, but a fresh teacher run on a tiny
+                # bucket can still slip a one-word "answer" through.
                 if target_text.startswith("# /") or " " not in target_text.strip():
                     continue
 
@@ -839,15 +1017,12 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
                     sp_scaled = (sp @ W_a).to(model_dtype)    # (K, D)
 
                 # Query dropout decided BEFORE curriculum mixing so r can be
-                # conditioned on whether the query is present.
-                # 90/10 Q=1 / Q=0. With _SEP_LAMBDA=0 and _ALIGN_LAMBDA=0, Q=0 steps
-                # only contribute CE on a no-query prefix — same loss path, different
-                # input distribution from inference. Heavy Q=1 dose pulls the LoRA
-                # toward the actual inference distribution; the 10% Q=0 retains a
-                # task_q0 measurement so we can detect if the model abandons
-                # latent-only decoding entirely.
-                use_query = (random.random() >= 0.1)  # 90% Q=1, 10% Q=0
-                question = bucket_query.get(bucket_id, PERSPECTIVE_PROMPTS[0])
+                # conditioned on whether the query is present. The dropout rate
+                # is the probability of Q=0 (query dropped); L_sep only fires on
+                # Q=0 steps, so higher dropout = more latent-grounding signal.
+                # CLAUDE.md mandates 0.5; the May-14 weights at 0.1 starved L_sep.
+                use_query = (random.random() >= query_dropout_rate)
+                question = unit_question or PERSPECTIVE_PROMPTS[0]
                 if use_query:
                     q_enc = base_tok(question, return_tensors="pt", truncation=True, max_length=32)
                     query_ids = q_enc["input_ids"].squeeze(0).long().to(device)  # (Q,)
@@ -885,12 +1060,30 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
                 with torch.no_grad():
                     tgt_embeds = embedding(target_ids).to(model_dtype)        # (T, D)
                 A = asst_embed.shape[0]   # number of assistant-cue tokens (typically 3)
-                parts = [bop_embed.unsqueeze(0), mixed, eop_embed.unsqueeze(0)]
+
+                # ── Phase B: prepend verbatim with p=0.5 ─────────────────
+                # When hybrid_train is on and this bucket has cached verbatim,
+                # prepend its embeddings to BOTH correct and wrong frames so the
+                # LoRA learns to attend across [verbatim, soft_prompt, query].
+                # Same verbatim used in both paths — the L_sep signal still
+                # measures soft-prompt distinguishability holding context fixed.
+                v_embeds = None
+                V = 0
+                if hybrid_train and bucket_id in bucket_verbatim_ids and random.random() < 0.5:
+                    v_ids = bucket_verbatim_ids[bucket_id]
+                    with torch.no_grad():
+                        v_embeds = embedding(v_ids).to(model_dtype)
+                    V = v_embeds.shape[0]
+
+                parts: list = []
+                if v_embeds is not None:
+                    parts.append(v_embeds)
+                parts.extend([bop_embed.unsqueeze(0), mixed, eop_embed.unsqueeze(0)])
                 if Q > 0:
                     parts.append(query_embeds)
                 parts.append(asst_embed)   # <|im_start|>assistant\n — matches decode()
                 parts.append(tgt_embeds)
-                inputs_embeds = torch.cat(parts)                               # (K+2+Q+A+T, D)
+                inputs_embeds = torch.cat(parts)                               # (V+K+2+Q+A+T, D)
 
                 wrong_id = random.choice([bid for bid in encoded_ids if bid != bucket_id])
                 wrong_sp = bucket_soft[wrong_id].to(device, dtype=torch.float32)
@@ -904,12 +1097,15 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
                     tok_embeds.to(model_dtype),
                     0.0,
                 )
-                wrong_parts = [bop_embed.unsqueeze(0), wrong_mixed, eop_embed.unsqueeze(0)]
+                wrong_parts: list = []
+                if v_embeds is not None:
+                    wrong_parts.append(v_embeds)   # same verbatim as correct path
+                wrong_parts.extend([bop_embed.unsqueeze(0), wrong_mixed, eop_embed.unsqueeze(0)])
                 if Q > 0:
                     wrong_parts.append(query_embeds)
                 wrong_parts.append(asst_embed)
                 wrong_parts.append(tgt_embeds)
-                inputs_embeds_wrong = torch.cat(wrong_parts)                  # (K+2+Q+A+T, D)
+                inputs_embeds_wrong = torch.cat(wrong_parts)                  # (V+K+2+Q+A+T, D)
 
                 # Plan path: query + target only (no latent frame) — used by L_align
                 # to anchor the latent-conditioned distribution. Only built when the
@@ -918,14 +1114,14 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
                     "inputs_embeds":       inputs_embeds,
                     "inputs_embeds_wrong": inputs_embeds_wrong,
                     "target_ids":          target_ids,
-                    "prefix_len":          K + 2 + Q + A,
+                    "prefix_len":          V + K + 2 + Q + A,
                 }
                 if Q > 0:
                     inputs_embeds_plan = torch.cat([query_embeds, asst_embed, tgt_embeds], dim=0)
                     batch["inputs_embeds_plan"] = inputs_embeds_plan
                     batch["plan_prefix_len"] = Q + A
 
-                is_last_in_epoch = (i == len(encoded_ids))
+                is_last_in_epoch = (i == len(_epoch_units))
                 should_step = (i % accum_steps == 0) or is_last_in_epoch
                 losses = trainer.accumulate_step(batch, scale=accum_steps, step=should_step)
                 all_task.append(losses["task"])
@@ -937,7 +1133,7 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
                 else:
                     _epoch_task_q1.append(losses["task"])
                 click.echo(
-                    f"  Epoch {epoch+1} [{i}/{len(encoded_ids)}] bucket={bucket_id} "
+                    f"  Epoch {epoch+1} [{i}/{len(_epoch_units)}] bucket={bucket_id} "
                     f"task={losses['task']:.4f} sep={losses['sep']:.4f} "
                     + ("Q0 " if Q == 0 else "    ")
                     + (" ← OPT" if should_step else "")
@@ -953,17 +1149,73 @@ async def _train_lora_receiver(cfg, store, bucket_ids, adapter, epochs, bucket_d
         _avg_q1  = sum(_epoch_task_q1) / max(1, len(_epoch_task_q1))
         _avg_sep = sum(_epoch_sep_q0)  / max(1, len(_epoch_sep_q0))
         _cur_lr  = trainer.optimizer.param_groups[0]["lr"]
+        import statistics as _stats
+        _median_sep_q0 = _stats.median(_epoch_sep_q0) if _epoch_sep_q0 else 0.0
         click.echo(
             f"── Epoch {epoch+1}/{epochs}  "
             f"task_q0={_avg_q0:.4f}  task_q1={_avg_q1:.4f}  "
-            f"sep={_avg_sep:.6f}  "
+            f"sep={_avg_sep:.6f}  median_sep_q0={_median_sep_q0:.6f}  "
             f"lr={_cur_lr:.2e}  "
             f"Q0={len(_epoch_task_q0)}  Q1={len(_epoch_task_q1)}"
         )
 
-    # Save only LoRA delta weights (lora_A / lora_B keys)
-    lora_state = {k: v for k, v in base_model.state_dict().items() if "lora_" in k}
-    torch.save(lora_state, bucket_dir / "lora_receiver.pt")
+        # Sep watchdog: ONLY at end of epoch 3 (epoch == 2 in 0-indexed),
+        # AND only if no good epoch has been recorded yet. The watchdog's
+        # purpose is to bail early on "model totally ignores the latent" —
+        # but if best-so-far already cleared 0.05, we have a usable
+        # checkpoint and a transient dip at epoch 3 is just training noise
+        # (margin saturation, lr cosine, dropout luck). In that case we keep
+        # training; the best-checkpoint tracker preserves the high-water mark.
+        # CLAUDE.md §LoRA rule.
+        if (
+            epoch == 2
+            and _median_sep_q0 < 0.05
+            and _avg_sep < 0.05
+            and _best_mean_sep < 0.05
+        ):
+            raise click.ClickException(
+                f"L_sep collapse: after 3 epoch(s), both "
+                f"median_sep_q0={_median_sep_q0:.6f} and mean_sep_q0={_avg_sep:.6f} "
+                f"are below the 0.05 threshold, AND no earlier epoch cleared it. "
+                f"The receiver is genuinely ignoring the latent. Weights are NOT saved.\n\n"
+                f"Investigate (per CLAUDE.md): "
+                f"(a) is --query-dropout-rate >= 0.5? "
+                f"(b) is inputs_embeds_wrong actually a different bucket? "
+                f"(c) is _SEP_LAMBDA > 0 in lora_trainer.py? "
+                f"(d) try --qa-per-bucket 5 + --epochs 10 for more sep-loaded steps."
+            )
+
+        # Best-checkpoint tracker — snapshot the LoRA state whenever this
+        # epoch's mean sep exceeds the prior best. Cloned so subsequent epoch
+        # updates don't mutate the snapshot.
+        if _avg_sep > _best_mean_sep:
+            _best_mean_sep = _avg_sep
+            _best_lora_state = {
+                k: v.detach().clone()
+                for k, v in base_model.state_dict().items()
+                if "lora_" in k
+            }
+            _best_epoch = epoch + 1
+            click.echo(
+                f"  ★ new best checkpoint  epoch={epoch+1}  "
+                f"mean_sep={_avg_sep:.4f}  median_sep={_median_sep_q0:.4f}",
+                err=True,
+            )
+
+    # Save the BEST checkpoint (highest mean sep) if we tracked one. Late
+    # epochs may degrade due to margin saturation + lr decay; best-so-far
+    # protects against shipping suboptimal final weights. Fall back to final
+    # state if best tracking was somehow skipped.
+    if _best_lora_state is not None:
+        torch.save(_best_lora_state, bucket_dir / "lora_receiver.pt")
+        click.echo(
+            f"[libucks] Saved BEST LoRA checkpoint (epoch {_best_epoch}, "
+            f"mean_sep={_best_mean_sep:.4f}) to lora_receiver.pt",
+            err=True,
+        )
+    else:
+        lora_state = {k: v for k, v in base_model.state_dict().items() if "lora_" in k}
+        torch.save(lora_state, bucket_dir / "lora_receiver.pt")
 
     if all_task:
         n = min(5, len(all_task))
@@ -1226,6 +1478,396 @@ async def _train_basic(cfg, registry, store, bucket_ids, adapter, epochs, bucket
     click.echo(f"Basic training complete. Saved to {bucket_dir / 'adapter.pt'}")
 
 
+@cli.command("build-kv-cache")
+@click.option("--repo", "repo_path", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=None, help="Path to repository (defaults to git repo containing cwd).")
+@click.option("--max-tokens", default=1024, show_default=True,
+              help="Per-bucket max tokens encoded into the KV cache.")
+def build_kv_cache_cmd(repo_path: Path | None, max_tokens: int):
+    """Phase 4-C: precompute per-bucket KV caches for `cache_aug` inference.
+
+    Iterates over registry buckets, runs Qwen 2.5-3B forward over each bucket's
+    source text, saves the resulting past_key_values to
+    <repo>/.libucks/kv_cache/<bucket_id>.safetensors. Required before
+    `cache_aug_translator` can route to a bucket.
+    """
+    target = repo_path or _find_repo_root()
+    asyncio.run(_run_build_kv_cache(target, max_tokens=max_tokens))
+
+
+async def _run_build_kv_cache(repo_path: Path, *, max_tokens: int) -> None:
+    import time
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from libucks.config import Config
+    from libucks.storage.bucket_store import BucketStore
+    from libucks.storage.bucket_registry import BucketRegistry
+    from libucks.thinking.model_manager import ModelManager
+    from libucks.cache_augmentation.bucket_kv_cache import BucketKVCache
+    from libucks.cache_augmentation.kv_extract import extract_bucket_kv
+    from libucks.thinking.training.data_generator import _collect_source_text
+
+    cfg = Config.load(repo_path)
+    bucket_dir = repo_path / ".libucks"
+    registry = BucketRegistry(bucket_dir / "registry.json")
+    registry.load()
+    store = BucketStore(repo_path / cfg.paths.bucket_dir)
+    bucket_ids = list(registry.get_all_centroids().keys())
+    if not bucket_ids:
+        raise click.ClickException("no buckets — run `libucks init` first")
+
+    # Cache aug receiver is locked to Qwen 2.5-3B (see train-cache-aug).
+    receiver_model_id = "Qwen/Qwen2.5-3B"
+    device = ModelManager._resolve_device(cfg.model.device)
+    click.echo(f"[libucks:build-kv] loading {receiver_model_id} on {device}...", err=True)
+    tokenizer = AutoTokenizer.from_pretrained(receiver_model_id)
+    model = AutoModelForCausalLM.from_pretrained(receiver_model_id, dtype=torch.bfloat16)
+    model.eval()
+    model = model.to(device)
+
+    kv_cache = BucketKVCache(bucket_dir / "kv_cache", model_id=receiver_model_id, max_tokens=max_tokens)
+
+    built = 0
+    skipped = 0
+    t0 = time.time()
+    for bid in bucket_ids:
+        try:
+            fm, prose = store.read(bid)
+        except Exception as exc:
+            click.echo(f"  {bid}: store.read failed ({exc}); skipping", err=True)
+            skipped += 1
+            continue
+        chunks = list(fm.chunks)
+        source_text = _collect_source_text(fm, max_chars=max_tokens * 4) or prose
+        if not source_text:
+            click.echo(f"  {bid}: empty source; skipping", err=True)
+            skipped += 1
+            continue
+        flat = extract_bucket_kv(model, tokenizer, source_text, max_tokens=max_tokens)
+        kv_cache.save(bid, flat, chunks)
+        built += 1
+    elapsed = time.time() - t0
+    click.echo(
+        f"[libucks:build-kv] built {built}/{len(bucket_ids)} (skipped {skipped}) "
+        f"in {elapsed:.1f}s -> {bucket_dir / 'kv_cache'}",
+        err=True,
+    )
+
+
+@cli.command("generate-qa")
+@click.option("--repo", "repo_path", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=None, help="Path to repository (defaults to git repo containing cwd).")
+@click.option("--qa-per-bucket", "qa_per_bucket", default=5, show_default=True,
+              help="Number of QA pairs to synthesize per bucket via the teacher.")
+@click.option("--no-teacher", "no_teacher", is_flag=True, default=False,
+              help="Skip the Anthropic teacher; fill missing buckets with source-text fallbacks only.")
+def generate_qa_cmd(repo_path: Path | None, qa_per_bucket: int, no_teacher: bool):
+    """Regenerate <repo>/.libucks/qa_cache.json by calling the Anthropic teacher.
+
+    Does NOT retrain the Phase 4-A adapter+LoRA. Use this to refresh QA data
+    independently of training (e.g. before `train-cache-aug` runs in Phase 4-C).
+    """
+    target = repo_path or _find_repo_root()
+    if qa_per_bucket < 1 or qa_per_bucket > 10:
+        raise click.ClickException(f"--qa-per-bucket must be in [1, 10]; got {qa_per_bucket}")
+    asyncio.run(_regenerate_qa_cache(target, qa_per_bucket=qa_per_bucket, no_teacher=no_teacher))
+
+
+async def _regenerate_qa_cache(repo_path: Path, *, qa_per_bucket: int, no_teacher: bool) -> None:
+    """Run only the teacher Q&A generation portion of the training pipeline.
+
+    Mirrors the logic in _train_lora_receiver's "Phase 1" block (the inline
+    teacher fetch loop). Kept duplicated rather than refactored to minimise
+    risk to the working Phase 4-A pipeline; can be DRY-ed later.
+    """
+    import os as _os
+    from libucks.config import Config
+    from libucks.storage.bucket_registry import BucketRegistry
+    from libucks.storage.bucket_store import BucketStore
+    from libucks.thinking.training.data_generator import PERSPECTIVE_PROMPTS, _collect_source_text
+
+    cfg = Config.load(repo_path)
+    bucket_dir = repo_path / ".libucks"
+    registry = BucketRegistry(bucket_dir / "registry.json")
+    registry.load()
+    store = BucketStore(repo_path / cfg.paths.bucket_dir)
+    bucket_ids = list(registry.get_all_centroids().keys())
+    if not bucket_ids:
+        raise click.ClickException("no buckets — run `libucks init` first")
+
+    teacher_client = None
+    if not no_teacher:
+        if not _os.environ.get("ANTHROPIC_API_KEY"):
+            raise click.ClickException(
+                "ANTHROPIC_API_KEY not set. Either set it in .env / shell, "
+                "or pass --no-teacher (lower quality)."
+            )
+        try:
+            import anthropic as _anthropic
+            teacher_client = _anthropic.AsyncAnthropic()
+        except ImportError:
+            click.echo("[libucks] anthropic package not found — falling back to source-text", err=True)
+
+    def _build_qa_prompt(n_pairs: int) -> str:
+        count_word = "ONE question" if n_pairs <= 1 else f"{n_pairs} distinct questions"
+        pair_word = "pair" if n_pairs <= 1 else "pairs"
+        return (
+            f"Given this source code, write {count_word} whose answers require specific "
+            "facts from the code (function/class names, parameter signatures, constant "
+            "values, return types, control flow). Each question must be ANSWERABLE only "
+            "by reading this specific code — not by generic knowledge of the topic. "
+            f"Make the {pair_word} cover different aspects of the code (different "
+            "functions, branches, or invariants) — do not paraphrase the same question.\n\n"
+            "Then write a concise 2-3 sentence plain English answer for each that "
+            "explicitly names the relevant identifiers from the code.\n\n"
+            "BAD example (too generic — answer comes from priors, not the code):\n"
+            "QUESTION 1: How does this module handle errors?\n"
+            "ANSWER 1: It catches exceptions and returns an error response.\n\n"
+            "GOOD example (answer requires the code):\n"
+            "QUESTION 1: What does load_config() return when the YAML file is missing?\n"
+            "ANSWER 1: It returns the default Config() instance built from DEFAULT_SETTINGS, "
+            "and logs a warning via logger.warning() rather than raising.\n\n"
+            f"Format EXACTLY (numbered 1..{n_pairs}):\n"
+            "QUESTION 1: <question>\nANSWER 1: <answer>\n"
+            + ("QUESTION 2: <question>\nANSWER 2: <answer>\n..." if n_pairs > 1 else "")
+        )
+
+    def _parse_qa_pairs(text: str, n_expected: int, fallback_q: str, fallback_a: str):
+        import re
+        pattern = re.compile(
+            r"QUESTION\s*(\d*)\s*:\s*(.+?)\s*ANSWER\s*\d*\s*:\s*(.+?)(?=\n\s*QUESTION\s*\d*\s*:|\Z)",
+            re.DOTALL | re.IGNORECASE,
+        )
+        pairs: list[tuple[str, str]] = []
+        for m in pattern.finditer(text):
+            q = m.group(2).strip()
+            a = m.group(3).strip()
+            if q and a:
+                pairs.append((q, a))
+            if len(pairs) >= n_expected:
+                break
+        if not pairs:
+            return [(fallback_q, fallback_a)]
+        return pairs
+
+    _TEACHER_QA_PROMPT = _build_qa_prompt(qa_per_bucket)
+    _qa_cache_path = bucket_dir / "qa_cache.json"
+    _qa_cache: dict[str, dict] = {}
+    if _qa_cache_path.exists():
+        try:
+            raw_cache = json.loads(_qa_cache_path.read_text())
+            for k, v in raw_cache.items():
+                if isinstance(v, dict) and "pairs" in v:
+                    _qa_cache[k] = {
+                        "pairs": [list(p) for p in v["pairs"]],
+                        "source": v.get("source", ""),
+                    }
+        except Exception as _e:
+            click.echo(f"[libucks] existing cache load failed ({_e}), starting fresh", err=True)
+            _qa_cache = {}
+
+    uncached = [
+        bid for bid in bucket_ids
+        if bid not in _qa_cache or len(_qa_cache[bid]["pairs"]) < qa_per_bucket
+    ]
+    click.echo(
+        f"[libucks:generate-qa] {len(_qa_cache)} cached, {len(uncached)} to fetch "
+        f"(target {qa_per_bucket} pairs/bucket)",
+        err=True,
+    )
+
+    if teacher_client is not None and uncached:
+        _sem = asyncio.Semaphore(1)
+        import anthropic as _anthropic
+
+        async def _fetch_qa(bucket_id: str):
+            front_matter, prose = store.read(bucket_id)
+            # max_chars=4096: _collect_source_text breaks (returns "") when the
+            # first chunk exceeds max_chars instead of truncating it. Markdown
+            # chunks routinely run 3-4KB; with max_chars=1024 the entire bucket
+            # source falls back to its domain_label, ruining teacher Q&A on
+            # ~25% of buckets. 4096 fits the typical first chunk.
+            source_text = _collect_source_text(front_matter, max_chars=4096) or prose or front_matter.domain_label
+            fallback_q = PERSPECTIVE_PROMPTS[0]
+            fallback_a = source_text or ""
+            pairs: list[tuple[str, str]] = [(fallback_q, fallback_a)]
+            if source_text:
+                try:
+                    async with _sem:
+                        max_toks = max(256, 200 * qa_per_bucket)
+                        resp = await teacher_client.messages.create(
+                            model=cfg.model.anthropic_model,
+                            max_tokens=max_toks,
+                            messages=[{"role": "user", "content": f"{_TEACHER_QA_PROMPT}\n\n{source_text}"}],
+                        )
+                        await asyncio.sleep(1.2)
+                    raw = resp.content[0].text.strip()
+                    pairs = _parse_qa_pairs(raw, qa_per_bucket, fallback_q, fallback_a)
+                    click.echo(
+                        f"  {bucket_id}: {len(pairs)} pairs  Q1={pairs[0][0][:50]}…",
+                        err=True,
+                    )
+                except (_anthropic.AuthenticationError,
+                        _anthropic.APIConnectionError,
+                        _anthropic.RateLimitError) as fatal:
+                    raise click.ClickException(f"Anthropic API fatal error: {fatal}") from fatal
+                except Exception as transient:
+                    click.echo(f"  {bucket_id}: teacher failed ({transient}) — fallback used", err=True)
+            return bucket_id, pairs, source_text
+
+        qa_results = await asyncio.gather(*[_fetch_qa(bid) for bid in uncached], return_exceptions=True)
+        for item in qa_results:
+            if isinstance(item, click.ClickException):
+                raise item
+            if isinstance(item, Exception):
+                click.echo(f"  skipped (error): {item}", err=True)
+                continue
+            bid, pairs, src = item
+            _qa_cache[bid] = {"pairs": [list(p) for p in pairs], "source": src or ""}
+    elif uncached:
+        for bucket_id in uncached:
+            front_matter, prose = store.read(bucket_id)
+            src = _collect_source_text(front_matter, max_chars=1024) or prose or front_matter.domain_label
+            _qa_cache[bucket_id] = {
+                "pairs": [[PERSPECTIVE_PROMPTS[0], src]],
+                "source": src or "",
+            }
+
+    _qa_cache_path.write_text(json.dumps(_qa_cache, indent=2))
+    total_pairs = sum(len(e["pairs"]) for e in _qa_cache.values())
+    stubs = sum(
+        1 for e in _qa_cache.values()
+        for p in e["pairs"]
+        if isinstance(p, list) and len(p) >= 1 and isinstance(p[0], str)
+        and p[0].startswith("Explain concisely what this code does")
+    )
+    click.echo(
+        f"[libucks:generate-qa] wrote {_qa_cache_path}: "
+        f"{len(_qa_cache)} buckets, {total_pairs} total pairs, "
+        f"{stubs} generic stubs ({100 * stubs / max(1, total_pairs):.1f}%)",
+        err=True,
+    )
+
+
+@cli.command("train-cache-aug")
+@click.option("--repo", "repo_path", type=click.Path(exists=True, file_okay=False, path_type=Path),
+              default=None, help="Path to repository (defaults to git repo containing cwd).")
+@click.option("--epochs", default=3, show_default=True, help="Number of training epochs.")
+@click.option("--lr", default=1e-4, show_default=True, help="AdamW base learning rate.")
+@click.option("--warmup-steps", default=100, show_default=True,
+              help="Linear warmup steps; lr ramps from 1/warmup_steps × base_lr up to base_lr.")
+@click.option("--text-ratios", default="0.0,0.25,0.5,0.75,1.0", show_default=True,
+              help="Comma-separated text_ratio choices for the Phase 4-C.5.5 curriculum. "
+                   "Per sample, r ∼ uniform(choices); verbatim_chars = r × max-verbatim-chars.")
+@click.option("--max-verbatim-chars", default=2400, show_default=True,
+              help="Upper bound on verbatim prepended to the query when text_ratio=1.0.")
+def train_cache_aug_cmd(
+    repo_path: Path | None, epochs: int, lr: float, warmup_steps: int,
+    text_ratios: str, max_verbatim_chars: int,
+):
+    """Phase 4-C.5/5.5: train Coprocessor + CrossBucketFusion against frozen Qwen 2.5-3B.
+
+    Reads per-bucket KV caches from .libucks/kv_cache/, Q&A pairs from
+    .libucks/qa_cache.json, and saves the trained coproc + fusion state_dict to
+    .libucks/cache_aug_state.pt. Receiver stays frozen throughout.
+    """
+    target = repo_path or _find_repo_root()
+    try:
+        ratios = tuple(float(x.strip()) for x in text_ratios.split(",") if x.strip())
+    except ValueError as exc:
+        raise click.ClickException(f"--text-ratios must be comma-separated floats; got {text_ratios!r}") from exc
+    if not ratios:
+        ratios = (0.0,)
+    asyncio.run(_run_train_cache_aug(
+        target, epochs=epochs, lr=lr, warmup_steps=warmup_steps,
+        text_ratios=ratios, max_verbatim_chars=max_verbatim_chars,
+    ))
+
+
+async def _run_train_cache_aug(
+    repo_path: Path, *, epochs: int, lr: float, warmup_steps: int,
+    text_ratios: tuple = (0.0,), max_verbatim_chars: int = 2400,
+) -> None:
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from libucks.config import Config
+    from libucks.storage.bucket_store import BucketStore
+    from libucks.storage.bucket_registry import BucketRegistry
+    from libucks.thinking.model_manager import ModelManager
+    from libucks.cache_augmentation.bucket_kv_cache import BucketKVCache
+    from libucks.cache_augmentation.coprocessor import Coprocessor
+    from libucks.cache_augmentation.fusion import CrossBucketFusion
+    from libucks.thinking.training.cache_aug_trainer import CacheAugTrainer, load_qa_pairs
+
+    cfg = Config.load(repo_path)
+    bucket_dir = repo_path / ".libucks"
+
+    qa_path = bucket_dir / "qa_cache.json"
+    if not qa_path.exists():
+        raise click.ClickException(
+            f"qa_cache.json missing at {qa_path}. Generate Q&A pairs via "
+            "`libucks train-adapter --train-receiver` first."
+        )
+    samples = load_qa_pairs(qa_path)
+    if not samples:
+        raise click.ClickException(f"No usable Q&A samples in {qa_path}")
+
+    registry = BucketRegistry(bucket_dir / "registry.json")
+    registry.load()
+    store = BucketStore(repo_path / cfg.paths.bucket_dir)
+    bucket_chunks = {}
+    for bid in registry.get_all_centroids():
+        fm, _ = store.read(bid)
+        bucket_chunks[bid] = list(fm.chunks)
+
+    # The cache-aug receiver is locked to Qwen 2.5-3B by the coprocessor's
+    # architectural defaults (36 layers, 2 KV heads, head_dim=128, hidden=2048).
+    # cfg.model.base_model is the Phase 4-A receiver knob and is not the
+    # right field for this pipeline.
+    receiver_model_id = "Qwen/Qwen2.5-3B"
+    device = ModelManager._resolve_device(cfg.model.device)
+    click.echo(f"[libucks:cache_aug] loading frozen {receiver_model_id} on {device}...", err=True)
+    tokenizer = AutoTokenizer.from_pretrained(receiver_model_id)
+    model = AutoModelForCausalLM.from_pretrained(receiver_model_id, dtype=torch.bfloat16)
+    model.eval()
+    model = model.to(device)
+
+    coproc = Coprocessor().to(device).to(torch.float32)
+    fusion = CrossBucketFusion().to(device).to(torch.float32)
+    kv_cache = BucketKVCache(bucket_dir / "kv_cache", model_id=receiver_model_id)
+
+    total_steps = max(1, len(samples) * epochs)
+    trainer = CacheAugTrainer(
+        base_model=model, tokenizer=tokenizer,
+        coprocessor=coproc, fusion=fusion,
+        bucket_kv_cache=kv_cache, bucket_chunks=bucket_chunks,
+        lr=lr, warmup_steps=warmup_steps, total_steps=total_steps,
+        store=store,
+        text_ratio_choices=text_ratios,
+        max_verbatim_chars=max_verbatim_chars,
+    )
+
+    click.echo(
+        f"[libucks:cache_aug] training: {len(samples)} samples × {epochs} epochs "
+        f"= {total_steps} steps, lr={lr:.2e}, warmup={warmup_steps}, "
+        f"text_ratios={list(text_ratios)}, max_verbatim_chars={max_verbatim_chars}",
+        err=True,
+    )
+
+    for epoch in range(epochs):
+        stats = trainer.train_epoch(samples)
+        click.echo(
+            f"[libucks:cache_aug] epoch {epoch+1}/{epochs}: "
+            f"mean_loss={stats['mean_loss']:.4f} n_steps={stats['n_steps']} "
+            f"skipped={stats['skipped']}",
+            err=True,
+        )
+
+    out_path = bucket_dir / "cache_aug_state.pt"
+    torch.save({"coproc": coproc.state_dict(), "fusion": fusion.state_dict()}, out_path)
+    click.echo(f"[libucks:cache_aug] saved {out_path}", err=True)
+
+
 @cli.command("query")
 @click.argument("query_text")
 @click.option("--repo", "repo_path", type=click.Path(exists=True, file_okay=False, path_type=Path),
@@ -1287,7 +1929,16 @@ async def _run_query(repo_path: Path, query_text: str, top_k: int) -> None:
     strategy = create_strategy(cfg)
     click.echo("[libucks] strategy ready", err=True)
 
-    agent = CentralAgent(registry, cfg, embed_fn=embedder.embed)
+    from libucks.chunk_retriever import ChunkRetriever
+    chunk_retriever = ChunkRetriever(
+        cache_dir=bucket_dir / "chunk_emb_cache",
+        embedder=embedder,
+        store=store,
+    )
+    agent = CentralAgent(
+        registry, cfg, embed_fn=embedder.embed,
+        chunk_retriever=chunk_retriever,
+    )
     librarians: dict[str, Librarian] = {}
     for bucket_id in bucket_ids:
         lib = Librarian(
@@ -1297,6 +1948,7 @@ async def _run_query(repo_path: Path, query_text: str, top_k: int) -> None:
             strategy=strategy,
             embedder=embedder,
             mitosis_threshold=cfg.routing.mitosis_threshold,
+            chunk_retriever=chunk_retriever,
         )
         librarians[bucket_id] = lib
         agent.register_librarian(bucket_id, lib)
@@ -1308,7 +1960,8 @@ async def _run_query(repo_path: Path, query_text: str, top_k: int) -> None:
         resolved_device = _MM._resolve_device(cfg.model.device)
         from transformers import AutoConfig as _AC2
         _base_hidden = _AC2.from_pretrained(cfg.model.base_model).hidden_size
-        adapter = CommunicationAdapter(hidden_dim=strategy.hidden_dim, output_dim=_base_hidden)
+        adapter = CommunicationAdapter(hidden_dim=strategy.hidden_dim, output_dim=_base_hidden,
+                                       output_len=cfg.model.output_len)
         adapter.load_saved_weights(bucket_dir / "adapter.pt")
 
         # Load the Base receiver model first so we can read its actual dtype.
@@ -1318,6 +1971,7 @@ async def _run_query(repo_path: Path, query_text: str, top_k: int) -> None:
             quantization=cfg.model.quantization,
             bnb_4bit_compute_dtype=cfg.model.bnb_4bit_compute_dtype,
             device=cfg.model.device,
+            base_model_dtype=cfg.model.base_model_dtype,
         )
         click.echo("[libucks] Base receiver model ready", err=True)
 
@@ -1328,7 +1982,12 @@ async def _run_query(repo_path: Path, query_text: str, top_k: int) -> None:
 
         _load_lora_weights(strategy, bucket_dir, resolved_device)
 
-    translator = Translator(strategy, adapter=adapter)
+    translator = Translator(
+        strategy, adapter=adapter, store=store,
+        hybrid=cfg.model.hybrid_retrieval,
+        verbatim_max_chars=cfg.model.hybrid_verbatim_max_chars,
+        chunk_retriever=chunk_retriever,
+    )
 
     orchestrator = QueryOrchestrator(
         central_agent=agent,
@@ -1338,10 +1997,17 @@ async def _run_query(repo_path: Path, query_text: str, top_k: int) -> None:
     )
 
     click.echo(f"[libucks] routing: \"{query_text}\"", err=True)
-    representations = await orchestrator.query(query_text)
+    query_embedding = embedder.embed(query_text)
+    pairs = await orchestrator.query(query_text)
+    bucket_ids = [bid for bid, _ in pairs]
+    representations = [rep for _, rep in pairs]
     click.echo(f"[libucks] {len(representations)} representations, synthesizing...", err=True)
 
-    answer = await translator.synthesize(query_text, representations)
+    answer = await translator.synthesize(
+        query_text, representations,
+        bucket_ids=bucket_ids,
+        query_embedding=query_embedding,
+    )
 
     # Answer goes to stdout so it can be piped / captured cleanly.
     click.echo(answer)
