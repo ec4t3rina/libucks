@@ -13,8 +13,42 @@ finding.
 
 - CM-0 — Documentation cleanup & archive — DONE 2026-07-01 (root .md 11→6; papers consolidated to docs/papers/; phase-4c + V1/V2 plans archived)
 - CM-A.0 — Scaffold + cartridge contract (TDD) — DONE 2026-07-01 (6/6 KVPrefixCartridge contract tests green; module landed)
+- CM-A.1 — Single-bucket distill proof — ⚠ GATE FAIL 2026-07-02 (KL 0.916→0.517; latent-alone grounding 1/8→2/8, needed ≥3; objective works but latent carries structure not identifiers — Phase-4A decomposition reproduced under distillation)
 
 ---
+
+## CM-A.1 — Single-bucket distill proof (2026-07-02)
+
+**Status**: ⚠ GATE FAIL — informative. Objective works; capacity/data-coverage limited.
+
+**Setup**: echoswarm bucket `bc6b90e2` (agents/relay, 8 routed fixtures, 948-token
+verbatim). Warm-start KVPrefixCartridge (P=64) from real extracted KV; distill with
+context distillation (KL + 0.3·CE) on 128 **templated** self-study queries, 2 epochs,
+lr=1e-2, frozen Qwen2.5-3B on MPS. Script: `scripts/cm_proof_single_bucket.py`.
+
+**Result**:
+- KL 0.916 → 0.517 (−44%, still falling at epoch 2 end).
+- Latent-alone grounding: warm-start **1/8** → distilled **2/8** (gate needed ≥3).
+- Distilled answers are coherent + on-topic but miss specific identifiers
+  (e.g. "relay probability is 0.5" — truth is 80%; missed 0.6, STRANDED, "2 confirmations").
+
+**Finding**: context distillation is the right *mechanism* (KL dropped, grounding rose,
+fluency improved vs. the cosine objective's noise), but at this scale the latent carries
+**structure, not precise identifiers** — the Phase-4A two-channel decomposition, reproduced
+under a proper objective. This is the load-bearing honest result.
+
+**Suspected causes (ranked)**:
+1. Query coverage — templated queries don't force the teacher to state the tested facts
+   (if "80%" never appears in training answers, the cartridge can't learn it).
+2. Prefix capacity P=64 for a 948-token bucket.
+3. Under-trained — 2 epochs, KL still falling.
+4. Warm-start from first-64 KV biases to the file header, not the fact-dense body.
+
+**Gate result**: FAIL (2/8 < 3/8). Decision pending (see chat): bounded lever test
+(model-generated + fact-probing queries, P=128–256, +epochs) on the same bucket, vs.
+bank as negative result.
+
+**Next**: user decision.
 
 ## CM-A.0 — Scaffold + cartridge contract (2026-07-01)
 
