@@ -21,8 +21,9 @@ Phase 4-A baseline to beat: **libugry hybrid 19.5 ± 1.7 / 30** (4-run mean).
 - [4-C.5 — Training data + single-position augmentation training](#4-c5--training-data--single-position-augmentation-training-2026-06-19--2026-06-25) — DONE 2026-06-25 (mean_loss 3.20→2.53→2.39, monotonic; 3 epochs, ~12h wall on MPS)
 - [4-C.5.5 — Real training (data quality + curriculum)](#4-c55--real-training-data-quality--curriculum-2026-06-25--2026-06-28) — DONE 2026-06-28 (mean_loss 1.85→1.60→1.60; 125 real samples, text_ratio curriculum; multi-position DEFERRED to 4-C.5.6)
 - [4-C.6 — 5-path eval on echoswarm](#4-c6--5-path-eval-on-echoswarm-2026-06-28) — ⚠ SUPERSEDED; the "loss" verdict was a decode bug, not a model result. See salvage entry below.
-- [4-C.6-SALVAGE — Cold Stop decode fix](#4-c6-salvage--cold-stop-decode-fix-2026-06-28) — DONE 2026-06-28 (**cache_aug 1/25 → 12/25, beats hybrid 9/25 by +3; cos 0.126 → 0.561 — grounding gate met, with fairness caveats below**)
-- [4-C.7 — Decision + carry-forward to writeup](#4-c7--decision--carry-forward-to-writeup-2026-06-30) — DONE 2026-06-30 (verdict: WIN accepted; proceed to POCSTRAT writeup arc; decode-fairness + no-verbatim ablation + libugry cross-val logged as open limitations)
+- [4-C.6-SALVAGE — Cold Stop decode fix](#4-c6-salvage--cold-stop-decode-fix-2026-06-28) — DONE 2026-06-28 (cache_aug 1/25 → 12/25 — **⚠ SUPERSEDED: fairness eval (below) shows this was decode-loop + single-run variance, NOT a real win; Cold Stop itself contributes 0**)
+- [4-C.6-FAIRNESS — decode + no-verbatim ablations](#4-c6-fairness--decode--no-verbatim-ablations-2026-07-01) — DONE 2026-07-01 (**NULL/LOSS: latent channel inert (no_verbatim 2/25 < no_context 3/25); cache_aug 12 ≈ hybrid 11 within noise; Cold Stop = red herring**)
+- [4-C.7 — Decision + carry-forward to writeup](#4-c7--decision--carry-forward-to-writeup-2026-06-30) — REVISED 2026-07-01 (verdict corrected to **4-D-C future-work / negative result**; Phase 4-A hybrid stays headline; cache-aug → related work)
 
 ---
 
@@ -338,29 +339,69 @@ This is the opposite of the pre-ColdStop garbage (`'The \nThe  11   2  3  9...'`
 
 **Time spent**: ~30 min code + ~1h re-eval. Phase 4-C cumulative: ~9.5 working days.
 
-**Next**: 4-C.7 decision.
+**⚠ SUPERSEDED by 4-C.6-FAIRNESS (below).** The 12/25 was reproduced, but the fairness ablations show the win was an artifact: (a) the 1→12 jump was the manual greedy loop replacing `model.generate`, NOT the Cold Stop gate (gate contributes 0 grounding); (b) hybrid's 9/25 that run was a single-run low — it is 11/25 on re-eval; (c) the grounding is entirely from verbatim, not the latent channel.
+
+**Next**: 4-C.6-FAIRNESS.
 
 ---
 
-## 4-C.7 — Decision + carry-forward to writeup (2026-06-30)
+## 4-C.6-FAIRNESS — decode + no-verbatim ablations (2026-07-01)
 
-**Status**: ✅ closed.
+**Status**: ❌ NULL/LOSS verdict — cache augmentation's latent channel is inert.
 
-**Decision** (user call, 2026-06-30): **accept the win** — cache_aug 12/25 > hybrid 9/25 is the new headline result for the cache-augmentation arc. Move to the POCSTRAT writeup arc rather than spending more compute up front.
+**Built**:
+- `libucks/translator.py::synthesize_cache_aug` — added `use_verbatim: bool` and `cold_stop_entropy` passthrough (defaults preserve prior behavior).
+- `tests/eval/test_latent_vs_baseline.py` — two new paths reusing the loaded 3B bundle (no extra model load): `cache_aug_no_verbatim` (verbatim off) and `cache_aug_greedy_nogate` (manual greedy, Cold Stop gate off).
 
-**What this is and isn't**:
-- IS: a real, surprising positive result — the DeepMind cache-aug architecture, decoded with a Soft-Thinking-style entropy gate, produces coherent grounded answers and out-grounds the Phase 4-A hybrid path on a fresh uncontaminated repo.
-- IS NOT (yet): a full 4-D-A migration. We are NOT archiving `adapter.pt` / `lora_receiver.pt` or flipping a config default. The three fairness caveats above are unresolved; they become the explicit "limitations / future work" in the writeup and the to-do list if/when we harden this into the production path.
+**Result** (echoswarm, 25 fixtures, single run — `tests/eval/results/phase4c/echoswarm_4c6_fairness.json`):
 
-**Open follow-ups (post-writeup, optional)**:
-- Decode-fairness re-eval: hybrid on the same Cold Stop decode.
-- `cache_aug_no_verbatim` ablation + 2nd seed.
-- libugry cross-validation of the trained coprocessor (no retrain).
-- Wire cache invalidation into mitosis/merge handlers (deferred since 4-C.2) before any production use.
+| path | grounding | multi | cos |
+|---|---|---|---|
+| hybrid (Phase 4-A) | **11/25** | 4/7 | **0.626** |
+| cache_aug (verbatim + Cold Stop) | 12/25 | 3/7 | 0.561 |
+| cache_aug_greedy_nogate | 12/25 | 3/7 | 0.574 |
+| cache_aug_no_verbatim | 2/25 | 1/7 | 0.549 |
+| text_clean | 4/25 | 2/7 | 0.555 |
+| latent | 2/25 | 2/7 | 0.534 |
+| no_context | 3/25 | 1/7 | 0.575 |
 
-**Time spent**: ~0.5h (assessment + docs). Phase 4-C cumulative: ~9.5 working days.
+Routing 24/25.
 
-**Next**: POCSTRAT writeup arc (see `POCSTRAT.md`).
+**Findings (all resolve the 4-C.6-SALVAGE caveats against cache-aug)**:
+1. **Cold Stop is a red herring.** `greedy_nogate` (12/25) is byte-identical in grounding to gated `cache_aug` (12/25); the first sampled answers are literally the same text. The gate marginally *lowers* cos (0.561 vs 0.574). The real 1→12 jump vs raw 4-C.6 was `model.generate` → manual greedy loop, not the entropy gate.
+2. **The latent (z_fused) channel is inert.** `cache_aug_no_verbatim` = 2/25, cos 0.549 — **below no_context (3/25)**. The strong-win gate wanted ≥ no_context + 5 (≈8). No-verbatim answers are fluent but fabricated (e.g. "relay probability … is 0.5" where the true answer is 80%). The Coprocessor+Fusion soft prompt carries no correct identifiers; **all cache_aug grounding comes from the verbatim channel.** This is the Phase 4-A "fluent fabrication" latent-failure mode reproduced in the cache-aug architecture.
+3. **cache_aug does not beat hybrid.** 12 vs 11 = +1, inside noise (Phase 4-A ±1.7/30 ≈ ±1.4/25); hybrid has better cosine (0.626 > 0.561). The salvage-run "+3" was hybrid's unlucky single run (9), not cache-aug strength.
+
+**Verdict**: **4-D-C future-work / negative result.** cache_aug ≈ a RAG path on the frozen 3B with an inert learned soft-prompt. At this scale (202M coproc from scratch, ~125 training samples, MPS) the latent coprocessor does not learn to carry bucket-specific content. Honest negative result → related work in the writeup.
+
+**Time spent**: ~0.5h code + ~40 min eval. Phase 4-C cumulative: ~10 working days.
+
+**Next**: 4-C.7 (revised decision).
+
+---
+
+## 4-C.7 — Decision + carry-forward to writeup (2026-06-30; REVISED 2026-07-01)
+
+**Status**: ✅ closed with corrected verdict.
+
+**Decision history**:
+- 2026-06-30 (provisional): accepted the salvage 12/25 as a win, deferred fairness eval.
+- 2026-07-01 (final, after 4-C.6-FAIRNESS): **verdict corrected to 4-D-C future-work / negative result.** The apparent win did not survive the decode-fairness and no-verbatim ablations. This correction was made *before* any writeup was drafted — no downstream artifact carried the wrong claim.
+
+**Final call**: **Phase 4-A hybrid (libugry 19.5 ± 1.7/30; echoswarm 11/25) remains the production path and the writeup headline.** Cache augmentation is documented as an implemented-but-negative experiment: the full DeepMind KV-cache coprocessor architecture, honestly evaluated, shows an inert latent channel at this scale. Do NOT archive Phase 4-A weights; do NOT flip any config default.
+
+**Why the negative result is still valuable for the writeup**:
+- Reinforces the two-channel decomposition finding: verbatim carries identifiers, the learned latent path does not (now shown for BOTH the adapter soft-prompt AND the cache-aug coprocessor).
+- The decode-loop-vs-`generate` gotcha (greedy loop ≠ `model.generate` defaults) is a reusable methodological caution.
+- Sizes the gap for the multi-repo-pretraining direction: 125 samples is far too little to train a 202M coprocessor to carry content; this quantifies why the pretraining step (POCSTRAT §11) is the real next research move.
+
+**Open follow-ups (optional, low priority given the verdict)**:
+- libugry cross-validation of the trained coprocessor (would confirm the null is not echoswarm-specific) — nice-to-have for the writeup, not decision-changing.
+- Wire cache invalidation into mitosis/merge handlers (deferred since 4-C.2) — only if cache-aug is ever revived.
+
+**Time spent**: ~0.5h (assessment + docs). Phase 4-C cumulative: ~10 working days.
+
+**Next**: POCSTRAT writeup arc (see `POCSTRAT.md`), with Phase 4-A as headline and cache-aug as honest negative result.
 
 ---
 

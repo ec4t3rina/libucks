@@ -76,6 +76,9 @@ class Translator:
         query: str,
         bucket_ids: List[str],
         query_embedding: Optional[np.ndarray] = None,
+        *,
+        use_verbatim: bool = True,
+        cold_stop_entropy: Optional[float] = 4.0,
     ) -> str:
         """Phase 4-C cache-augmentation decode path.
 
@@ -99,10 +102,20 @@ class Translator:
             _log("synthesize_cache_aug: no fresh bucket caches — fallback message")
             return "No relevant context found in the memory store."
 
-        verbatim = self._gather_verbatim(bucket_ids, query_embedding=query_embedding)
+        # Phase 4-C.6 fairness ablations:
+        #   use_verbatim=False  → isolate the latent (z_fused) contribution
+        #                         ("latent alone is viable" gate).
+        #   cold_stop_entropy=None → manual greedy WITHOUT the entropy gate,
+        #                         to attribute the win to Cold Stop vs. greedy.
+        verbatim = (
+            self._gather_verbatim(bucket_ids, query_embedding=query_embedding)
+            if use_verbatim
+            else ""
+        )
         return augmented_decode(
             bundle["receiver"], bundle["tokenizer"], z_fused,
             query=query, verbatim=verbatim,
+            cold_stop_entropy=cold_stop_entropy,
         )
 
     def _gather_verbatim(

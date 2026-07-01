@@ -37,7 +37,7 @@ import os
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 import numpy as np
 import pytest
@@ -386,14 +386,23 @@ def _path_no_context(pipe, question: str) -> str:
 
 def _path_cache_aug(
     pipe, question: str, bucket_ids: List[str], query_embedding: np.ndarray,
+    *, use_verbatim: bool = True, cold_stop_entropy: Optional[float] = 4.0,
 ) -> str:
     """Phase 4-C cache-augmentation path. Returns "" if cache_aug isn't loaded
     (so the row is excluded from grounding when the feature isn't enabled
-    for this repo)."""
+    for this repo).
+
+    Phase 4-C.6 fairness variants (same 3B receiver bundle, no extra load):
+      use_verbatim=False     → cache_aug_no_verbatim (latent-alone gate).
+      cold_stop_entropy=None → cache_aug_greedy_nogate (attribute the win
+                               to Cold Stop vs. plain greedy)."""
     translator = pipe.get("cache_aug_translator")
     if translator is None:
         return ""
-    return translator.synthesize_cache_aug(question, bucket_ids, query_embedding=query_embedding)
+    return translator.synthesize_cache_aug(
+        question, bucket_ids, query_embedding=query_embedding,
+        use_verbatim=use_verbatim, cold_stop_entropy=cold_stop_entropy,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +488,12 @@ async def _run_eval_one_repo(name: str, repo_path: Path, fixtures_path: Path) ->
     # hybrid_clean) dropped — diagnosis done, LoRA confirmed essential.
     # text_lora dropped — diagnosis confirmed it's OOD on plain text.
     # 4 paths × 30 fixtures keeps eval ~1h 20min on MPS.
-    paths = ["latent", "hybrid", "cache_aug", "text_clean", "no_context"]
+    paths = [
+        "latent", "hybrid", "cache_aug",
+        "cache_aug_no_verbatim",    # 4-C.6 ablation: latent-alone gate
+        "cache_aug_greedy_nogate",  # 4-C.6 ablation: Cold Stop vs. plain greedy
+        "text_clean", "no_context",
+    ]
     grounding = {p: 0 for p in paths}
     cosine = {p: [] for p in paths}
     routing_hits = 0  # shared by latent + text paths
@@ -509,6 +523,12 @@ async def _run_eval_one_repo(name: str, repo_path: Path, fixtures_path: Path) ->
         # 3. Cache-aug path (Phase 4-C). "" when state_dict is absent.
         cache_aug_answer = _path_cache_aug(pipe, question, bucket_ids, query_embedding)
 
+        # 3b/3c. 4-C.6 fairness ablations (same 3B bundle, no extra model load).
+        cache_aug_no_verb_answer = _path_cache_aug(
+            pipe, question, bucket_ids, query_embedding, use_verbatim=False)
+        cache_aug_greedy_answer = _path_cache_aug(
+            pipe, question, bucket_ids, query_embedding, cold_stop_entropy=None)
+
         # 4. Text-clean (LoRA disabled). Same bucket_ids from latent route.
         text_clean_answer = _path_text(pipe, question, bucket_ids, lora_active=False)
 
@@ -519,6 +539,8 @@ async def _run_eval_one_repo(name: str, repo_path: Path, fixtures_path: Path) ->
             "latent": latent_answer,
             "hybrid": hybrid_answer,
             "cache_aug": cache_aug_answer,
+            "cache_aug_no_verbatim": cache_aug_no_verb_answer,
+            "cache_aug_greedy_nogate": cache_aug_greedy_answer,
             "text_clean": text_clean_answer,
             "no_context": no_ctx_answer,
         }
