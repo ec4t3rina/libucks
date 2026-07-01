@@ -12,8 +12,29 @@ finding.
 ## Table of contents
 
 - CM-0 — Documentation cleanup & archive — DONE 2026-07-01 (root .md 11→6; papers consolidated to docs/papers/; phase-4c + V1/V2 plans archived)
+- CM-A.0 — Scaffold + cartridge contract (TDD) — DONE 2026-07-01 (6/6 KVPrefixCartridge contract tests green; module landed)
 
 ---
+
+## CM-A.0 — Scaffold + cartridge contract (2026-07-01)
+
+**Status**: ✅ gate passed.
+
+**Built**:
+- `tests/unit/test_cartridge.py` — TDD contract for `KVPrefixCartridge` (shapes,
+  init-from-extracted-KV incl. short-bucket pad, grad-flow, save/load roundtrip).
+  Written first; watched it fail (ModuleNotFoundError).
+- `libucks/cache_augmentation/cartridge.py` — `KVPrefixCartridge(nn.Module)`:
+  per-layer trainable `(1, n_kv_heads, P, head_dim)` K/V ParameterLists;
+  `init_from_extracted_kv` (warm-start from `kv_extract` flat dict, first-P copy
+  with short-bucket slack); `to_dynamic_cache` (grad-preserving DynamicCache);
+  safetensors `save`/`load`.
+
+**Gate result**: `uv run pytest tests/unit/test_cartridge.py` → **6/6 green**.
+
+**Next**: CM-A.1 — `distillation_loss` (KL to full-context teacher), `self_study`
+query generation, `cartridge_trainer` (backprop into prefix only, base frozen),
+real-model integration smoke, then single-bucket distill proof.
 
 ## CM-0 — Documentation cleanup & archive (2026-07-01)
 
