@@ -50,6 +50,27 @@ class KVPrefixCartridge(nn.Module):
         )
 
     # ------------------------------------------------------------------
+    @classmethod
+    def for_model(
+        cls,
+        model: torch.nn.Module,
+        *,
+        prefix_len: int = 64,
+        dtype: torch.dtype = torch.float32,
+    ) -> "KVPrefixCartridge":
+        """Build a cartridge whose KV geometry matches `model`'s attention config."""
+        cfg = model.config
+        n_layers = int(cfg.num_hidden_layers)
+        n_kv_heads = int(getattr(cfg, "num_key_value_heads", cfg.num_attention_heads))
+        head_dim = int(
+            getattr(cfg, "head_dim", cfg.hidden_size // cfg.num_attention_heads)
+        )
+        return cls(
+            n_layers=n_layers, n_kv_heads=n_kv_heads,
+            prefix_len=prefix_len, head_dim=head_dim, dtype=dtype,
+        )
+
+    # ------------------------------------------------------------------
     @torch.no_grad()
     def init_from_extracted_kv(self, flat: dict[str, torch.Tensor]) -> None:
         """Warm-start the prefix from a bucket's real extracted KV (the flat

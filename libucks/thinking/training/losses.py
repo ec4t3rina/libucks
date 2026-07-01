@@ -3,9 +3,42 @@
 separation_loss       — simplified L_sep from Interlat §3.2 (JSD-based).
 margin_separation_loss — direct margin ranking on first target token (no chicken-and-egg).
 alignment_loss        — L_align from Interlat §3.3 (prevents L_sep exploitation).
+distillation_loss     — context distillation (Cartridge Memory, CM-A): KL from a
+                        full-context teacher into a latent-conditioned student.
 """
 import torch
 import torch.nn.functional as F
+
+
+def distillation_loss(
+    student_logits: torch.Tensor,
+    teacher_logits: torch.Tensor,
+    temperature: float = 1.0,
+) -> torch.Tensor:
+    """Context-distillation loss: KL(teacher ‖ student) over answer positions.
+
+    The teacher sees the full verbatim context; the student sees only the
+    trained latent (cartridge) prefix. Minimising this trains the latent to
+    make the frozen model reproduce the teacher's full-context next-token
+    distribution — the objective that (per arXiv 2605.28889 / Cartridges
+    2506.06266) makes a latent memory channel actually carry facts, where the
+    cosine/margin objectives did not.
+
+    Args:
+        student_logits: (P, V) logits at the answer positions from the
+            cartridge-conditioned forward. Grad flows through these.
+        teacher_logits: (P, V) logits at the same answer positions from the
+            full-context forward. Detached internally (teacher is fixed).
+        temperature: softmax temperature T; loss scaled by T² (Hinton distillation).
+
+    Returns:
+        Scalar tensor ≥ 0. Zero when the student matches the teacher.
+    """
+    t = max(1e-6, float(temperature))
+    log_student = F.log_softmax(student_logits.float() / t, dim=-1)
+    teacher_probs = F.softmax(teacher_logits.float().detach() / t, dim=-1)
+    # F.kl_div(log_student, teacher_probs) = Σ teacher·(log teacher − log student) = KL(teacher‖student)
+    return F.kl_div(log_student, teacher_probs, reduction="batchmean") * (t * t)
 
 
 def margin_separation_loss(
