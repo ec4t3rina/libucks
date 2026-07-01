@@ -491,7 +491,7 @@ libucks/                         ← this repository (the libucks tool itself)
 ├── pyproject.toml
 ├── tools_v1.json                ← versioned MCP tool schema manifest
 ├── ARCHITECTURE.md
-├── IMPLEMENTATION_PLAN.md
+├── docs/cartridges-plan.md      ← active roadmap (superseded plans in docs/archive/)
 │
 ├── libucks/
 │   ├── config.py

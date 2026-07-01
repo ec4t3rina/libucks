@@ -5,7 +5,7 @@ You are the Principal Systems Architect and Lead Python Engineer building the `l
 ## 1. Project Blueprints (MANDATORY ROUTING)
 Before executing complex code changes, you MUST consult the blueprints:
 - `ARCHITECTURE.md`: Contains the system design, data flows, and the critical V2 Latent Space constraints.
-- `IMPLEMENTATION_PLAN.md`: Contains our strict, phase-gated roadmap.
+- `docs/cartridges-plan.md`: The current active roadmap (Cartridge Memory track). Superseded V1/V2/Phase-4 plans are archived under `docs/archive/` (including the closed Phase 4-C negative-result log at `docs/archive/phase-4c/`).
 
 ## 2. The Golden Rules
 - **Strict TDD:** You are never allowed to move to Phase N+1 until the Testing Gate for Phase N is 100% green. Always write the `test_*.py` file first, run it to watch it fail, then write the implementation to make it pass.
@@ -19,7 +19,7 @@ Before executing complex code changes, you MUST consult the blueprints:
 
 ## 3. Session Start Protocol
 When a new session begins:
-1. Read `IMPLEMENTATION_PLAN.md` to find the current phase gate status.
+1. Read `docs/cartridges-log.md` (newest entry) to find the current stage/gate status, and `docs/cartridges-plan.md` for the active roadmap.
 2. Scan `tests/unit/` to confirm which tests exist and which are green.
 3. Check if `lora_receiver.pt` exists in the target repo's `.libucks/` before assuming LoRA is trained.
 4. Never assume training was successful — always verify `sep > 0.0000` in logs.
