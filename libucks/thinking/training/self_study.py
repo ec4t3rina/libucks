@@ -23,17 +23,22 @@ def _log(msg: str) -> None:
     print(f"[libucks:self_study] {msg}", file=sys.stderr, flush=True)
 
 
+# Fact-probing templates: phrased to force the full-context teacher to state
+# SPECIFIC values (numbers, probabilities, thresholds, state names, defaults) —
+# the identifiers the latent must carry. Generic "what does X do" templates
+# (CM-A.1) let the teacher answer structurally without stating the facts, so the
+# cartridge never learned them. See docs/cartridges-log.md CM-A.1.
 _TEMPLATES = (
-    "What does {tok} do in this code?",
-    "How is {tok} used?",
-    "What is the purpose of {tok}?",
-    "Explain the role of {tok}.",
-    "What are the inputs and outputs of {tok}?",
-    "Which other components depend on {tok}?",
-    "What happens when {tok} is called?",
-    "Describe the control flow around {tok}.",
-    "What edge cases does {tok} handle?",
-    "What would break if {tok} were removed?",
+    "What is the exact numeric value, probability, or threshold associated with {tok}?",
+    "State the precise default or constant used for {tok}.",
+    "What specific state or condition does {tok} correspond to, exactly?",
+    "Give the exact behavior of {tok}, including any numbers or probabilities.",
+    "Under what precise conditions (with specific counts or values) does {tok} apply?",
+    "What exact value does {tok} take, and what does it control?",
+    "What does {tok} do in this code, with the specific values involved?",
+    "How is {tok} used, and what are the exact parameters or thresholds?",
+    "What happens, step by step with concrete values, when {tok} is triggered?",
+    "Which specific constants, states, or probabilities are involved in {tok}?",
 )
 
 # Identifier-ish tokens: function/class/method names, CONSTANTS, snake_case.
@@ -79,50 +84,70 @@ def _model_queries(
     model: Any,
     tokenizer: Any,
     *,
-    max_new_tokens: int = 400,
+    per_call_new_tokens: int = 384,
     max_context_chars: int = 3000,
+    max_attempts: Optional[int] = None,
 ) -> list[str]:
-    """Ask an instruct model to propose `n` questions about the bucket source.
+    """Ask an instruct model to propose fact-probing questions about the bucket.
 
-    Best-effort: returns whatever parses cleanly (may be < n; caller tops up
-    with templates). Uses the chat template when available.
+    Loops `generate` (sampled, so each call yields different questions) until it
+    has `n` distinct questions or exhausts `max_attempts`. Best-effort: caller
+    tops up any shortfall with templates. Uses the chat template when available.
     """
     device = next(model.parameters()).device
     ctx = bucket_text[:max_context_chars]
+    batch = max(8, min(30, n))  # ask for a chunk at a time
     instruction = (
-        f"Read the following source code and write {n} distinct, specific "
-        "questions whose answers require facts from the code (function names, "
-        "constants, control flow, defaults). One question per line, no numbering.\n\n"
+        f"Read the following source code and write {batch} distinct, specific "
+        "questions. Each answer MUST require a concrete fact from the code — an "
+        "exact number, probability, threshold, default, constant, state name, or "
+        "function name. Avoid vague questions. One question per line, no numbering.\n\n"
         f"```\n{ctx}\n```\n\nQuestions:"
     )
-    try:
-        if hasattr(tokenizer, "apply_chat_template") and tokenizer.chat_template:
-            msgs = [{"role": "user", "content": instruction}]
-            input_ids = tokenizer.apply_chat_template(
-                msgs, add_generation_prompt=True, return_tensors="pt"
-            ).to(device)
-        else:
-            input_ids = tokenizer(instruction, return_tensors="pt").input_ids.to(device)
-        out = model.generate(
-            input_ids,
-            max_new_tokens=max_new_tokens,
-            do_sample=True,
-            temperature=0.8,
-            top_p=0.95,
-            pad_token_id=tokenizer.eos_token_id,
+    if hasattr(tokenizer, "apply_chat_template") and tokenizer.chat_template:
+        msgs = [{"role": "user", "content": instruction}]
+        # return_dict=True → BatchEncoding with input_ids + attention_mask.
+        # (Without it, this transformers version returns a BatchEncoding whose
+        # .shape access raises, or a bare tensor — normalise both here.)
+        enc = tokenizer.apply_chat_template(
+            msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True
         )
-        text = tokenizer.decode(out[0, input_ids.shape[1]:], skip_special_tokens=True)
-    except Exception as exc:  # model/generation hiccup → fall back to templates
-        _log(f"model query-gen failed ({exc}); using templates only")
-        return []
+    else:
+        enc = tokenizer(instruction, return_tensors="pt")
+    base_ids = enc["input_ids"].to(device)
+    attn = enc["attention_mask"].to(device)
+    prompt_len = base_ids.shape[1]
 
+    attempts = max_attempts if max_attempts is not None else min(30, 2 * ((n // batch) + 2))
+    seen: set[str] = set()
     queries: list[str] = []
-    for line in text.splitlines():
-        line = line.strip()
-        line = re.sub(r"^\s*[-*\d.)\]]+\s*", "", line)  # strip bullets/numbering
-        if len(line) < 8 or "?" not in line:
-            continue
-        queries.append(line)
+    for _ in range(attempts):
+        if len(queries) >= n:
+            break
+        try:
+            out = model.generate(
+                base_ids,
+                attention_mask=attn,
+                max_new_tokens=per_call_new_tokens,
+                do_sample=True,
+                temperature=0.9,
+                top_p=0.95,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+            text = tokenizer.decode(out[0, prompt_len:], skip_special_tokens=True)
+        except Exception as exc:
+            _log(f"model query-gen failed ({exc}); stopping model gen")
+            break
+        for line in text.splitlines():
+            line = re.sub(r"^\s*[-*\d.)\]]+\s*", "", line.strip())
+            if len(line) < 8 or "?" not in line:
+                continue
+            key = line.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            queries.append(line)
+    _log(f"model query-gen: {len(queries)} distinct questions in <= {attempts} attempts")
     return queries
 
 

@@ -44,7 +44,7 @@ class CartridgeTrainer:
         *,
         temperature: float = 2.0,
         alpha_ce: float = 0.3,
-        max_answer_tokens: int = 48,
+        max_answer_tokens: int = 32,
         max_verbatim_chars: int = 3000,
     ) -> None:
         self.model = base_model
@@ -109,6 +109,28 @@ class CartridgeTrainer:
             ans_ids = torch.tensor(answer_ids, dtype=torch.long, device=self.device)
             return ans_ids, ans_logits
 
+    @torch.no_grad()
+    def _teacher_forced_logits(
+        self, verbatim: str, query: str, answer_ids: torch.Tensor
+    ) -> torch.Tensor:
+        """Teacher logits over a KNOWN answer via a SINGLE forward (teacher-forced).
+
+        The teacher is frozen + deterministic, so once the greedy answer is known
+        (precomputed once) its per-position logits are constant across epochs and
+        recoverable with one forward — vs. 48 sequential forwards for greedy gen.
+        Returns (A, V) aligned to answer_ids[0..A-1]."""
+        with torch.inference_mode(False), torch.no_grad():
+            ctx = self._q_text(query, verbatim[: self.max_verbatim_chars])
+            ctx_ids = self.tokenizer(
+                ctx, return_tensors="pt", truncation=True, max_length=3500
+            )["input_ids"].to(self.device)
+            fed = torch.cat([ctx_ids, answer_ids.view(1, -1)], dim=1)
+            out = self.model(input_ids=fed, use_cache=False)
+            lc = ctx_ids.shape[1]
+            a = answer_ids.shape[0]
+            # logits[lc-1 : lc-1+A] predict answer[0..A-1].
+            return out.logits[0, lc - 1 : lc - 1 + a, :].detach().float()
+
     def _student_logits(
         self, cartridge: KVPrefixCartridge, query: str, answer_ids: torch.Tensor
     ) -> torch.Tensor:
@@ -135,14 +157,12 @@ class CartridgeTrainer:
         return logits[0, lq - 1 : lq - 1 + a, :]
 
     # ------------------------------------------------------------------
-    def step(
-        self, cartridge, optimizer, scheduler, verbatim: str, query: str
-    ) -> Optional[dict[str, float]]:
-        gen = self._teacher_generate(verbatim, query)
-        if gen is None:
-            return None
-        answer_ids, teacher_ans_logits = gen
-
+    def _optimize(
+        self, cartridge, optimizer, scheduler, query: str,
+        answer_ids: torch.Tensor, teacher_ans_logits: torch.Tensor,
+    ) -> dict[str, float]:
+        """Student forward + KL(+CE) distill + step, given precomputed teacher
+        target. Shared by step() (greedy) and _step_cached (teacher-forced)."""
         with torch.inference_mode(False), torch.enable_grad():
             student_ans_logits = self._student_logits(cartridge, query, answer_ids)
             kl = distillation_loss(student_ans_logits, teacher_ans_logits, self.temperature)
@@ -152,7 +172,6 @@ class CartridgeTrainer:
                 loss = kl + self.alpha_ce * ce
             optimizer.zero_grad()
             loss.backward()
-            # MPS/pytest can leave grads as inference tensors → step() no-ops.
             for p in cartridge.parameters():
                 if p.grad is not None and p.grad.is_inference():
                     p.grad = p.grad.clone()
@@ -161,13 +180,32 @@ class CartridgeTrainer:
         with torch.inference_mode(False), torch.enable_grad():
             optimizer.step()
         scheduler.step()
-
+        if self.device.type == "mps":
+            torch.mps.empty_cache()
         return {
             "loss": float(loss.item()),
             "kl": float(kl.item()),
             "n_ans": int(answer_ids.shape[0]),
             "lr": float(optimizer.param_groups[0]["lr"]),
         }
+
+    def _step_cached(
+        self, cartridge, optimizer, scheduler, verbatim: str, query: str,
+        answer_ids: torch.Tensor,
+    ) -> dict[str, float]:
+        """Training step with a precomputed teacher answer — teacher logits via
+        one forward (fast path used across all epochs)."""
+        teacher_ans_logits = self._teacher_forced_logits(verbatim, query, answer_ids)
+        return self._optimize(cartridge, optimizer, scheduler, query, answer_ids, teacher_ans_logits)
+
+    def step(
+        self, cartridge, optimizer, scheduler, verbatim: str, query: str
+    ) -> Optional[dict[str, float]]:
+        gen = self._teacher_generate(verbatim, query)
+        if gen is None:
+            return None
+        answer_ids, teacher_ans_logits = gen
+        return self._optimize(cartridge, optimizer, scheduler, query, answer_ids, teacher_ans_logits)
 
     # ------------------------------------------------------------------
     def distill_bucket(
@@ -180,12 +218,34 @@ class CartridgeTrainer:
         lr: float = 1e-2,
         weight_decay: float = 0.0,
     ) -> dict[str, Any]:
-        """Distill one bucket's cartridge over its self-study queries."""
+        """Distill one bucket's cartridge over its self-study queries.
+
+        Teacher answers are precomputed ONCE (greedy) and reused across epochs —
+        the teacher is frozen+deterministic, so per-epoch regeneration is wasted
+        work. Training steps then get teacher logits via a single teacher-forced
+        forward (fast) instead of 48-step greedy generation."""
         cartridge.train()
         cartridge.to(self.device)
-        total_steps = max(1, epochs * len(queries))
-        warmup = max(1, total_steps // 10)
 
+        # --- precompute teacher answers once (greedy) ---
+        _log(f"precomputing teacher answers for {len(queries)} queries ...")
+        qa: list[tuple[str, torch.Tensor]] = []
+        for i, q in enumerate(queries):
+            gen = self._teacher_generate(verbatim, q)
+            if gen is None:
+                continue
+            qa.append((q, gen[0]))  # (query, answer_ids); discard greedy logits
+            if self.device.type == "mps":
+                torch.mps.empty_cache()
+            if (i + 1) % 40 == 0:
+                _log(f"  precomputed {i+1}/{len(queries)}")
+        _log(f"precomputed {len(qa)} usable (query, answer) pairs")
+        if not qa:
+            return {"epoch_mean_kl": [], "init_mean_kl": 0.0, "final_mean_kl": 0.0,
+                    "n_queries": 0}
+
+        total_steps = max(1, epochs * len(qa))
+        warmup = max(1, total_steps // 10)
         optimizer = torch.optim.AdamW(
             cartridge.parameters(), lr=lr, weight_decay=weight_decay,
             eps=1e-6, foreach=False,
@@ -203,30 +263,27 @@ class CartridgeTrainer:
         first_kls: list[float] = []
         last_kls: list[float] = []
         for ep in range(epochs):
-            order = list(range(len(queries)))
+            order = list(range(len(qa)))
             random.shuffle(order)
             ep_kls: list[float] = []
-            skipped = 0
             for i, idx in enumerate(order):
-                m = self.step(cartridge, optimizer, scheduler, verbatim, queries[idx])
-                if m is None:
-                    skipped += 1
-                    continue
+                q, ans = qa[idx]
+                m = self._step_cached(cartridge, optimizer, scheduler, verbatim, q, ans)
                 ep_kls.append(m["kl"])
-                if (i + 1) % 20 == 0:
+                if (i + 1) % 40 == 0:
                     _log(f"  ep{ep} step {i+1}/{len(order)}: kl={m['kl']:.3f} loss={m['loss']:.3f} lr={m['lr']:.2e}")
             mean_kl = sum(ep_kls) / max(1, len(ep_kls))
             history.append(mean_kl)
             if ep == 0:
                 first_kls = ep_kls
             last_kls = ep_kls
-            _log(f"epoch {ep}: mean_kl={mean_kl:.4f} steps={len(ep_kls)} skipped={skipped}")
+            _log(f"epoch {ep}: mean_kl={mean_kl:.4f} steps={len(ep_kls)}")
 
         return {
             "epoch_mean_kl": history,
             "init_mean_kl": sum(first_kls) / max(1, len(first_kls)),
             "final_mean_kl": sum(last_kls) / max(1, len(last_kls)),
-            "n_queries": len(queries),
+            "n_queries": len(qa),
         }
 
     # ------------------------------------------------------------------
@@ -269,4 +326,7 @@ class CartridgeTrainer:
                 cache = out.past_key_values
                 next_logits = out.logits[:, -1, :]
 
-            return self.tokenizer.decode(gen, skip_special_tokens=True).strip()
+            text = self.tokenizer.decode(gen, skip_special_tokens=True).strip()
+            if self.device.type == "mps":
+                torch.mps.empty_cache()
+            return text

@@ -31,13 +31,18 @@ from libucks.cache_augmentation.cartridge import KVPrefixCartridge
 from libucks.thinking.training.cartridge_trainer import CartridgeTrainer
 from libucks.thinking.training.self_study import generate_self_study_queries
 
+import os
+
 REPO = Path("/Users/ecaterina/Developer/test-repos/echoswarm")
 FIXTURES = Path(__file__).resolve().parent.parent / "tests/eval/fixtures/echoswarm_qa.json"
 RECEIVER_ID = "Qwen/Qwen2.5-3B"
-PREFIX_LEN = 64
-N_QUERIES = 128
-EPOCHS = 2
-LR = 1e-2
+QGEN_ID = "Qwen/Qwen2.5-0.5B-Instruct"   # instruct model for fact-probing query gen
+# Env-tunable levers (defaults = original CM-A.1 run for reproducibility).
+PREFIX_LEN = int(os.environ.get("CM_PREFIX_LEN", "64"))
+N_QUERIES = int(os.environ.get("CM_NQUERIES", "128"))
+EPOCHS = int(os.environ.get("CM_EPOCHS", "2"))
+MODEL_QUERIES = os.environ.get("CM_MODEL_QUERIES", "0") == "1"
+LR = float(os.environ.get("CM_LR", "1e-2"))
 
 
 def _log(m: str) -> None:
@@ -113,8 +118,18 @@ def main() -> None:
     _log("=== BEFORE distillation (warm-start KV, latent-alone) ===")
     init_grounded = _eval("init")
 
-    queries = generate_self_study_queries(verbatim, N_QUERIES, model=None)  # templates ($0)
-    _log(f"distilling on {len(queries)} self-study queries, {EPOCHS} epochs, lr={LR} ...")
+    qgen_model = qgen_tok = None
+    if MODEL_QUERIES:
+        _log(f"loading query-gen model {QGEN_ID} ...")
+        qgen_model = AutoModelForCausalLM.from_pretrained(QGEN_ID, dtype=torch.float32).eval().to(device)
+        qgen_tok = AutoTokenizer.from_pretrained(QGEN_ID)
+    queries = generate_self_study_queries(verbatim, N_QUERIES, model=qgen_model, tokenizer=qgen_tok)
+    if qgen_model is not None:
+        del qgen_model  # free before distillation
+        if device.type == "mps":
+            torch.mps.empty_cache()
+    _log(f"distilling on {len(queries)} queries (model_queries={MODEL_QUERIES}), P={PREFIX_LEN}, {EPOCHS} epochs, lr={LR} ...")
+    _log(f"sample queries: {queries[:3]}")
     res = trainer.distill_bucket(cart, verbatim, queries, epochs=EPOCHS, lr=LR)
 
     _log("=== AFTER distillation (latent-alone) ===")

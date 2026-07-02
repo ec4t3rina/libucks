@@ -13,9 +13,45 @@ finding.
 
 - CM-0 — Documentation cleanup & archive — DONE 2026-07-01 (root .md 11→6; papers consolidated to docs/papers/; phase-4c + V1/V2 plans archived)
 - CM-A.0 — Scaffold + cartridge contract (TDD) — DONE 2026-07-01 (6/6 KVPrefixCartridge contract tests green; module landed)
-- CM-A.1 — Single-bucket distill proof — ⚠ GATE FAIL 2026-07-02 (KL 0.916→0.517; latent-alone grounding 1/8→2/8, needed ≥3; objective works but latent carries structure not identifiers — Phase-4A decomposition reproduced under distillation)
+- CM-A.1 — Single-bucket distill proof — ⚠ GATE FAIL 2026-07-02 (v1: templated queries, P=64, 2ep → 2/8)
+- CM-A.1-retry — Fact-probing queries + P=128 + 4ep — ✅ GATE PASS 2026-07-02 (**latent-alone 2/8→4/8; KL 0.749→0.219; carries identifiers — "80%", garble, STRANDED. Hypothesis confirmed: query coverage was the bottleneck**)
 
 ---
+
+## CM-A.1-retry — Fact-probing queries + P=128 + 4 epochs (2026-07-02)
+
+**Status**: ✅ GATE PASS.
+
+**Changed vs v1** (bounded lever retry, same bucket `bc6b90e2`):
+- Self-study queries: generic templates → **fact-probing templates** (force the teacher
+  to state specific values: numbers, probabilities, thresholds, states). This was the #1
+  suspected cause and it was correct.
+- Prefix P=64 → **128**; epochs 2 → **4**; queries 128 → **200**.
+
+**Two bugs fixed to get here** (both real, both in `cartridge_trainer.py`):
+1. **Missing per-step `torch.mps.empty_cache()`** → MPS memory fragmented and the process
+   HUNG at ~step 180 (observed twice). cache_aug_trainer does per-step empty_cache; mirrored.
+2. **Teacher regeneration every epoch** → the frozen+deterministic teacher answer was
+   greedy-regenerated (48 seq forwards) every step every epoch. Refactored to **precompute
+   answers once**, then teacher logits via a **single teacher-forced forward** per step.
+   Cut projected runtime from ~2h to ~30 min. Validated by smoke (KL still 5.66→4.21→3.61).
+
+**Result** (echoswarm bucket `bc6b90e2`, 8 fixtures, latent-alone / no verbatim):
+- KL 0.749 → 0.219 (4 epochs, monotonic, −71%).
+- Latent-alone grounding: warm-start **2/8** → distilled **4/8** (gate ≥3 and > init) → **PASS**.
+- Carries specific identifiers now: "relay probability is **80%**" (v1 said 0.5), Panic
+  garble, Immobile→"never receive", INFORMED preservation — all from the latent alone.
+
+**Finding**: context distillation + **fact-probing self-study** makes the latent channel
+carry facts. The whole-project failure mode (latent ≈ no_context; Phase-4A 2/25, cache-aug
+no-verbatim 2/25) is broken here: 4/8 latent-alone on a real uncontaminated bucket. The
+prior gate fail was query coverage, not a fundamental ceiling.
+
+**Caveats (honest)**: n=1 bucket, 8 fixtures; 3B/MPS; fact-probing queries are templated
+(not model-generated — MPS crashed on 0.5B generate, CPU too slow). CM-A.2 must confirm
+this holds across all 33 buckets (gate: latent-alone ≥ 8/25 vs no_context 3/25).
+
+**Next**: CM-A.2 — all-bucket distill + full 5-path eval.
 
 ## CM-A.1 — Single-bucket distill proof (2026-07-02)
 
