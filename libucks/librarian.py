@@ -61,6 +61,12 @@ def _collect_source_text(front_matter, max_chars: int = 3000) -> str:
             continue
         block = f"# {meta.source_file}\n{content}\n"
         if total + len(block) > max_chars:
+            # Slice-on-overflow: a block larger than the remaining budget is
+            # truncated rather than dropped, so a bucket whose first chunk
+            # exceeds max_chars still yields text instead of "".
+            remaining = max_chars - total
+            if remaining > 0:
+                parts.append(block[:remaining])
             break
         parts.append(block)
         total += len(block)

@@ -237,7 +237,7 @@ class CartridgeTrainer:
             qa.append((q, gen[0]))  # (query, answer_ids); discard greedy logits
             if self.device.type == "mps":
                 torch.mps.empty_cache()
-            if (i + 1) % 40 == 0:
+            if (i + 1) % 10 == 0:
                 _log(f"  precomputed {i+1}/{len(queries)}")
         _log(f"precomputed {len(qa)} usable (query, answer) pairs")
         if not qa:
