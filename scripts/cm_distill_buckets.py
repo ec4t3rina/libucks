@@ -2,7 +2,10 @@
 bucket that any fixture routes to, saving each to disk.
 
 Resumable: skips buckets whose cartridge already exists, so a sleep/crash just
-requires re-running (it continues where it left off).
+requires re-running (it continues where it left off). A per-epoch checkpoint
+(<bucket_id>.cartridge.ckpt.safetensors) is written during training and removed
+on success, so an MPS wedge leaves at most one lost epoch behind — the final
+.cartridge.safetensors only appears once all epochs completed.
 
 Cartridge saved to: <repo>/.libucks/kv_cache/<bucket_id>.cartridge.safetensors
 
@@ -92,8 +95,11 @@ def main() -> None:
             cart.to(device)
             queries = generate_self_study_queries(verbatim, N_QUERIES, model=None)
             _log(f"[{n}/{len(routed_list)}] {bid[:8]} — distilling ({len(queries)} q, P={PREFIX_LEN}, {EPOCHS}ep) ...")
-            res = trainer.distill_bucket(cart, verbatim, queries, epochs=EPOCHS, lr=LR)
+            ckpt_path = cart_dir / f"{bid}.cartridge.ckpt.safetensors"
+            res = trainer.distill_bucket(cart, verbatim, queries, epochs=EPOCHS, lr=LR,
+                                         checkpoint_path=ckpt_path)
             cart.save(out_path)
+            ckpt_path.unlink(missing_ok=True)
             _log(f"[{n}/{len(routed_list)}] {bid[:8]} — saved. KL {res['init_mean_kl']:.3f}->{res['final_mean_kl']:.3f} "
                  f"({time.time()-t0:.0f}s)")
             done += 1

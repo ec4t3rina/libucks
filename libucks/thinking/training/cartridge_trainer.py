@@ -20,9 +20,11 @@ cache_aug_trainer.py, which validated them on this exact hardware.
 """
 from __future__ import annotations
 
+import faulthandler
 import math
 import random
 import sys
+from pathlib import Path
 from typing import Any, Optional
 
 import torch
@@ -30,6 +32,12 @@ import torch.nn.functional as F
 
 from libucks.cache_augmentation.cartridge import KVPrefixCartridge
 from libucks.thinking.training.losses import distillation_loss
+
+# MPS runs have wedged mid-step inside Metal waitUntilCompleted (CM-A.1 step
+# ~180; CM-A.2 fe7ded0d epoch 1) with no traceback. Each precompute/train
+# iteration re-arms this watchdog; a step stalling past the timeout dumps all
+# thread stacks to stderr every interval instead of hanging silently for hours.
+_STALL_DUMP_SECS = 300
 
 
 def _log(msg: str) -> None:
@@ -217,20 +225,45 @@ class CartridgeTrainer:
         epochs: int = 2,
         lr: float = 1e-2,
         weight_decay: float = 0.0,
+        checkpoint_path: str | Path | None = None,
     ) -> dict[str, Any]:
         """Distill one bucket's cartridge over its self-study queries.
 
         Teacher answers are precomputed ONCE (greedy) and reused across epochs —
         the teacher is frozen+deterministic, so per-epoch regeneration is wasted
         work. Training steps then get teacher logits via a single teacher-forced
-        forward (fast) instead of 48-step greedy generation."""
+        forward (fast) instead of 48-step greedy generation.
+
+        With checkpoint_path set, the cartridge is saved after every epoch, so
+        an MPS wedge loses at most one epoch (plus the final save the caller
+        does), not the whole run."""
         cartridge.train()
         cartridge.to(self.device)
+        try:
+            return self._distill_bucket_inner(
+                cartridge, verbatim, queries,
+                epochs=epochs, lr=lr, weight_decay=weight_decay,
+                checkpoint_path=checkpoint_path,
+            )
+        finally:
+            faulthandler.cancel_dump_traceback_later()
 
+    def _distill_bucket_inner(
+        self,
+        cartridge: KVPrefixCartridge,
+        verbatim: str,
+        queries: list[str],
+        *,
+        epochs: int,
+        lr: float,
+        weight_decay: float,
+        checkpoint_path: str | Path | None,
+    ) -> dict[str, Any]:
         # --- precompute teacher answers once (greedy) ---
         _log(f"precomputing teacher answers for {len(queries)} queries ...")
         qa: list[tuple[str, torch.Tensor]] = []
         for i, q in enumerate(queries):
+            faulthandler.dump_traceback_later(_STALL_DUMP_SECS, repeat=True, exit=False)
             gen = self._teacher_generate(verbatim, q)
             if gen is None:
                 continue
@@ -267,9 +300,15 @@ class CartridgeTrainer:
             random.shuffle(order)
             ep_kls: list[float] = []
             for i, idx in enumerate(order):
+                faulthandler.dump_traceback_later(_STALL_DUMP_SECS, repeat=True, exit=False)
                 q, ans = qa[idx]
                 m = self._step_cached(cartridge, optimizer, scheduler, verbatim, q, ans)
                 ep_kls.append(m["kl"])
+                if self.device.type == "mps" and (i + 1) % 20 == 0:
+                    # Flush the Metal command queue at a controlled point; the
+                    # observed wedge is an unbounded waitUntilCompleted deep in
+                    # a step after long uninterrupted queueing.
+                    torch.mps.synchronize()
                 if (i + 1) % 40 == 0:
                     _log(f"  ep{ep} step {i+1}/{len(order)}: kl={m['kl']:.3f} loss={m['loss']:.3f} lr={m['lr']:.2e}")
             mean_kl = sum(ep_kls) / max(1, len(ep_kls))
@@ -278,6 +317,9 @@ class CartridgeTrainer:
                 first_kls = ep_kls
             last_kls = ep_kls
             _log(f"epoch {ep}: mean_kl={mean_kl:.4f} steps={len(ep_kls)}")
+            if checkpoint_path is not None:
+                cartridge.save(checkpoint_path)
+                _log(f"  checkpoint saved (epoch {ep}) -> {checkpoint_path}")
 
         return {
             "epoch_mean_kl": history,
