@@ -187,10 +187,11 @@ async def serve() -> None:
                     librarians[bucket_id] = lib
                     agent.register_librarian(bucket_id, lib)
 
-                return embedder, strategy, agent, librarians, adapter, translator
+                return (embedder, strategy, agent, librarians, adapter,
+                        translator, chunk_retriever)
 
-            embedder, strategy, agent, librarians, adapter, translator = \
-                await loop.run_in_executor(None, _sync_setup)
+            (embedder, strategy, agent, librarians, adapter, translator,
+             chunk_retriever) = await loop.run_in_executor(None, _sync_setup)
 
             # ------------------------------------------------------------------
             # Startup recovery: replay commits that arrived while server was offline.
@@ -283,6 +284,11 @@ async def serve() -> None:
                 merging_service=merging_svc,
                 embedder=embedder,
                 mitosis_threshold=cfg.routing.mitosis_threshold,
+                # Coherence runs over every bucket every `interval` seconds
+                # forever. Without this the pass re-embeds every chunk in the
+                # repo each tick — measured at a full performance core on a
+                # 159-bucket repo. ChunkRetriever caches by (chunk_id, git_sha).
+                chunk_retriever=chunk_retriever,
             )
             asyncio.ensure_future(health_monitor.run())
 

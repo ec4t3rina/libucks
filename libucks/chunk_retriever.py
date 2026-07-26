@@ -87,6 +87,31 @@ class ChunkRetriever:
         scored = self.score_chunks(bucket_id, query_embedding)
         return scored[0][1] if scored else 0.0
 
+    def embeddings_for(
+        self,
+        bucket_id: str,
+        chunks: List[ChunkMetadata],
+    ) -> Dict[str, np.ndarray]:
+        """Return {chunk_id: embedding} for *chunks*, embedding only what changed.
+
+        Exposes the (chunk_id, git_sha)-keyed cache to callers that want the
+        vectors themselves rather than a query score — HealthMonitor's coherence
+        pass, which previously re-embedded every chunk of every bucket on every
+        300s tick.
+
+        Chunks whose source file is unreadable are ABSENT from the result rather
+        than mapped to a zero vector, because this class is CONTENT-family (see
+        _read_chunk_content above). Callers that need a geometry-style fallback
+        must supply it themselves for the missing ids; HealthMonitor does.
+        """
+        cache = self._get_or_build(bucket_id, chunks)
+        out: Dict[str, np.ndarray] = {}
+        for meta in chunks:
+            entry = cache.get(meta.chunk_id)
+            if entry is not None:
+                out[meta.chunk_id] = entry["embedding"]  # type: ignore[assignment]
+        return out
+
     def _chunks_for_bucket(self, bucket_id: str) -> List[ChunkMetadata]:
         try:
             fm, _ = self._store.read(bucket_id)

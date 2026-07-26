@@ -21,6 +21,7 @@ import structlog
 from libucks.mitosis import _read_chunk_content
 
 if TYPE_CHECKING:
+    from libucks.chunk_retriever import ChunkRetriever
     from libucks.embeddings.embedding_service import EmbeddingService
     from libucks.merging_service import MergingService
     from libucks.mitosis import MitosisService
@@ -42,6 +43,7 @@ class HealthMonitor:
         embedder: "EmbeddingService",
         mitosis_threshold: int = 20_000,
         interval: int = 300,
+        chunk_retriever: Optional["ChunkRetriever"] = None,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -50,6 +52,9 @@ class HealthMonitor:
         self._embedder = embedder
         self._mitosis_threshold = mitosis_threshold
         self._interval = interval
+        # Optional so existing callers and tests keep working; when absent,
+        # _chunk_embeddings falls back to the original uncached embed_batch.
+        self._chunk_retriever = chunk_retriever
 
     async def run(self) -> None:
         """Loop forever, running a health check every *interval* seconds."""
@@ -117,9 +122,8 @@ class HealthMonitor:
         if len(chunks) < 2:
             return 1.0  # a single-chunk bucket is trivially coherent
 
-        contents = [_read_chunk_content(c) for c in chunks]
         try:
-            embeddings = self._embedder.embed_batch(contents)  # (N, D)
+            embeddings = self._chunk_embeddings(bucket_id, chunks)  # (N, D)
         except Exception as exc:
             log.warning("health_monitor.embed_failed", bucket_id=bucket_id, error=str(exc))
             return None
@@ -134,3 +138,43 @@ class HealthMonitor:
             centroid /= c_norm
 
         return float(np.mean(embeddings @ centroid))
+
+    def _chunk_embeddings(self, bucket_id: str, chunks: list) -> np.ndarray:
+        """Return an (N, D) matrix of chunk embeddings, cached where possible.
+
+        This pass runs for every bucket every `interval` seconds forever, so
+        embedding from scratch each time is the dominant cost of a live server:
+        on a 159-bucket repo it held a whole performance core busy indefinitely.
+        ChunkRetriever already keys embeddings by (chunk_id, git_sha), so only
+        genuinely changed chunks are recomputed.
+
+        Chunks the cache omits — ChunkRetriever is CONTENT-family and drops any
+        whose source file is unreadable — are embedded here from the GEOMETRY
+        fallback (the file path), preserving the previous coherence semantics
+        exactly. Dropping them instead would make a bucket of deleted files look
+        perfectly coherent and silently suppress a split it should get.
+        """
+        if self._chunk_retriever is None:
+            return self._embedder.embed_batch([_read_chunk_content(c) for c in chunks])
+
+        try:
+            cached = self._chunk_retriever.embeddings_for(bucket_id, chunks)
+        except Exception as exc:
+            # A corrupt or unreadable cache must not disable the coherence
+            # check — that would silently stop all coherence-driven mitosis
+            # while the size trigger kept working, which looks like "splitting
+            # just stopped happening" and is near-impossible to diagnose.
+            log.warning(
+                "health_monitor.chunk_cache_failed",
+                bucket_id=bucket_id,
+                error=repr(exc),
+                consequence="falling back to uncached embed_batch for this bucket",
+            )
+            return self._embedder.embed_batch([_read_chunk_content(c) for c in chunks])
+        rows = [
+            cached[c.chunk_id]
+            if c.chunk_id in cached
+            else self._embedder.embed(_read_chunk_content(c))
+            for c in chunks
+        ]
+        return np.stack(rows)
