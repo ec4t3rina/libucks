@@ -15,8 +15,63 @@ finding.
 - CM-A.0 — Scaffold + cartridge contract (TDD) — DONE 2026-07-01 (6/6 KVPrefixCartridge contract tests green; module landed)
 - CM-A.1 — Single-bucket distill proof — ⚠ GATE FAIL 2026-07-02 (v1: templated queries, P=64, 2ep → 2/8)
 - CM-A.1-retry — Fact-probing queries + P=128 + 4ep — ✅ GATE PASS 2026-07-02 (**latent-alone 2/8→4/8; KL 0.749→0.219; carries identifiers — "80%", garble, STRANDED. Hypothesis confirmed: query coverage was the bottleneck**)
+- CM-A.2 — All-bucket distill + eval gate — ❌ GATE FAIL 2026-07-07 (latent-alone 7/25 vs gate ≥8, bit-identical across 2 evals; fe7ded0d redistill r6 clean (KL 3.69→2.69) but converts neither of its fixtures; `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` proven causally necessary; decision pending: 512-query retry vs bank negative)
 
 ---
+
+## CM-A.2 — All-bucket distill + eval gate (2026-07-07)
+
+**Status**: ❌ GATE FAIL, reproduced — latent-alone 7/25 vs gate ≥8/25. Decision pending.
+
+**Setup**: all 10 fixture-routed echoswarm buckets distilled (fact-probing self-study,
+N=120 queries, P=128, 4 epochs, lr=1e-2, frozen Qwen2.5-3B/MPS) via
+`scripts/cm_distill_buckets.py` (resumable batch; per-epoch checkpoints). Eval:
+`scripts/cm_eval_cartridge.py`, 25 fixtures, latent-alone (no verbatim).
+
+**The fe7ded0d redistill (6 attempts, Jul 3–7)** — its original cartridge predated the
+`_collect_source_text` truncation fix (30ee434) and was deleted for redistill:
+- r1 hung mid-step early in epoch 1; r2 reached ep1 (KL 3.97→2.84) then wedged in
+  `torch.mps.empty_cache()` mid-ep2 (uninterruptible MPS wait); r3 hung in teacher
+  precompute alongside the zombie r2.
+- r4 (launched WITHOUT `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0`) wedged at the first
+  teacher-generate. A standalone clean-process probe wedged without the env var and
+  passed with it (62 s) → **the env var is causally NECESSARY on this machine for any
+  distill/eval run**. Pressure-sensitive (16 GB RAM), which is why Jul 2–3 runs
+  sometimes passed without it.
+- r5 (env var on) exited cleanly at 01:05 mid-precompute (40/120) — launched
+  non-detached, killed when its parent session closed.
+- r6 (env var on, `nohup caffeinate -dimsu`, detached): **completed** —
+  KL 3.690 → 2.685 (4 ep, one recovered bump at ep2: 2.84→3.08→2.69), 7199 s.
+
+**Result** (eval r2, new fe7ded0d cartridge; eval r1 preserved as
+`tests/eval/results/cm/echoswarm_cartridge_A2_r1_fail7.json`):
+- Latent-alone grounding **7/25** (multi 3/7) — **bit-identical fixture set to eval r1**
+  (which ran with the old broken fe7ded0d cartridge). Stable result, not variance.
+  Gate ≥8/25 → **FAIL**.
+- Refs (eval r1): hybrid 11/25, text_clean 4/25, no_context 3/25,
+  cache_aug_no_verbatim 2/25.
+- The redistilled fe7ded0d is qualitatively better on its two fixtures but converts
+  neither: echoswarm_10 went degenerate loop ("the CER of the CER of…") → fluent
+  three-pillar CERC structure with WRONG expansions ("Crisis, Economic, Reputation"
+  vs FRAMING/CLARITY/CONTENT); echoswarm_16 still misses all 5 highway-class keywords.
+  **Structure, not identifiers** — the CM-A.1-v1 failure mode at bucket scale.
+- No near-misses anywhere: best failed fixtures carry 1 of 3–5 required keywords;
+  10 of 18 carry 0. There is no cheap +1.
+- Honest positive: 7/25 is **+4 over no_context (3/25)** with multi 3/7 — the cartridge
+  channel is *alive*, unlike Phase 4-C cache-aug (2/25, below floor). The fail is
+  "under the strong-win bar", not "inert".
+
+**Anomaly for the decision**: the batch used **N_QUERIES=120**, below the proven
+CM-A.1-retry recipe (**200** queries on bc6b90e2 → 4/8); in this eval bc6b90e2 scores
+2/8 (grading harnesses differ, so directionally suggestive only). The plan
+pre-authorizes scaling self-study to 512–1000 when the gate is borderline —
+one-short-twice qualifies.
+
+**Gate result**: latent-alone ≥8/25; **not met (7/25, twice)**.
+
+**Next**: user decision — bounded query-scale retry (512 queries on the high-miss
+buckets bc6b90e2 / 40615ba9 / 95c8e099, ~4 h/bucket, needs +1 conversion) vs bank as
+second negative result ("3B is the ceiling for latent-alone identifiers").
 
 ## CM-A.1-retry — Fact-probing queries + P=128 + 4 epochs (2026-07-02)
 

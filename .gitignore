@@ -14,3 +14,7 @@ venv/
 # Local secrets — never commit
 .env
 .env.local
+
+# Local training/eval run logs (transient; results snapshot to tests/eval/results/)
+cm_*.log
+.claude/scheduled_tasks.lock
