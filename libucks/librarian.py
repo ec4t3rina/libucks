@@ -9,7 +9,6 @@ Responsibilities per event type:
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 import subprocess
 from datetime import datetime, timezone
@@ -27,6 +26,7 @@ from libucks.models.events import (
     UpdateEvent,
 )
 from libucks.storage.bucket_registry import BucketRegistry
+from libucks.storage.bucket_registry import encode_centroid as _encode_centroid
 from libucks.storage.bucket_store import BucketStore
 from libucks.thinking.base import Representation, ThinkingStrategy
 
@@ -38,12 +38,19 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
-def _encode_centroid(arr: np.ndarray) -> str:
-    return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
-
-
 def _read_chunk_content(meta: ChunkMetadata) -> str:
-    """Read lines [start_line, end_line] from the chunk's source file."""
+    """Read lines [start_line, end_line] from the chunk's source file.
+
+    CONTENT variant — returns "" when the file is unreadable, because this text
+    is shown to a model or a user as source code and a bare path masquerading
+    as file content is a hallucination source. Every caller already skips
+    falsy content.
+
+    Deliberately NOT the same as the GEOMETRY variant in mitosis.py (shared by
+    merging_service and health_monitor), which falls back to the path so that
+    dead chunks do not all collapse onto one degenerate embedding. See
+    tests/unit/test_read_chunk_content_families.py before unifying these.
+    """
     try:
         lines = Path(meta.source_file).read_text(errors="replace").splitlines()
         return "\n".join(lines[meta.start_line - 1 : meta.end_line])

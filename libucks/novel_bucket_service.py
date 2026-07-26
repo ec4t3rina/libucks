@@ -17,7 +17,6 @@ enqueue is a no-op.
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -28,6 +27,7 @@ import structlog
 from libucks.models.chunk import ChunkMetadata
 from libucks.models.events import CreateBucketEvent
 from libucks.storage.bucket_registry import BucketRegistry
+from libucks.storage.bucket_registry import encode_centroid as _encode_centroid
 from libucks.storage.bucket_store import BucketStore
 
 if TYPE_CHECKING:
@@ -41,10 +41,6 @@ log = structlog.get_logger(__name__)
 # Matches init_orchestrator: 0.8 chunk centroid + 0.2 title embedding.
 _TITLE_BLEND_ALPHA = 0.2
 _TOKENS_PER_CHAR = 0.25
-
-
-def _encode_centroid(arr: np.ndarray) -> str:
-    return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
 
 
 def _rough_tokens(text: str) -> int:

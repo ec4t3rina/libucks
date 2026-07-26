@@ -20,14 +20,29 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import structlog
 import torch
 
 from libucks.embeddings.embedding_service import EmbeddingService
 from libucks.models.chunk import ChunkMetadata
 from libucks.storage.bucket_store import BucketStore
 
+log = structlog.get_logger(__name__)
+
 
 def _read_chunk_content(meta: ChunkMetadata) -> str:
+    """Read lines [start_line, end_line] from the chunk's source file.
+
+    CONTENT variant — returns "" when the file is unreadable, because this text
+    is shown to a model or a user as source code and a bare path masquerading
+    as file content is a hallucination source. Every caller already skips
+    falsy content.
+
+    Deliberately NOT the same as the GEOMETRY variant in mitosis.py (shared by
+    merging_service and health_monitor), which falls back to the path so that
+    dead chunks do not all collapse onto one degenerate embedding. See
+    tests/unit/test_read_chunk_content_families.py before unifying these.
+    """
     try:
         lines = Path(meta.source_file).read_text(errors="replace").splitlines()
         return "\n".join(lines[meta.start_line - 1 : meta.end_line])
@@ -119,7 +134,17 @@ class ChunkRetriever:
             return {}
         try:
             return torch.load(path, weights_only=False)
-        except Exception:
+        except Exception as exc:
+            # Self-healing: an empty dict makes the caller re-embed every chunk
+            # and overwrite the file. Correct, but silently expensive — a
+            # permanently corrupt cache re-embeds the whole bucket on every
+            # single query with no outward sign except latency.
+            log.warning(
+                "chunk_retriever.cache_unreadable",
+                path=str(path),
+                error=repr(exc),
+                consequence="re-embedding every chunk in this bucket",
+            )
             return {}
 
     def _save_to_disk(self, bucket_id: str, cached: Dict[str, Dict[str, object]]) -> None:

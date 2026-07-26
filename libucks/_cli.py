@@ -1682,11 +1682,19 @@ async def _regenerate_qa_cache(repo_path: Path, *, qa_per_bucket: int, no_teache
 
         async def _fetch_qa(bucket_id: str):
             front_matter, prose = store.read(bucket_id)
-            # max_chars=4096: _collect_source_text breaks (returns "") when the
-            # first chunk exceeds max_chars instead of truncating it. Markdown
-            # chunks routinely run 3-4KB; with max_chars=1024 the entire bucket
-            # source falls back to its domain_label, ruining teacher Q&A on
-            # ~25% of buckets. 4096 fits the typical first chunk.
+            # max_chars=4096 so the teacher sees a whole typical bucket
+            # (echoswarm averages ~4,126 chars). This value was raised from
+            # 1024 back when _collect_source_text returned "" outright if the
+            # first chunk overflowed max_chars, which made the entire bucket
+            # fall back to its domain_label on ~25% of buckets. That overflow
+            # bug is fixed (data_generator.py:52 now slices), so 1024 no longer
+            # blanks the source — it just truncates it to a quarter.
+            #
+            # KNOWN DIVERGENCE: the three sibling call sites (:684, :742, and
+            # :1730 in this file's own --no-teacher branch) were never raised
+            # and still pass 1024. See docs/cm-b-plan.md before changing them:
+            # they feed LoRA receiver training, so touching them invalidates
+            # comparisons against existing lora_receiver.pt checkpoints.
             source_text = _collect_source_text(front_matter, max_chars=4096) or prose or front_matter.domain_label
             fallback_q = PERSPECTIVE_PROMPTS[0]
             fallback_a = source_text or ""

@@ -141,6 +141,29 @@ fact-probing vs templated queries. Raising coverage at the same time would chang
 things at once and make the result uninterpretable. Fix it for the full ten-bucket
 re-distill, where it becomes a clean second improvement.
 
+**Teacher Q&A sees only 1024 chars in three of four call sites.** `_cli.py` has
+four sibling calls that build the source text handed to the Anthropic teacher.
+One (`:1690`, in `generate-qa`) was raised to `max_chars=4096` with a comment
+explaining why 1024 was wrong. The other three — `:684` and `:742` in
+`train-adapter`, and `:1730`, the `--no-teacher` branch of `generate-qa` itself
+— were never updated and still pass 1024. Echoswarm buckets average ~4,126
+chars, so those paths see roughly a quarter of each bucket.
+
+The `--no-teacher` branches are the worse case: they store the truncated text
+*as the training target* (`"pairs": [[PERSPECTIVE_PROMPTS[0], src]]`), so the
+LoRA receiver is trained to reproduce a quarter-bucket.
+
+*Not fixed.* `train-adapter` produces `lora_receiver.pt`, which the hybrid path
+— the Phase 4-A headline of 19.5 ± 1.7/30 — depends on. Changing its training
+inputs invalidates comparisons against every existing checkpoint, so this is a
+deliberate decision to make with a re-train, not a drive-by edit. The
+divergence is now flagged in-place at `_cli.py:1690`.
+
+Note the original justification is itself stale: the comment describes
+`_collect_source_text` returning `""` outright on overflow, which was fixed on
+2026-07-03 (it now slices). The failure mode changed from "blanks ~25% of
+buckets" to "truncates all of them".
+
 **Three fixtures route within 0.01 of a tie.** Fixture→bucket routing is top-1 cosine over
 centroids. It is deterministic within a run and verified byte-identical to CM-A.2's stored
 routing (0 of 25 changed), so the 5/13 spot-check baseline is valid. But 3 of 25 fixtures

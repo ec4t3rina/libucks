@@ -36,6 +36,22 @@ class ModelConfig:
     device: str = "auto"
     strategy: str = "latent"
     compression_steps: int = 8
+    """INERT — currently has no effect on any code path.
+
+    `LatentCompressor` (thinking/compressor.py) is fully implemented and
+    trainable via `ContrastiveAdapterTrainer.train_compressor_step`, and
+    `LatentStrategy` will use one if given (`latent_strategy.py:218`) — but
+    nothing in production ever constructs one. `thinking/__init__.py:20` builds
+    `LatentStrategy(mgr)` with no compressor, so this value is read by nobody.
+
+    Do NOT "fix" this by wiring a fresh LatentCompressor in: its query vectors
+    are random at init, and injecting an untrained cross-attention bottleneck
+    into the live latent path would corrupt every Representation. It would need
+    a trained, persisted checkpoint first — there is no save/load path for one.
+
+    Kept because the Phase 11 module and its tests are intact and the feature
+    may be revived. Documented as dormant rather than deleted."""
+
     base_model_dtype: str = "float16"
     """Storage dtype for the Base receiver on MPS. float16 is fine for ~0.5B
     models; bigger models (1.5B+) may overflow fp16 and produce NaN losses

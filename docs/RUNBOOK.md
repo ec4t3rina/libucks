@@ -2,7 +2,15 @@
 
 This runbook walks you through transitioning a V1 (text-based) libucks installation to the V2 Latent Space architecture and starting the live engine.
 
-**What changes in V2.** Librarians no longer return natural-language strings. They return raw `torch.Tensor` hidden states from a local Qwen2.5-3B model. These tensors are merged by the `CommunicationAdapter` and compressed by the `LatentCompressor` before the Translator decodes them into a final answer. The Anthropic API is still used as the V1 teacher during adapter training, but is no longer required for live inference.
+**What changes in V2.** Librarians no longer return natural-language strings. They return raw `torch.Tensor` hidden states from a local Qwen2.5-3B model. These tensors are merged by the `CommunicationAdapter` before the Translator decodes them into a final answer. The Anthropic API is still used as the V1 teacher during adapter training, but is no longer required for live inference.
+
+> **Freshness.** This runbook was written for the V2 bring-up (April 2026) and
+> describes setup and querying, which are still accurate. It predates the
+> git-hook update pipeline — `libucks serve` no longer starts WatchdogService;
+> updates arrive via `libucks install-hooks` → post-commit → Unix socket →
+> `StartupRecovery`. See CLAUDE.md and ARCHITECTURE.md for the current design.
+> It also predates the entire Cartridge Memory track (`docs/cartridges-plan.md`,
+> `docs/cm-b-plan.md`).
 
 ---
 
@@ -70,9 +78,17 @@ strategy       = "latent"       # activates V2 — set to "text" to revert to V1
 device         = "mps"          # "mps" for Apple Silicon | "cuda" | "cpu"
 quantization   = "none"         # "none" | "4bit" | "8bit"  (4bit saves ~3 GB VRAM)
 
-# Latent compressor: squashes (L, 2048) → (8, 2048) before the adapter
-compression_steps = 8           # set to 0 to disable compression
+# Latent compressor: INERT — see the note below. Setting this does nothing.
+compression_steps = 8
 ```
+
+> **`compression_steps` currently has no effect.** `LatentCompressor` is
+> implemented and unit-tested, and `LatentStrategy` will use one if given, but
+> nothing in production constructs one — `thinking/__init__.py:20` builds
+> `LatentStrategy(mgr)` with no compressor. The knob is read by nobody. It is
+> documented here as dormant rather than removed because the Phase 11 module is
+> intact and may be revived; reviving it needs a *trained*, persisted
+> compressor checkpoint, which does not exist yet.
 
 **Device reference:**
 
@@ -311,4 +327,4 @@ Or watch stderr if running in the foreground — all Librarian reasoning happens
 | Slow first query (~30–60s) | Model loading + initial KV cache warm-up | Normal — subsequent queries are faster |
 | MCP Inspector "Request timed out" | 60s UI timeout exceeded by serial Qwen inference | Use `libucks query "..."` from the terminal instead — no timeout |
 | `.libucks/adapter.pt` not found | Training hasn't been run yet | Run `libucks train-adapter --creative` |
-| OOM on MPS | Unified memory pressure from other processes | Set `quantization = "4bit"` or reduce `compression_steps = 4` |
+| OOM on MPS | Unified memory pressure from other processes | Export `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` **before** torch is imported, or set `quantization = "4bit"`. Do **not** bother with `compression_steps` — it is inert (see §2). |

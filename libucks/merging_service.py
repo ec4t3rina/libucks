@@ -14,7 +14,6 @@ Merge protocol:
 """
 from __future__ import annotations
 
-import base64
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, List, Optional, Set
 
@@ -22,6 +21,7 @@ import numpy as np
 import structlog
 
 from libucks.mitosis import _read_chunk_content
+from libucks.storage.bucket_registry import encode_centroid as _encode_centroid
 
 if TYPE_CHECKING:
     from libucks.central_agent import CentralAgent
@@ -34,11 +34,18 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 MERGE_SIMILARITY: float = 0.82
+
+# The merge limit is DERIVED from mitosis_threshold, never hardcoded, so that a
+# merge can never produce a bucket the next HealthMonitor pass immediately
+# size-splits. That would cycle forever: MergingService's anti-cycle cooldown
+# stores the pre-merge bucket IDs, but MitosisService mints new sha1 child IDs
+# (mitosis._child_id), so the children fall outside the cooldown and re-merge.
+# 0.75 * the 20_000 default reproduces the historical 15_000 exactly.
+MERGE_TOKEN_RATIO: float = 0.75
 MERGE_TOKEN_LIMIT: int = 15_000
-
-
-def _encode_centroid(arr: np.ndarray) -> str:
-    return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
+"""Default merge limit (= MERGE_TOKEN_RATIO * the default 20_000 mitosis
+threshold). Kept for reference and back-compat; the live value is the
+per-instance MergingService._merge_token_limit."""
 
 
 class MergingService:
@@ -50,6 +57,7 @@ class MergingService:
         embedder: "EmbeddingService",
         strategy: "ThinkingStrategy",
         translator: "Translator | None" = None,
+        mitosis_threshold: int = 20_000,
     ) -> None:
         self._registry = registry
         self._store = store
@@ -57,6 +65,10 @@ class MergingService:
         self._embedder = embedder
         self._strategy = strategy
         self._translator = translator
+        # Derived, not hardcoded — see MERGE_TOKEN_RATIO. Must stay strictly
+        # below mitosis_threshold or merge and mitosis fight each other every
+        # 5 minutes (tests/unit/test_merge_split_invariant.py).
+        self._merge_token_limit = int(mitosis_threshold * MERGE_TOKEN_RATIO)
 
     # ------------------------------------------------------------------
     # Public
@@ -97,7 +109,7 @@ class MergingService:
             combined = self._registry.get_token_count(a) + self._registry.get_token_count(b)
         except KeyError:
             return False
-        return combined < MERGE_TOKEN_LIMIT
+        return combined < self._merge_token_limit
 
     def _recent_merged_ids(self) -> Set[str]:
         """Return bucket IDs involved in any merge within the last hour."""
@@ -113,8 +125,15 @@ class MergingService:
                 if merged_at > cutoff:
                     for bid in entry.get("merged_bucket_ids", []):
                         result.add(bid)
-            except Exception:
-                pass
+            except Exception as exc:
+                # An unparseable entry drops out of the cooldown set, so the
+                # buckets it names become immediately re-mergeable.
+                log.warning(
+                    "merging.history_entry_unreadable",
+                    entry=repr(entry)[:120],
+                    error=repr(exc),
+                    consequence="those buckets lose their 1-hour merge cooldown",
+                )
         return result
 
     async def _merge(self, a: str, b: str) -> None:
@@ -215,6 +234,13 @@ class MergingService:
                     merged_at = merged_at.replace(tzinfo=timezone.utc)
                 if merged_at > cutoff:
                     kept.append(entry)
-            except Exception:
-                pass
+            except Exception as exc:
+                # `kept` is written back over merge_history, so an entry that
+                # fails to parse here is deleted permanently, not just skipped.
+                log.warning(
+                    "merging.history_entry_dropped",
+                    entry=repr(entry)[:120],
+                    error=repr(exc),
+                    consequence="entry permanently removed from merge_history",
+                )
         self._registry._meta["merge_history"] = kept

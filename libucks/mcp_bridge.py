@@ -272,6 +272,9 @@ async def serve() -> None:
                 agent=agent,
                 embedder=embedder,
                 strategy=strategy,
+                # Keeps the merge limit strictly below the split threshold, so
+                # merge and mitosis cannot fight each other every 5 minutes.
+                mitosis_threshold=cfg.routing.mitosis_threshold,
             )
             health_monitor = HealthMonitor(
                 registry=registry,

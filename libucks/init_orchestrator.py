@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
 import random
 import struct
@@ -19,6 +18,7 @@ from libucks.parsing.aspect_mapper import AspectMapper
 from libucks.parsing.ast_parser import ASTParser
 from libucks.parsing.grammar_registry import SUPPORTED_LANGUAGES
 from libucks.storage.bucket_registry import BucketRegistry
+from libucks.storage.bucket_registry import encode_centroid as _encode_centroid
 from libucks.storage.bucket_store import BucketStore
 from libucks.thinking.base import ThinkingStrategy
 from libucks.thinking.context_condenser import ContextCondenser
@@ -67,10 +67,6 @@ _RETRY_BASE_DELAY = 2.0  # seconds; doubles each attempt + jitter
 
 def _rough_tokens(text: str) -> int:
     return max(1, int(len(text) * _TOKENS_PER_CHAR))
-
-
-def _encode_centroid(arr: np.ndarray) -> str:
-    return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
 
 
 def _chunk_id(raw: RawChunk) -> str:

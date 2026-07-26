@@ -13,7 +13,6 @@ Invariant: len(child_A.chunks) + len(child_B.chunks) == len(parent.chunks).
 """
 from __future__ import annotations
 
-import base64
 import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING, List
@@ -24,6 +23,7 @@ from sklearn.cluster import KMeans  # type: ignore[import-untyped]
 
 from libucks.models.chunk import ChunkMetadata
 from libucks.storage.bucket_registry import BucketRegistry
+from libucks.storage.bucket_registry import encode_centroid as _encode_centroid
 from libucks.storage.bucket_store import BucketStore
 
 if TYPE_CHECKING:
@@ -36,21 +36,32 @@ if TYPE_CHECKING:
 log = structlog.get_logger(__name__)
 
 
-def _encode_centroid(arr: np.ndarray) -> str:
-    return base64.b64encode(arr.astype(np.float32).tobytes()).decode()
-
-
 def _child_id(parent_id: str, label: int) -> str:
     raw = f"{parent_id}:child{label}"
     return hashlib.sha1(raw.encode()).hexdigest()[:8]
 
 
 def _read_chunk_content(meta: ChunkMetadata) -> str:
+    """Read lines [start_line, end_line] from the chunk's source file.
+
+    GEOMETRY variant — shared with merging_service and health_monitor, which
+    import this exact function. Output goes straight to `embed_batch` to build
+    centroids, k-means clusters and coherence scores.
+
+    The path fallback is deliberate and must NOT be "cleaned up" to match the
+    three CONTENT-family copies in librarian/chunk_retriever/data_generator,
+    which return "". Embedding "" is degenerate: every chunk whose source file
+    was deleted would land on the identical vector, dragging the bucket
+    centroid somewhere meaningless and corrupting split/merge decisions. The
+    path at least carries directory and filename signal.
+
+    Pinned by tests/unit/test_read_chunk_content_families.py.
+    """
     try:
         lines = Path(meta.source_file).read_text(errors="replace").splitlines()
         return "\n".join(lines[meta.start_line - 1 : meta.end_line])
     except OSError:
-        return meta.source_file  # fallback: just use filename as content
+        return meta.source_file
 
 
 class MitosisService:

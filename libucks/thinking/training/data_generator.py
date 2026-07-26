@@ -30,7 +30,18 @@ import torch
 
 
 def _read_chunk_content(meta) -> str:
-    """Read lines [start_line, end_line] from the chunk's source file."""
+    """Read lines [start_line, end_line] from the chunk's source file.
+
+    CONTENT variant — returns "" when the file is unreadable, because this text
+    is shown to a model or a user as source code and a bare path masquerading
+    as file content is a hallucination source. Every caller already skips
+    falsy content.
+
+    Deliberately NOT the same as the GEOMETRY variant in mitosis.py (shared by
+    merging_service and health_monitor), which falls back to the path so that
+    dead chunks do not all collapse onto one degenerate embedding. See
+    tests/unit/test_read_chunk_content_families.py before unifying these.
+    """
     try:
         lines = Path(meta.source_file).read_text(errors="replace").splitlines()
         return "\n".join(lines[meta.start_line - 1 : meta.end_line])

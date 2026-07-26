@@ -44,14 +44,28 @@ class _BucketEntry:
         self.last_query_hit_at: Optional[str] = None
 
 
-def _encode_centroid(centroid: np.ndarray) -> str:
+def encode_centroid(centroid: np.ndarray) -> str:
+    """Serialise a centroid to the registry's base64 float32 wire format.
+
+    THE single encoder. Five other modules (librarian, mitosis, merging_service,
+    init_orchestrator, novel_bucket_service) used to carry byte-identical private
+    copies while decode_centroid lived only here — five writers of a format one
+    reader owned. Import this instead of re-implementing it; the pairing is
+    enforced by tests/unit/test_centroid_codec.py.
+    """
     return base64.b64encode(centroid.astype(np.float32).tobytes()).decode()
 
 
-def _decode_centroid(encoded: str) -> np.ndarray:
+def decode_centroid(encoded: str) -> np.ndarray:
+    """Inverse of encode_centroid."""
     raw = base64.b64decode(encoded)
     n = len(raw) // 4
     return np.array(struct.unpack(f"{n}f", raw), dtype=np.float32)
+
+
+# Back-compat aliases for this module's existing internal call sites.
+_encode_centroid = encode_centroid
+_decode_centroid = decode_centroid
 
 
 class BucketRegistry:
