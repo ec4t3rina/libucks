@@ -4,17 +4,29 @@ For each fixture: route to its bucket, load that bucket's distilled cartridge,
 generate an answer from the LATENT ALONE (no verbatim), score keyword grounding.
 Reports the CM-A.2 gate number: cartridge latent-alone grounding /25.
 
-Reference baselines (from docs/archive/phase-4c fairness eval):
-  hybrid 11/25 · text_clean 4/25 · no_context 3/25 · cache_aug_no_verbatim 2/25
+Reference baselines (Phase 4-C fairness eval, re-scored under CM-B.0a):
+  hybrid 11/25 · text_clean 4/25 · no_context 3/25 · cache_aug_no_verbatim 3/25
 Gate: cartridge latent-alone >= 8/25 (= no_context 3 + 5).
 
+WARNING — those baselines ran on a 0.5B receiver (echoswarm has no
+.libucks/config.toml, so Config falls back to the 0.5B default) while this script
+hardcodes 3B below. Cartridge-vs-baseline is therefore CROSS-MODEL and must not be
+quoted as a comparison until a 3B no_context/text_clean baseline exists.
+
 Run: uv run python scripts/cm_eval_cartridge.py
+     uv run python scripts/cm_eval_cartridge.py --buckets bc6b90e2,40615ba9,fe7ded0d
 """
 from __future__ import annotations
 
+import argparse
 import json
+import os
 import sys
 from pathlib import Path
+
+# MUST precede the torch import. Proven causally necessary for any distill/eval
+# run on this machine (CM-A.2 r4 wedged without it; a clean probe passed with it).
+os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
 
 import numpy as np
 import torch
@@ -23,6 +35,7 @@ from libucks.config import Config
 from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
 from libucks.embeddings.embedding_service import EmbeddingService
+from libucks.eval_metrics import grounding_score
 from libucks.cache_augmentation.cartridge import KVPrefixCartridge
 from libucks.thinking.training.cartridge_trainer import CartridgeTrainer
 
@@ -38,13 +51,25 @@ def _log(m: str) -> None:
 
 
 def _grounded(answer: str, keywords: list[str]) -> bool:
-    if not keywords:
-        return False
-    a = answer.lower()
-    return sum(1 for kw in keywords if kw.lower() in a) >= len(keywords) / 2.0
+    """Shared CM-B.0a metric — do NOT reintroduce a local substring copy here.
+
+    This script used to carry its own plain-substring scorer, which is the metric
+    that under-counted CM-A.2 by 3 fixtures (7/25 -> 10/25 once corrected). Any
+    number produced with a local copy is not comparable to the logged results.
+    """
+    return grounding_score(answer, keywords)
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--buckets",
+        default="",
+        help="comma-separated bucket id prefixes; evaluate only fixtures routing to these",
+    )
+    ap.add_argument("--tag", default="", help="suffix for the results filename")
+    args = ap.parse_args()
+
     cfg = Config.load(REPO)
     libucks_dir = REPO / ".libucks"
     cart_dir = libucks_dir / "kv_cache"
@@ -57,6 +82,18 @@ def main() -> None:
     centroids = registry.get_all_centroids()
     bids = list(centroids.keys())
     mat = np.stack([centroids[b] for b in bids])
+
+    if args.buckets:
+        want = {b.strip() for b in args.buckets.split(",") if b.strip()}
+        kept = []
+        for fx in fixtures:
+            bid = bids[int((mat @ embedder.embed(fx["question"])).argmax())]
+            if any(bid.startswith(w) for w in want):
+                kept.append(fx)
+        if not kept:
+            sys.exit(f"[cm_eval] --buckets matched no fixtures: {sorted(want)}")
+        _log(f"restricted to {len(kept)}/{len(fixtures)} fixtures routing to {sorted(want)}")
+        fixtures = kept
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
@@ -101,20 +138,31 @@ def main() -> None:
         multi_grounded += int(g and is_multi)
         rows.append({"id": fx["id"], "bucket": bid[:8], "grounded": g,
                      "multi": is_multi, "kw": fx["answer_keywords"], "answer": ans})
-        _log(f"[{i:2d}/25] {fx['id']} b={bid[:8]} grounded={g} :: {ans[:90]!r}")
+        _log(f"[{i:2d}/{len(fixtures)}] {fx['id']} b={bid[:8]} grounded={g} :: {ans[:90]!r}")
 
     n = len(fixtures)
-    _log("================ CM-A.2 CARTRIDGE EVAL ================")
+    _log("================ CARTRIDGE EVAL ================")
     _log(f"cartridge latent-alone grounding: {grounded}/{n}  (multi {multi_grounded}/{multi_total})")
     _log(f"missing cartridges (ungrounded): {missing}")
-    _log("reference: hybrid 11/25 · text_clean 4/25 · no_context 3/25 · cache_aug_no_verbatim 2/25")
-    _log(f"GATE (cartridge latent-alone >= 8/25): {'PASS' if grounded >= 8 else 'FAIL'}")
+    if args.buckets:
+        # Subset run: the /25 gate does not apply. CM-A.2's score on the three
+        # CM-B.0b spot-check buckets was 2/13 raw, 5/13 under the CM-B.0a metric.
+        _log("SUBSET RUN — the >=8/25 gate does not apply.")
+        _log("CM-A.2 baseline on these fixtures: 2/13 old metric, 5/13 CM-B.0a metric")
+        _log(f"CM-B.0b bar (>= 5/13 is neutral, > 5/13 is improvement): {grounded}/{n}")
+    else:
+        _log("reference (0.5B receiver — CROSS-MODEL, not a valid comparison): "
+             "hybrid 11/25 · text_clean 4/25 · no_context 3/25 · cache_aug_no_verbatim 3/25")
+        _log(f"GATE (cartridge latent-alone >= 8/25): {'PASS' if grounded >= 8 else 'FAIL'}")
 
     RESULTS.mkdir(parents=True, exist_ok=True)
-    (RESULTS / "echoswarm_cartridge_A2.json").write_text(json.dumps(
+    name = f"echoswarm_cartridge_A2{('_' + args.tag) if args.tag else ''}.json"
+    (RESULTS / name).write_text(json.dumps(
         {"grounding": grounded, "n": n, "multi_grounding": multi_grounded,
-         "multi_total": multi_total, "missing": missing, "per_question": rows}, indent=2))
-    _log(f"wrote {RESULTS / 'echoswarm_cartridge_A2.json'}")
+         "multi_total": multi_total, "missing": missing,
+         "buckets_filter": args.buckets or None, "metric": "cm-b.0a",
+         "per_question": rows}, indent=2))
+    _log(f"wrote {RESULTS / name}")
 
 
 if __name__ == "__main__":
