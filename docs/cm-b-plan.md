@@ -127,6 +127,27 @@ compose when buckets merge? Merge is the hard one — CAS shows naive concatenat
 collapses to near-chance, which is very likely what CM-A.2's multi-bucket top-k concat
 (`cartridges-plan.md:106`) was also hitting.
 
+## Known measurement fragilities
+
+Found in the CM-B.0b bug sweep. Neither is fixed, both are deliberate deferrals.
+
+**Self-study covers only 73% of each bucket.** `_model_queries` caps its context at
+`bucket_text[:3000]` (`self_study.py:98`) while echoswarm buckets are ~4,126 chars — so
+roughly 27% of every bucket has no training question written about it. CM-A.1's finding
+was literally "query coverage was the bottleneck", so this is on the critical path.
+
+*Not fixed mid-run on purpose.* The Stage 0b run is testing exactly one variable —
+fact-probing vs templated queries. Raising coverage at the same time would change two
+things at once and make the result uninterpretable. Fix it for the full ten-bucket
+re-distill, where it becomes a clean second improvement.
+
+**Three fixtures route within 0.01 of a tie.** Fixture→bucket routing is top-1 cosine over
+centroids. It is deterministic within a run and verified byte-identical to CM-A.2's stored
+routing (0 of 25 changed), so the 5/13 spot-check baseline is valid. But 3 of 25 fixtures
+have a top1–top2 margin below 0.01, so any centroid recomputation, mitosis/merge, or
+embedding-model change can silently flip which cartridge they are scored against. Before
+trusting any future cross-run comparison, re-run the routing-stability check.
+
 ## House rules
 
 Tests first, watch them fail, then implement. No advancing on a red gate. Every stage's
