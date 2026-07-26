@@ -21,6 +21,7 @@ cache_aug_trainer.py, which validated them on this exact hardware.
 from __future__ import annotations
 
 import faulthandler
+import json
 import math
 import random
 import sys
@@ -234,9 +235,16 @@ class CartridgeTrainer:
         work. Training steps then get teacher logits via a single teacher-forced
         forward (fast) instead of 48-step greedy generation.
 
-        With checkpoint_path set, the cartridge is saved after every epoch, so
-        an MPS wedge loses at most one epoch (plus the final save the caller
-        does), not the whole run."""
+        With checkpoint_path set, the cartridge is saved after every epoch and a
+        `<checkpoint_path>.json` sidecar records how many epochs it contains, so
+        an MPS wedge loses at most one epoch rather than the whole bucket.
+
+        Resuming is the CALLER's job: load the checkpoint into the cartridge and
+        pass the remaining epoch count. See `scripts/cm_distill_buckets.py`.
+        Until CM-B.0b nothing ever read the checkpoint back, so the guarantee in
+        this docstring was not actually delivered — a wedge cost the full ~2 h
+        bucket. Note that a resumed run's `init_mean_kl` is the first RESUMED
+        epoch, not the true pre-training value."""
         cartridge.train()
         cartridge.to(self.device)
         try:
@@ -319,7 +327,15 @@ class CartridgeTrainer:
             _log(f"epoch {ep}: mean_kl={mean_kl:.4f} steps={len(ep_kls)}")
             if checkpoint_path is not None:
                 cartridge.save(checkpoint_path)
-                _log(f"  checkpoint saved (epoch {ep}) -> {checkpoint_path}")
+                # Sidecar records how many epochs the checkpoint actually
+                # contains. Without it a resume cannot know how many remain and
+                # would silently re-run all of them — which is why the
+                # checkpoint was write-only and the "loses at most one epoch"
+                # claim was false until CM-B.0b.
+                Path(str(checkpoint_path) + ".json").write_text(
+                    json.dumps({"epochs_done": ep + 1, "mean_kl": mean_kl})
+                )
+                _log(f"  checkpoint saved (epoch {ep}, {ep + 1} done) -> {checkpoint_path}")
 
         return {
             "epoch_mean_kl": history,

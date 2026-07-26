@@ -25,3 +25,6 @@ mps_bitsandbytes-0.7.0.tar.gz
 
 # Stale Claude worktree checkouts (were committed as orphaned gitlinks; safe to rm -rf)
 .claude/worktrees/
+
+# Local run logs (kept out of git; cm_*.log already covered above)
+logs/

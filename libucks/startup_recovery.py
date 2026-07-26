@@ -63,8 +63,10 @@ def _git_rev_parse_head(repo_path: Path) -> Optional[str]:
         )
         if result.returncode == 0:
             return result.stdout.strip()
-    except Exception:
-        pass
+        log.warning("git_rev_parse_head_failed", repo=str(repo_path),
+                    returncode=result.returncode, stderr=result.stderr.strip()[:200])
+    except Exception as exc:
+        log.warning("git_rev_parse_head_errored", repo=str(repo_path), error=repr(exc))
     return None
 
 
@@ -85,8 +87,10 @@ def _git_show_toplevel(repo_path: Path) -> Optional[Path]:
         )
         if result.returncode == 0:
             return Path(result.stdout.strip())
-    except Exception:
-        pass
+        log.warning("git_show_toplevel_failed", repo=str(repo_path),
+                    returncode=result.returncode, stderr=result.stderr.strip()[:200])
+    except Exception as exc:
+        log.warning("git_show_toplevel_errored", repo=str(repo_path), error=repr(exc))
     return None
 
 
@@ -101,8 +105,20 @@ def _git_diff_name_only(repo_path: Path, from_sha: str, to_sha: str) -> List[str
         )
         if result.returncode == 0:
             return [f for f in result.stdout.strip().splitlines() if f]
-    except Exception:
-        pass
+        log.warning(
+            "git_diff_failed",
+            from_sha=from_sha, to_sha=to_sha, returncode=result.returncode,
+            stderr=result.stderr.strip()[:200],
+            consequence="treated as no-changes; bucket updates will be SKIPPED",
+        )
+    except Exception as exc:
+        # Returning [] here is indistinguishable from "no files changed", so a
+        # silent failure means the whole update pipeline quietly does nothing.
+        log.warning(
+            "git_diff_errored",
+            from_sha=from_sha, to_sha=to_sha, error=repr(exc),
+            consequence="treated as no-changes; bucket updates will be SKIPPED",
+        )
     return []
 
 

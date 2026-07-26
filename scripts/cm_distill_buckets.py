@@ -194,17 +194,54 @@ def main() -> None:
         try:
             t0 = time.time()
             cart = KVPrefixCartridge.for_model(model, prefix_len=PREFIX_LEN, dtype=torch.float32)
-            cart.init_from_extracted_kv(extract_bucket_kv(model, tok, verbatim, max_tokens=1024))
-            cart.to(device)
-            queries = queries_by_bucket[bid]
-            _log(f"[{n}/{len(todo)}] {bid[:8]} — distilling ({len(queries)} q, P={PREFIX_LEN}, {EPOCHS}ep) ...")
             ckpt_path = cart_dir / f"{bid}.cartridge.ckpt.safetensors"
-            res = trainer.distill_bucket(cart, verbatim, queries, epochs=EPOCHS, lr=LR,
+            side_path = Path(str(ckpt_path) + ".json")
+
+            # Resume from a wedged run's per-epoch checkpoint. Before CM-B.0b the
+            # checkpoint was written but never read, so a wedge cost the whole
+            # ~2 h bucket instead of one epoch.
+            epochs_done = 0
+            if ckpt_path.exists() and side_path.exists():
+                try:
+                    epochs_done = int(json.loads(side_path.read_text())["epochs_done"])
+                    cart.load(ckpt_path)   # validates geometry; raises on mismatch
+                    _log(f"[{n}/{len(todo)}] {bid[:8]} — RESUMING from checkpoint "
+                         f"({epochs_done}/{EPOCHS} epochs already done)")
+                except Exception as exc:
+                    _log(f"[{n}/{len(todo)}] {bid[:8]} — checkpoint unusable ({exc!r}); "
+                         "starting from warm-start init")
+                    epochs_done = 0
+                    cart = KVPrefixCartridge.for_model(model, prefix_len=PREFIX_LEN,
+                                                       dtype=torch.float32)
+
+            if epochs_done == 0:
+                cart.init_from_extracted_kv(
+                    extract_bucket_kv(model, tok, verbatim, max_tokens=1024)
+                )
+            cart.to(device)
+
+            remaining = EPOCHS - epochs_done
+            if remaining <= 0:
+                _log(f"[{n}/{len(todo)}] {bid[:8]} — checkpoint already has all "
+                     f"{EPOCHS} epochs; saving as final")
+                cart.save(out_path)
+                ckpt_path.unlink(missing_ok=True)
+                side_path.unlink(missing_ok=True)
+                done += 1
+                continue
+
+            queries = queries_by_bucket[bid]
+            _log(f"[{n}/{len(todo)}] {bid[:8]} — distilling ({len(queries)} q, "
+                 f"P={PREFIX_LEN}, {remaining}ep{f' of {EPOCHS}, resumed' if epochs_done else ''}) ...")
+            res = trainer.distill_bucket(cart, verbatim, queries, epochs=remaining, lr=LR,
                                          checkpoint_path=ckpt_path)
             cart.save(out_path)
             ckpt_path.unlink(missing_ok=True)
+            side_path.unlink(missing_ok=True)
+            resumed = " (RESUMED — init_mean_kl is the first resumed epoch, "
+            resumed += "not the true pre-training value)" if epochs_done else ""
             _log(f"[{n}/{len(todo)}] {bid[:8]} — saved. KL {res['init_mean_kl']:.3f}->{res['final_mean_kl']:.3f} "
-                 f"({time.time()-t0:.0f}s)")
+                 f"({time.time()-t0:.0f}s){resumed if epochs_done else ''}")
             done += 1
         except Exception as exc:
             _log(f"[{n}/{len(todo)}] {bid[:8]} — FAILED: {exc!r}")
