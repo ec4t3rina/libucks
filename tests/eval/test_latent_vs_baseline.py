@@ -46,6 +46,7 @@ import torch
 from libucks.central_agent import CentralAgent
 from libucks.config import Config
 from libucks.embeddings.embedding_service import EmbeddingService
+from libucks.eval_metrics import grounding_score
 from libucks.librarian import Librarian, _collect_source_text
 from libucks.query_orchestrator import QueryOrchestrator
 from libucks.storage.bucket_registry import BucketRegistry
@@ -449,12 +450,14 @@ def _routing_score(
 
 
 def _grounding_score(answer: str, answer_keywords: List[str]) -> bool:
-    """At least 50% of expected answer keywords appear in the answer."""
-    if not answer_keywords:
-        return False
-    ans = answer.lower()
-    hits = sum(1 for kw in answer_keywords if kw.lower() in ans)
-    return hits >= len(answer_keywords) / 2.0
+    """At least 50% of expected answer keywords appear in the answer.
+
+    Delegates to libucks.eval_metrics.grounding_score (Stage 0a), which keeps
+    plain substring matching for the literal keyword and additionally accepts
+    equivalent surface forms (80% <-> 0.8, "2" <-> "two") on word boundaries.
+    Contract + regression cases: tests/unit/test_eval_metrics.py.
+    """
+    return grounding_score(answer, answer_keywords)
 
 
 def _cosine_score(embedder, answer: str, ground_truth: str) -> float:

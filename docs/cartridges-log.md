@@ -15,13 +15,80 @@ finding.
 - CM-A.0 — Scaffold + cartridge contract (TDD) — DONE 2026-07-01 (6/6 KVPrefixCartridge contract tests green; module landed)
 - CM-A.1 — Single-bucket distill proof — ⚠ GATE FAIL 2026-07-02 (v1: templated queries, P=64, 2ep → 2/8)
 - CM-A.1-retry — Fact-probing queries + P=128 + 4ep — ✅ GATE PASS 2026-07-02 (**latent-alone 2/8→4/8; KL 0.749→0.219; carries identifiers — "80%", garble, STRANDED. Hypothesis confirmed: query coverage was the bottleneck**)
-- CM-A.2 — All-bucket distill + eval gate — ❌ GATE FAIL 2026-07-07 (latent-alone 7/25 vs gate ≥8, bit-identical across 2 evals; fe7ded0d redistill r6 clean (KL 3.69→2.69) but converts neither of its fixtures; `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` proven causally necessary; decision pending: 512-query retry vs bank negative)
+- CM-A.2 — All-bucket distill + eval gate — ❌ GATE FAIL 2026-07-07 (latent-alone 7/25 vs gate ≥8, bit-identical across 2 evals; fe7ded0d redistill r6 clean (KL 3.69→2.69) but converts neither of its fixtures; `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` proven causally necessary) — **SUPERSEDED by CM-B.0a: the 7/25 was a metric artifact; re-scores to 10/25 = GATE PASS. Also ran templated queries, not the fact-probing ones the entry claims.**
+- CM-B.0a — Grounding metric audit + full re-score — ✅ GATE PASS 2026-07-27 (**cartridge latent-alone 7/25 → 10/25 vs gate ≥8; baselines move ≤+1, so not general inflation; CM-A.2's negative result is overturned**)
 
 ---
 
+## CM-B.0a — Grounding metric audit + full re-score (2026-07-27)
+
+**Status**: ✅ GATE PASS — CM-A.2's ❌ is overturned. Zero compute; scoring only.
+
+**Found**: `_grounding_score` (`test_latent_vs_baseline.py:451`) did plain
+case-insensitive substring matching, so a correct answer in a different surface form
+scored as wrong. Three of CM-A.2's 18 "failures" were correct:
+
+| fixture | expected | model said | |
+|---|---|---|---|
+| echoswarm_01 | `80%` | "relay probability … is **0.8**" | correct, scored wrong |
+| echoswarm_02 | `2` | "at least **two** different sources" | correct, scored wrong |
+| echoswarm_03 | `1` | "randomly changing **one** character" | correct, scored wrong |
+
+**Built**:
+- `libucks/eval_metrics.py` — `keyword_variants` / `keyword_hit` / `grounding_score`.
+  Literal keyword keeps plain substring matching (so no previously-passing fixture can
+  start failing, and historical numbers stay comparable); *added* variants
+  (percent↔decimal, number word↔digit) match on word boundaries only — without that,
+  keyword "1" → variant "one" would fire inside "money".
+- `tests/unit/test_eval_metrics.py` — 19 tests, written first, watched fail
+  (ModuleNotFoundError). Includes the four real CM-A.2 cases as regressions: 01/02 must
+  flip to grounded, 06/10 must stay failures.
+- `scripts/cm_rescore_grounding.py` — re-scores stored answers under both metrics.
+- `test_latent_vs_baseline.py:451` now delegates to the shared function.
+
+**Gate result** (`uv run python scripts/cm_rescore_grounding.py`):
+
+| path | old | new | Δ |
+|---|---|---|---|
+| **cartridge (CM-A.2)** | **7/25** | **10/25** | **+3** |
+| cache_aug_no_verbatim | 2/25 | 3/25 | +1 |
+| hybrid | 11/25 | 11/25 | 0 |
+| text_clean | 4/25 | 4/25 | 0 |
+| no_context | 3/25 | 3/25 | 0 |
+| latent | 2/25 | 2/25 | 0 |
+| cache_aug | 12/25 | 12/25 | 0 |
+
+Old metric reproduces the logged 7/25 exactly, so the re-score is trustworthy.
+**Gate ≥8/25: FAIL → PASS.** The correction is not general inflation — every baseline
+moves by ≤+1, because the baselines' failures are vague or wrong answers, not
+correctly-stated facts in another format.
+
+**Issues / not yet resolved**:
+- **The 10/25 vs 11/25 hybrid comparison is cross-model and must not be quoted.** The
+  cartridge ran on 3B (`cm_eval_cartridge.py:32`); hybrid / text_clean / no_context ran
+  on 0.5B (echoswarm has no `.libucks/config.toml`, so `Config` falls back to the 0.5B
+  default). A 3B no_context / text_clean baseline is still owed.
+- Phase 4-C stays a negative result: `cache_aug_no_verbatim` re-scores to 3/25, exactly
+  the no_context floor.
+- CM-A.2 additionally ran **templated** queries — `cm_distill_buckets.py:96` passes
+  `model=None`, which skips `_model_queries` entirely (`self_study.py:178-185`) — despite
+  the entry claiming fact-probing self-study. CM-A.1 had already shown templates were the
+  bottleneck (2/8 → 4/8). So 10/25 is the *templated-query* score; the fact-probing
+  re-run (CM-B.0b) is still owed and should go higher.
+
+**Next**: CM-B.0b — fix `cm_distill_buckets.py:96`, re-distill bc6b90e2 / 40615ba9 /
+fe7ded0d, re-eval those 13 fixtures (currently 2/13 old, 5/13 new-metric).
+
 ## CM-A.2 — All-bucket distill + eval gate (2026-07-07)
 
-**Status**: ❌ GATE FAIL, reproduced — latent-alone 7/25 vs gate ≥8/25. Decision pending.
+**Status**: ~~❌ GATE FAIL, reproduced — latent-alone 7/25 vs gate ≥8/25~~ — **SUPERSEDED
+2026-07-27 by CM-B.0a.** The 7/25 was a scoring artifact: three of the 18 "failures" were
+correct answers in a different surface form ("0.8" vs `80%`, "two" vs `2`, "one" vs `1`).
+Re-scores to **10/25 = GATE PASS**. Two further corrections to the entry below: it states
+"fact-probing self-study", but `cm_distill_buckets.py:96` passed `model=None` and therefore
+ran **templated** queries; and the reference baselines it quotes were measured on a 0.5B
+receiver while the cartridge ran on 3B. Read the numbers below as the record of what was
+run, not as a valid gate result.
 
 **Setup**: all 10 fixture-routed echoswarm buckets distilled (fact-probing self-study,
 N=120 queries, P=128, 4 epochs, lr=1e-2, frozen Qwen2.5-3B/MPS) via
