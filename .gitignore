@@ -18,3 +18,10 @@ venv/
 # Local training/eval run logs (transient; results snapshot to tests/eval/results/)
 cm_*.log
 .claude/scheduled_tasks.lock
+
+# Vendored dep removed in the CM-B cleanup (installed from PyPI or local wheel instead)
+mps_bitsandbytes-0.7.0/
+mps_bitsandbytes-0.7.0.tar.gz
+
+# Stale Claude worktree checkouts (were committed as orphaned gitlinks; safe to rm -rf)
+.claude/worktrees/

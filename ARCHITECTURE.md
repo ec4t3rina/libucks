@@ -487,7 +487,7 @@ repo_cache         = "~/.libucks/repos"
 
 ```
 libucks/                         ← this repository (the libucks tool itself)
-├── main.py                      ← CLI entry point (click group)
+├── libucks/_cli.py              ← CLI entry point (click group, via [project.scripts])
 ├── pyproject.toml
 ├── tools_v1.json                ← versioned MCP tool schema manifest
 ├── ARCHITECTURE.md

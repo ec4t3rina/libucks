@@ -62,7 +62,12 @@ pip install libucks
 pip install "libucks[latent]"
 ```
 
-> **V2 hardware:** Apple Silicon (MPS, float16), CUDA, CPU fallback. Current PoC uses `Qwen2.5-0.5B` (encoder) and `Qwen2.5-0.5B-Base` (receiver) — fits comfortably in 4 GB. Production target is `Qwen2.5-1.5B` or `Qwen2.5-3B`.
+> **V2 hardware:** Apple Silicon (MPS), CUDA, CPU fallback. The encoder (Librarian) is
+> `Qwen2.5-0.5B-Instruct` in every configuration. The receiver is **per-repo** and set by
+> `.libucks/config.toml` — the headline eval below used `Qwen2.5-3B` (bfloat16, ~6 GB, no
+> quantization). Repos with no `config.toml` fall back to the `Qwen2.5-0.5B` default in
+> `libucks/config.py`, which is a *different* and weaker configuration. See
+> [Results](#results) — this distinction matters when comparing numbers.
 
 ### Initialize + Train in One Shot
 
@@ -291,22 +296,61 @@ When a bucket exceeds its token threshold (`mitosis_threshold`, default 20,000 t
 
 ---
 
-## PoC Status
+## Results
 
-The current implementation is a working proof of concept with known limitations:
+Every number below is from `tests/eval/test_latent_vs_baseline.py` against hand-curated
+fixtures in `tests/eval/fixtures/`. Grounding = ≥50% of expected answer keywords present.
+Full per-phase detail is in [`docs/cartridges-log.md`](./docs/cartridges-log.md) and
+[`docs/archive/phase-4c/`](./docs/archive/phase-4c/).
 
-| Component | Status |
-|---|---|
-| Bucket indexing (init, routing, storage) | ✅ Production-quality |
-| Git hook pipeline (commit → re-index) | ✅ Working end-to-end |
-| MCP server (libucks_query, libucks_status) | ✅ Working |
-| Multi-repo support | ✅ Validated on libucks-self + click |
-| CommunicationAdapter training | ✅ Stable (cross-bucket cos ~0.57) |
-| LoRA receiver training | ✅ Trains, sep > 0 |
-| Answer factual grounding | ⚠️ Hallucination ceiling — 0.5B model + small datasets produce plausible but often wrong answers |
-| Mitosis (bucket splitting) | ✅ Implemented, not stress-tested |
+**Headline: hybrid retrieval grounds 19.5 ± 1.7 / 30 (65%) on libugry** — 4-run mean,
+`Qwen2.5-3B` receiver, an uncontaminated single-commit repo the model has never seen.
 
-The routing and pipeline mechanics are correct. The answer quality limitation is a model capacity / training data problem, not an architectural one. Upgrading to `Qwen2.5-1.5B` or generating 400+ QA pairs per repo are the two paths to grounded answers.
+| Phase | Change | Result |
+|---|---|---|
+| 1 | Routing metric fix | correct-bucket 1/15 → **14/15** |
+| 3-A | LoRA ablation | 4/30 without vs 10/30 with — LoRA is load-bearing |
+| 3-B | **In-bucket chunk rerank** | 10 → **16/30**. Routing-*layer* rerank did nothing; the lever was inside the bucket |
+| 4-A | Verbatim-only ablation, 4-run mean | **19.5 ± 1.7 / 30** — and routing-layer rerank was *actively hurting* |
+| 4-C | KV-cache coprocessor (DeepMind-style) | ❌ **Negative.** Latent-alone 2/25, *below* the 3/25 no-context floor. An apparent 12/25 win was decode-loop artifact + variance |
+| CM-A.1 | Context distillation → KV cartridge, 1 bucket | ✅ 2/8 → **4/8** latent-alone, KL 0.749 → 0.219; latent carried exact identifiers |
+| CM-A.2 | Same, all 10 buckets, top-k prefixes concatenated | ❌ **Negative.** 7/25 vs ≥8/25 gate, bit-identical across two runs |
+
+### What this actually means
+
+**The memory substrate works.** Routing, incremental git-hook updates, AST-affinity
+clustering, mitosis/merge, and hybrid retrieval all do their jobs. 65% grounding on a repo
+the model has never seen is a real result.
+
+**The "latent alone carries facts" thesis is not supported by this evidence.** It failed
+twice, via two different architectures. The honest reading is that all grounding flows
+through the verbatim retrieval channel. Latent + retrieval (hybrid) is what performs.
+
+**Two caveats that a careful reader should know, because they cut both ways:**
+
+1. **The negative results were scored against a cross-model baseline.** The echoswarm
+   reference numbers (hybrid 11/25, no_context 3/25) ran on a **0.5B** receiver, because
+   that repo has no `config.toml`. But `cm_eval_cartridge.py:32` and
+   `test_latent_vs_baseline.py:182` hardcode **3B**. So 4-C's "2/25 is below the 3/25
+   floor" compares 3B-with-latent against 0.5B-with-nothing. This does not rescue the
+   result — arguably it makes it worse — but those numbers are not like-for-like and
+   should not be reused as baselines.
+2. **CM-A.2's specific failure mode is now a named, published one.** CM-A.1 passed on a
+   single bucket and CM-A.2 failed once top-k cartridges were **concatenated without
+   fusion training**. [Cartridges at Scale](https://arxiv.org/abs/2606.04557) (2026)
+   documents exactly this: naively mixing independently-trained cartridges collapses to
+   near-chance, and joint training with distractor mixing fixes it. That paper postdates
+   this run. CM-A.2 is therefore better read as *under-trained* than as *impossible*.
+
+Scale context for anyone judging the negatives: the papers where this works use 7–8B
+models and ~1000 synthetic queries per document. CM-A.2 ran 3B with 120 queries per
+bucket — under-scaled roughly 2× on model and 8× on data.
+
+### Reproducing
+
+```bash
+python scripts/run_eval.py --repo /path/to/target-repo --fixtures libugry
+```
 
 ---
 
