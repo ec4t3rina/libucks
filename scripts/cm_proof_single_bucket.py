@@ -22,6 +22,7 @@ import numpy as np
 import torch
 
 from libucks.config import Config
+from libucks.eval_metrics import grounding_score
 from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
 from libucks.embeddings.embedding_service import EmbeddingService
@@ -50,10 +51,14 @@ def _log(m: str) -> None:
 
 
 def _grounded(answer: str, keywords: list[str]) -> bool:
-    if not keywords:
-        return False
-    a = answer.lower()
-    return sum(1 for kw in keywords if kw.lower() in a) >= len(keywords) / 2.0
+    """Shared CM-B.0a metric — do NOT reintroduce a local substring copy here.
+
+    This was the third copy of the plain-substring scorer. That metric
+    under-counted CM-A.2 by 3 fixtures (7/25 -> 10/25 once corrected), so the
+    CM-A.1 numbers this script produced (2/8 templated, 4/8 fact-probing) are
+    also lower bounds and are not comparable to anything scored after CM-B.0a.
+    """
+    return grounding_score(answer, keywords)
 
 
 def main() -> None:
@@ -119,6 +124,14 @@ def main() -> None:
     init_grounded = _eval("init")
 
     qgen_model = qgen_tok = None
+    if not MODEL_QUERIES:
+        # This default is the losing configuration, kept only so the original
+        # CM-A.1 v1 run reproduces. Templated queries scored 2/8; fact-probing
+        # scored 4/8. Copying this default into the batch distiller is exactly
+        # how the CM-A.2 regression happened — so say so, loudly.
+        _log("WARNING: CM_MODEL_QUERIES=0 -> TEMPLATED queries. CM-A.1 showed these "
+             "fail (2/8 vs 4/8 fact-probing). Set CM_MODEL_QUERIES=1 unless you are "
+             "deliberately reproducing the v1 run.")
     if MODEL_QUERIES:
         _log(f"loading query-gen model {QGEN_ID} ...")
         qgen_model = AutoModelForCausalLM.from_pretrained(QGEN_ID, dtype=torch.float32).eval().to(device)

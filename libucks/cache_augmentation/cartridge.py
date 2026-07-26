@@ -122,9 +122,69 @@ class KVPrefixCartridge(nn.Module):
         save_file(flat, str(path), metadata=meta)
 
     def load(self, path: str | Path) -> None:
+        """Load a saved cartridge, refusing any geometry that isn't an exact match.
+
+        The validation is not optional politeness. `Tensor.copy_` broadcasts, so a
+        file saved with n_kv_heads=1 loads into a 2-head cartridge *silently*,
+        duplicating head 0 across both heads and corrupting the prefix with no
+        error. A file with more layers than this object silently loads a prefix of
+        them. libucks runs two receiver geometries (Qwen2.5-3B: 36 layers/2 heads;
+        Qwen2.5-0.5B: 24 layers) and PREFIX_LEN is duplicated across scripts under a
+        "MUST match" comment, so a mismatch is a question of when, not if.
+
+        `save` has always written the geometry as safetensors metadata; this reads
+        it. Files without metadata fall back to per-tensor shape comparison.
+        """
+        from safetensors import safe_open
         from safetensors.torch import load_file
 
+        path = Path(path)
+        with safe_open(str(path), framework="pt") as f:
+            meta = f.metadata() or {}
+
+        expected = {
+            "n_layers": self.n_layers,
+            "n_kv_heads": self.n_kv_heads,
+            "prefix_len": self.prefix_len,
+            "head_dim": self.head_dim,
+        }
+        mismatches = [
+            f"{field}: this cartridge is {want}, file has {meta[field]}"
+            for field, want in expected.items()
+            if meta.get(field) is not None and int(meta[field]) != want
+        ]
+        if mismatches:
+            raise ValueError(
+                f"cartridge geometry mismatch loading {path.name} — "
+                + "; ".join(mismatches)
+                + ". Refusing to load: copy_ would broadcast or partially fill "
+                "and corrupt the prefix silently."
+            )
+
         flat = load_file(str(path))
+
+        n_in_file = sum(1 for key in flat if key.startswith("k_"))
+        if n_in_file != self.n_layers:
+            raise ValueError(
+                f"cartridge geometry mismatch loading {path.name} — n_layers: "
+                f"this cartridge is {self.n_layers}, file has {n_in_file}."
+            )
+
+        for i in range(self.n_layers):
+            for kind, params in (("k", self.k), ("v", self.v)):
+                src = flat.get(f"{kind}_{i}")
+                if src is None:
+                    raise ValueError(
+                        f"cartridge file {path.name} is missing tensor {kind}_{i} "
+                        f"(n_layers: this cartridge is {self.n_layers})."
+                    )
+                if tuple(src.shape) != tuple(params[i].shape):
+                    raise ValueError(
+                        f"cartridge geometry mismatch loading {path.name} — "
+                        f"{kind}_{i}: this cartridge is {tuple(params[i].shape)}, "
+                        f"file has {tuple(src.shape)}."
+                    )
+
         with torch.no_grad():
             for i in range(self.n_layers):
                 self.k[i].data.copy_(flat[f"k_{i}"].to(self.k[i].dtype))

@@ -102,3 +102,106 @@ def test_save_load_roundtrip(tmp_path):
     reloaded.load(path)
     for a, b in zip(cart.parameters(), reloaded.parameters()):
         assert torch.allclose(a.detach(), b.detach(), atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# CM-B.0b: load() geometry validation.
+#
+# save() has always written n_layers / n_kv_heads / prefix_len / head_dim as
+# safetensors metadata, but load() never read it and went straight to
+# `param.data.copy_(flat[...])`. Tensor.copy_ BROADCASTS, so a file with a
+# smaller-but-broadcastable geometry loads silently and corrupts the cartridge
+# instead of raising. Verified: copying a (1,1,P,D) source into a (1,2,P,D)
+# destination succeeds and duplicates head 0 across both heads.
+#
+# This matters here specifically because the project runs two receiver sizes
+# (Qwen2.5-3B: 36 layers/2 heads, Qwen2.5-0.5B: 24 layers) and PREFIX_LEN is
+# duplicated across scripts under a "MUST match" comment. A mismatched load
+# must fail loudly.
+# ---------------------------------------------------------------------------
+
+import pytest
+
+
+def test_load_rejects_prefix_len_mismatch(tmp_path):
+    saved = KVPrefixCartridge(
+        n_layers=N_LAYERS, n_kv_heads=N_KV_HEADS,
+        prefix_len=PREFIX_LEN * 2, head_dim=HEAD_DIM, dtype=torch.float32,
+    )
+    path = tmp_path / "c.safetensors"
+    saved.save(path)
+
+    with pytest.raises(ValueError, match="prefix_len"):
+        _make_cartridge().load(path)
+
+
+def test_load_rejects_layer_count_mismatch(tmp_path):
+    saved = KVPrefixCartridge(
+        n_layers=N_LAYERS * 2, n_kv_heads=N_KV_HEADS,
+        prefix_len=PREFIX_LEN, head_dim=HEAD_DIM, dtype=torch.float32,
+    )
+    path = tmp_path / "c.safetensors"
+    saved.save(path)
+
+    # Without validation this silently loads only the first N_LAYERS layers.
+    with pytest.raises(ValueError, match="n_layers"):
+        _make_cartridge().load(path)
+
+
+def test_load_rejects_kv_head_mismatch_instead_of_broadcasting(tmp_path):
+    saved = KVPrefixCartridge(
+        n_layers=N_LAYERS, n_kv_heads=1,
+        prefix_len=PREFIX_LEN, head_dim=HEAD_DIM, dtype=torch.float32,
+    )
+    path = tmp_path / "c.safetensors"
+    saved.save(path)
+
+    # copy_ would broadcast 1 head across 2 and duplicate it silently.
+    with pytest.raises(ValueError, match="n_kv_heads"):
+        _make_cartridge().load(path)
+
+
+def test_load_error_names_both_geometries(tmp_path):
+    """The message must say what was expected and what was found — a bare
+    'shape mismatch' is what made the 3B/0.5B confusion expensive to trace."""
+    saved = KVPrefixCartridge(
+        n_layers=N_LAYERS, n_kv_heads=N_KV_HEADS,
+        prefix_len=PREFIX_LEN * 2, head_dim=HEAD_DIM, dtype=torch.float32,
+    )
+    path = tmp_path / "c.safetensors"
+    saved.save(path)
+
+    with pytest.raises(ValueError) as ei:
+        _make_cartridge().load(path)
+    msg = str(ei.value)
+    assert str(PREFIX_LEN) in msg and str(PREFIX_LEN * 2) in msg
+    assert str(path.name) in msg or str(path) in msg
+
+
+def test_load_still_accepts_matching_geometry(tmp_path):
+    """Guard against the validation being too strict."""
+    a = _make_cartridge()
+    with torch.no_grad():
+        a.k[0].add_(1.234)
+    path = tmp_path / "c.safetensors"
+    a.save(path)
+
+    b = _make_cartridge()
+    b.load(path)
+    assert torch.allclose(a.k[0], b.k[0])
+
+
+def test_load_tolerates_missing_metadata(tmp_path):
+    """Cartridges written before CM-B.0b carry metadata, but a hand-built file
+    may not. Absent metadata must fall back to shape checks, not crash."""
+    from safetensors.torch import save_file
+
+    src = _make_cartridge()
+    flat = {}
+    for i in range(N_LAYERS):
+        flat[f"k_{i}"] = src.k[i].detach().clone()
+        flat[f"v_{i}"] = src.v[i].detach().clone()
+    path = tmp_path / "nometa.safetensors"
+    save_file(flat, str(path))          # no metadata= argument
+
+    _make_cartridge().load(path)        # must not raise
