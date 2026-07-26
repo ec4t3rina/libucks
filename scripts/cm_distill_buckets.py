@@ -147,8 +147,19 @@ def main() -> None:
     from transformers import AutoModelForCausalLM, AutoTokenizer
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 
-    _log(f"loading query generator {QGEN_ID} on {device} ...")
-    qgen_model = AutoModelForCausalLM.from_pretrained(QGEN_ID, dtype=torch.float32).eval().to(device)
+    # Query generation runs on CPU, deliberately. transformers' generate() aborts
+    # the whole process on MPS for prompts of this length:
+    #     MPSNDArray.mm:761: total bytes of NDArray > 2**32
+    # It is a hard Metal assertion, not a Python exception, so it cannot be caught
+    # or retried. Verified 2026-07-27 across greedy / sample / top-k / top-p and
+    # both fp32 and bf16 — all four crash on MPS at a ~780-token prompt; CPU
+    # completes in ~10 s. Distillation itself is unaffected because
+    # CartridgeTrainer._teacher_generate uses a manual decode loop, not generate().
+    qgen_device = torch.device("cpu")
+    _log(f"loading query generator {QGEN_ID} on {qgen_device} (MPS generate() is broken; see note) ...")
+    qgen_model = AutoModelForCausalLM.from_pretrained(
+        QGEN_ID, dtype=torch.float32
+    ).eval().to(qgen_device)
     qgen_tok = AutoTokenizer.from_pretrained(QGEN_ID)
     queries_by_bucket: dict[str, list[str]] = {}
     for n, (bid, verbatim) in enumerate(todo, 1):
@@ -158,11 +169,17 @@ def main() -> None:
         queries_by_bucket[bid] = qs
         _log(f"[qgen {n}/{len(todo)}] {bid[:8]} — {len(qs)} queries")
 
-    # Free the generator before the 3B loads: never hold both on 16 GB.
+    # Free the generator before the 3B loads: never hold both resident on 16 GB.
     del qgen_model, qgen_tok
     if device.type == "mps":
         torch.mps.empty_cache()
     _log("query generator freed")
+
+    # Fail loudly rather than silently distilling on templates again — the exact
+    # regression CM-B.0b exists to fix.
+    template_only = [b for b, qs in queries_by_bucket.items() if not qs]
+    if template_only:
+        sys.exit(f"[cm_distill] query generation produced nothing for {template_only}; aborting")
 
     # ---- Phase 2: distillation (3B resident) ----
     _log(f"loading {RECEIVER_ID} on {device} ...")
