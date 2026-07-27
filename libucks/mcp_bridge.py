@@ -29,6 +29,7 @@ import mcp.server.stdio
 import mcp.types as types
 from mcp.server import Server
 
+from libucks.background_tasks import spawn
 from libucks.config import Config
 from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
@@ -254,7 +255,7 @@ async def serve() -> None:
                 except Exception as exc:
                     print(f"[libucks] hook event error: {exc}", file=sys.stderr)
 
-            asyncio.ensure_future(serve_socket(sock_path, _on_hook_event))
+            spawn(serve_socket(sock_path, _on_hook_event), name="git_hook.socket_server")
 
             # ------------------------------------------------------------------
             # HealthMonitor (Phase 6-E/6-F): autonomous quality guardian.
@@ -290,7 +291,7 @@ async def serve() -> None:
                 # 159-bucket repo. ChunkRetriever caches by (chunk_id, git_sha).
                 chunk_retriever=chunk_retriever,
             )
-            asyncio.ensure_future(health_monitor.run())
+            spawn(health_monitor.run(), name="health_monitor.run")
 
             # ------------------------------------------------------------------
             # NovelBucketService: drains CentralAgent.create_bucket_queue and
@@ -308,7 +309,7 @@ async def serve() -> None:
                 mitosis_threshold=cfg.routing.mitosis_threshold,
                 repo_path=repo_path,
             )
-            asyncio.ensure_future(novel_bucket_svc.run())
+            spawn(novel_bucket_svc.run(), name="novel_bucket_service.run")
 
             # ------------------------------------------------------------------
             # StaleChecker + reindex callback (Phase 6-C JIT invalidation).
@@ -424,7 +425,7 @@ async def serve() -> None:
         raise ValueError(f"Unknown tool: {name!r}")
 
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
-        asyncio.ensure_future(_load_heavy())
+        spawn(_load_heavy(), name="startup.load_heavy")
         await server.run(
             read_stream,
             write_stream,

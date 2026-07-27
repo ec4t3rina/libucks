@@ -7,6 +7,7 @@ from typing import Awaitable, Callable, List, Optional
 import numpy as np
 import structlog
 
+from libucks.background_tasks import spawn
 from libucks.central_agent import CentralAgent
 from libucks.librarian import Librarian
 from libucks.models.events import QueryEvent
@@ -49,9 +50,8 @@ class QueryOrchestrator:
                     stale_bucket_ids=stale_result.stale_bucket_ids,
                 )
                 if self._reindex_fn is not None:
-                    asyncio.ensure_future(
-                        self._reindex_fn(stale_result.stale_bucket_ids)
-                    )
+                    spawn(self._reindex_fn(stale_result.stale_bucket_ids),
+                          name="query.reindex_stale")
         # ---- Answer with possibly-stale data (eventual consistency) ----------
 
         async def _query_one(bucket_id: str) -> Optional[Representation]:

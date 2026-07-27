@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, List, Optional
 import numpy as np
 import structlog
 
+from libucks.background_tasks import spawn
 from libucks.models.chunk import ChunkMetadata
 from libucks.models.events import (
     PathUpdateEvent,
@@ -242,7 +243,8 @@ class Librarian:
         # Check mitosis outside lock.
         if new_token_count > self._mitosis_threshold and self._mitosis_service:
             log.info("librarian.mitosis_triggered", bucket_id=self.bucket_id, token_count=new_token_count)
-            asyncio.ensure_future(self._mitosis_service.split(self.bucket_id))
+            spawn(self._mitosis_service.split(self.bucket_id),
+                  name=f"mitosis.split:{self.bucket_id[:8]}")
 
     # ------------------------------------------------------------------
     # TombstoneEvent
