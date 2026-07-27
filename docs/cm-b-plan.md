@@ -16,8 +16,24 @@ libucks has two halves that don't compose:
   away and rebuild — **7,199 s per bucket**, measured.
 
 `BucketKVCache` (`bucket_kv_cache.py:35-46`) already hashes every `(chunk_id, git_sha)`
-pair and marks the cache stale on mitosis, merge, or update. libucks already **knows**
-when a cartridge has gone stale. It cannot **repair** one.
+pair, so libucks already **knows** when a cartridge has gone stale. It cannot **repair**
+one.
+
+*Mechanism correction (found in the CM-B dependency sweep).* Staleness is detected
+**lazily, on read**: `load()` recomputes the chunk signature and returns `None` on
+mismatch (`bucket_kv_cache.py:110`), called from `decode.py:70` and
+`cache_aug_trainer.py:167`. The eager path — `invalidate()`, whose own docstring says
+"call on mitosis / merge / removal" — has **zero callers anywhere in the repo**. An
+earlier draft of this plan said the cache is "marked stale on mitosis, merge, or update";
+that is wrong about the mechanism, though the effect mostly holds because the next read
+detects the change anyway.
+
+Two consequences. Cache files for buckets that mitosis or merge destroyed are never
+deleted, since nothing pushes an invalidation — measured as harmless today (0 real
+orphans across echoswarm and libugry) only because those events have been rare. And
+deliberately **not fixed by wiring `invalidate()` in**: eager deletion on split/merge is
+precisely the throw-it-away behaviour Stage 2 exists to replace with repair. Wiring it
+now would build the thing this track is trying to remove.
 
 ## Why this is worth doing
 
@@ -170,6 +186,32 @@ routing (0 of 25 changed), so the 5/13 spot-check baseline is valid. But 3 of 25
 have a top1–top2 margin below 0.01, so any centroid recomputation, mitosis/merge, or
 embedding-model change can silently flip which cartridge they are scored against. Before
 trusting any future cross-run comparison, re-run the routing-stability check.
+
+## Dependency-graph sweep — structural findings
+
+Run over `libucks/` + `scripts/` + `tests/` (import graph, cycles, layering, dead code,
+config-key readers). Architecture is clean: **no runtime import cycles, no layering
+violations** (nothing low-level imports upward), and every production module except
+`_cli.py` (2,035 loc, untested) has at least one test.
+
+What it did surface, none of it a live crash:
+
+| finding | status |
+|---|---|
+| Merge limit hardcoded above a tunable split threshold | **fixed** — derived, `12c1af7` |
+| Six `_encode_centroid` copies, one decoder | **fixed** — consolidated, `12c1af7` |
+| HealthMonitor re-embedded every chunk every 300 s | **fixed** — cached, `e622585` |
+| `chunk_retriever` used outside its nested scope | **fixed** before running — `NameError` at serve time, `e622585` |
+| `margin_separation_loss` never called, never tested | documented in `losses.py` |
+| `alignment_loss` imported, never called | leave |
+| `BucketKVCache.invalidate()` zero callers | documented above; not wiring, on purpose |
+| `compression_steps` inert config knob | documented in `config.py` + RUNBOOK |
+| `PathsConfig.{grammar_cache, log_file, pending_events, repo_cache}` never read | inert; documented in ARCHITECTURE.md as if live |
+| `_inject_lora_into_module_dict`, `_pool` dead | leave |
+
+The `margin_separation_loss` one is the most interesting for this project: it was written
+specifically to escape the `sep=0.0000` collapse CLAUDE.md tells you to halt on, and it
+has never been called in the entire git history. See its docstring.
 
 ## House rules
 

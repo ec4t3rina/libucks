@@ -49,6 +49,23 @@ def margin_separation_loss(
 ) -> torch.Tensor:
     """Margin ranking loss: correct-latent logit for y[0] must exceed wrong-latent by margin.
 
+    ⚠️ NEVER WIRED IN. Added by 03a9db5 ("fix adapter collapse via L_xsep +
+    L_sep"), imported by lora_trainer.py:33, and called from nowhere — verified
+    against the full git history, not just the current tree. It also has no
+    test; tests/unit/test_lsep_loss.py covers only `separation_loss`.
+
+    That matters because of what it was written to fix. `separation_loss` (JSD)
+    is the loss actually in use (lora_trainer.py:348), and JSD has ZERO gradient
+    when the two distributions coincide — exactly the sep=0.0000 collapse
+    CLAUDE.md tells you to stop the run over. This function was built to escape
+    that state, per the docstring below. The project's shipped mitigation is
+    instead query_dropout_rate=0.5, a different lever.
+
+    So: if sep=0.0000 recurs and query dropout does not rescue it, swapping
+    this in is the obvious next experiment — but it IS an experiment. It
+    changes the LoRA objective, so it needs its own gate and a retrain, and
+    every existing lora_receiver.pt was trained without it.
+
     L_sep = ReLU(margin - (logit_c[y0] - logit_w[y0]))
 
     Unlike JSD, this produces a non-zero gradient even when the model ignores
