@@ -87,6 +87,33 @@ cleanly re-distilled 6× under the old config, so a win here isolates the query 
 **Bar:** those 13 fixtures score 5/13 under the CM-B.0a metric. `> 5/13` justifies the
 full ~20 h re-distill of all ten buckets.
 
+**RESULT 2026-07-27: ❌ 1/13 — a regression, not a near miss.** Full entry in
+`cartridges-log.md`. The full re-distill is NOT authorised. Headlines:
+- The query-gen hypothesis is dead: the control bucket `fe7ded0d` went 2.685 → 2.749 KL,
+  i.e. unchanged. And the fix only partly applied — 84/120 and 81/120 model questions,
+  the rest silently padded with the templates it was meant to replace.
+- KL is decoupled from grounding: `40615ba9` hit **KL 0.227** (better than CM-A.1-retry's
+  passing 0.219) and scored **0/3**.
+- The run was confounded: it used **120 queries / `max_answer_tokens=32`**, not the
+  proven **200 / 48**. That variable has still never been tested at batch scale.
+
+### 0b-repro — faithful CM-A.1-retry reproduction 🔄 RUNNING (2026-07-28)
+
+Before any further hypothesis, establish whether the only passing result in this track
+reproduces. `bc6b90e2`, the exact CM-A.1-retry recipe: **200 queries,
+`max_answer_tokens=48`**, P=128, 4 epochs, lr 1e-2, verbatim 4096, extract 1024,
+**last-epoch save** (matching the original protocol — best-epoch selection is deliberately
+deferred so this stays a reproduction, not an improvement).
+
+Chosen over the verbatim/P sweep because `bc6b90e2` carries **8 fixtures** (the best
+statistical power of any bucket) and retains 89% of its content, so truncation is not a
+confound there.
+
+**Bar:** CM-A.1-retry scored **4/8**; CM-B.0b scored **1/8**. Returning to ~4/8 confirms
+the recipe and identifies query count / answer budget as the lever. Staying near 1/8 means
+the single passing result never reproduced, and **no downstream plan in this document is
+trustworthy until that is resolved** — including Stage 1.
+
 ### 0c — cross-model baseline ⬜ TODO, blocks all comparisons
 
 The cartridge runs on 3B (`cm_eval_cartridge.py:32`) while echoswarm's other paths run on

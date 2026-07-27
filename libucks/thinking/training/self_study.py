@@ -157,11 +157,18 @@ def generate_self_study_queries(
     *,
     model: Optional[Any] = None,
     tokenizer: Optional[Any] = None,
+    stats: Optional[dict] = None,
 ) -> list[str]:
     """Return exactly `n` self-study queries for a bucket.
 
     Uses the model if provided (deduped), then tops up to `n` with deterministic
     template queries. Always returns `n` items (assuming non-empty bucket_text).
+
+    Because the top-up is unconditional, a caller CANNOT infer from the return
+    value how many queries the model actually wrote. CM-B.0b distilled on 84
+    model questions plus 36 silent template fill-ins and was logged as a
+    fact-probing run. Pass `stats` to receive
+    ``{"model": int, "template": int, "requested": int}`` and log it.
     """
     queries: list[str] = []
     seen: set[str] = set()
@@ -175,6 +182,8 @@ def generate_self_study_queries(
                 if len(queries) >= n:
                     break
 
+    n_model = len(queries)
+
     if len(queries) < n:
         for q in _template_queries(bucket_text, n * 2):
             key = q.lower()
@@ -184,5 +193,12 @@ def generate_self_study_queries(
                 if len(queries) >= n:
                     break
 
-    _log(f"generated {len(queries)} queries (target {n})")
-    return queries[:n]
+    out = queries[:n]
+    n_model = min(n_model, len(out))
+    if stats is not None:
+        stats.update({"model": n_model,
+                      "template": len(out) - n_model,
+                      "requested": n})
+    _log(f"generated {len(out)} queries (target {n}; "
+         f"model={n_model} template={len(out) - n_model})")
+    return out

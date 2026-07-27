@@ -227,6 +227,7 @@ class CartridgeTrainer:
         lr: float = 1e-2,
         weight_decay: float = 0.0,
         checkpoint_path: str | Path | None = None,
+        best_path: str | Path | None = None,
     ) -> dict[str, Any]:
         """Distill one bucket's cartridge over its self-study queries.
 
@@ -244,14 +245,22 @@ class CartridgeTrainer:
         Until CM-B.0b nothing ever read the checkpoint back, so the guarantee in
         this docstring was not actually delivered — a wedge cost the full ~2 h
         bucket. Note that a resumed run's `init_mean_kl` is the first RESUMED
-        epoch, not the true pre-training value."""
+        epoch, not the true pre-training value.
+
+        With `best_path` set, the lowest-mean-KL epoch is ALSO retained there,
+        with a `<best_path>.json` sidecar naming the winning epoch. Training is
+        not otherwise affected. This is opt-in because selecting the best of N
+        epochs is a protocol change: a run that does it is not comparable to one
+        that does not, and CM-A.1-retry (the reference result) took the last
+        epoch. CM-B.0b needed this — bc6b90e2's epoch means were 5.4433,
+        4.1816, 5.2721, 5.2284, and it promoted the 5.2284."""
         cartridge.train()
         cartridge.to(self.device)
         try:
             return self._distill_bucket_inner(
                 cartridge, verbatim, queries,
                 epochs=epochs, lr=lr, weight_decay=weight_decay,
-                checkpoint_path=checkpoint_path,
+                checkpoint_path=checkpoint_path, best_path=best_path,
             )
         finally:
             faulthandler.cancel_dump_traceback_later()
@@ -266,6 +275,7 @@ class CartridgeTrainer:
         lr: float,
         weight_decay: float,
         checkpoint_path: str | Path | None,
+        best_path: str | Path | None = None,
     ) -> dict[str, Any]:
         # --- precompute teacher answers once (greedy) ---
         _log(f"precomputing teacher answers for {len(queries)} queries ...")
@@ -283,7 +293,7 @@ class CartridgeTrainer:
         _log(f"precomputed {len(qa)} usable (query, answer) pairs")
         if not qa:
             return {"epoch_mean_kl": [], "init_mean_kl": 0.0, "final_mean_kl": 0.0,
-                    "n_queries": 0}
+                    "n_queries": 0, "best_epoch": None, "best_mean_kl": None}
 
         total_steps = max(1, epochs * len(qa))
         warmup = max(1, total_steps // 10)
@@ -303,6 +313,8 @@ class CartridgeTrainer:
         history: list[float] = []
         first_kls: list[float] = []
         last_kls: list[float] = []
+        best_mean_kl = float("inf")
+        best_epoch: int | None = None
         for ep in range(epochs):
             order = list(range(len(qa)))
             random.shuffle(order)
@@ -337,11 +349,25 @@ class CartridgeTrainer:
                 )
                 _log(f"  checkpoint saved (epoch {ep}, {ep + 1} done) -> {checkpoint_path}")
 
+            # Retain the best epoch SEPARATELY. It must not share
+            # `checkpoint_path`: that file's sidecar promises `epochs_done`
+            # epochs of training, and skipping a write on a worse epoch would
+            # leave the two out of step and rewind a resume.
+            if best_path is not None and mean_kl < best_mean_kl:
+                best_mean_kl, best_epoch = mean_kl, ep
+                cartridge.save(best_path)
+                Path(str(best_path) + ".json").write_text(
+                    json.dumps({"best_epoch": ep, "best_mean_kl": mean_kl})
+                )
+                _log(f"  best so far (epoch {ep}, mean_kl={mean_kl:.4f}) -> {best_path}")
+
         return {
             "epoch_mean_kl": history,
             "init_mean_kl": sum(first_kls) / max(1, len(first_kls)),
             "final_mean_kl": sum(last_kls) / max(1, len(last_kls)),
             "n_queries": len(qa),
+            "best_epoch": best_epoch,
+            "best_mean_kl": None if best_epoch is None else best_mean_kl,
         }
 
     # ------------------------------------------------------------------

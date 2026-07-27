@@ -17,6 +17,88 @@ finding.
 - CM-A.1-retry — Fact-probing queries + P=128 + 4ep — ✅ GATE PASS 2026-07-02 (**latent-alone 2/8→4/8; KL 0.749→0.219; carries identifiers — "80%", garble, STRANDED. Hypothesis confirmed: query coverage was the bottleneck**)
 - CM-A.2 — All-bucket distill + eval gate — ❌ GATE FAIL 2026-07-07 (latent-alone 7/25 vs gate ≥8, bit-identical across 2 evals; fe7ded0d redistill r6 clean (KL 3.69→2.69) but converts neither of its fixtures; `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` proven causally necessary) — **SUPERSEDED by CM-B.0a: the 7/25 was a metric artifact; re-scores to 10/25 = GATE PASS. Also ran templated queries, not the fact-probing ones the entry claims.**
 - CM-B.0a — Grounding metric audit + full re-score — ✅ GATE PASS 2026-07-27 (**cartridge latent-alone 7/25 → 10/25 vs gate ≥8; baselines move ≤+1, so not general inflation; CM-A.2's negative result is overturned**)
+- CM-B.0b — Query-gen fix + 3-bucket re-distill — ❌ GATE FAIL 2026-07-27 (**1/13 vs a 5/13 baseline — a regression, not a near miss. bc6b90e2 5/8→1/8 with 6/13 answers degenerate token loops. Confounded: still 120 queries, not the proven 200. Diagnostics found the verbatim cap discards 66–72% of two buckets and the eval ceiling is 20/25, not 25/25**)
+
+---
+
+## CM-B.0b — Query-gen fix + 3-bucket re-distill (2026-07-27)
+
+**Status**: ❌ GATE FAIL — and a regression against the bucket it was meant to help.
+
+**Ran**: `cm_distill_buckets.py --buckets bc6b90e2,40615ba9,fe7ded0d --force`,
+3h32m + 2 buckets, 0 failures. Query generator wired per plan (`Qwen2.5-0.5B-Instruct`).
+
+| bucket | KL start → end | time | grounding before → after |
+|---|---|---|---|
+| `40615ba9` | 0.536 → **0.227** | 8,134 s | 0/3 → 0/3 |
+| `bc6b90e2` | 5.443 → **5.228** | 6,796 s | 5/8 → **1/8** |
+| `fe7ded0d` | 3.880 → **2.749** | 5,874 s | 0/2 → 0/2 |
+
+**Gate**: the plan said "currently 2/13, pass at ≥5/13". That 2/13 was scored with the
+**pre-0a** metric. Re-scoring the *unchanged* CM-A.2 cartridges with `grounding_score`
+gives **5/13** (bc6b90e2 5/8, 40615ba9 0/3, fe7ded0d 0/2). So ≥5/13 was the *baseline*,
+not a bar. Result **1/13**. The gate text in `cm-b-plan.md` has been corrected.
+
+**Six of thirteen answers are degenerate token loops** — `'TheORYoryoryory…'`,
+`'A Skeptical agent isatisatisatis…'` — all from bc6b90e2. Not weak grounding; the
+cartridge is corrupting generation.
+
+### The query-gen hypothesis is dead
+
+`fe7ded0d` was chosen to isolate it: 6 clean re-distills under the old template config
+gave KL 3.69→2.69; fact-probing queries gave **3.880→2.749**. Same trajectory,
+marginally worse. The generator was never the lever.
+
+It also only partly applied: the 0.5B model produced **84/120** distinct questions for
+bc6b90e2 and **81/120** for fe7ded0d — the shortfall was silently padded with the exact
+templates CM-A.1 identified as the bottleneck. `40615ba9` got 112/120 and had the best
+KL by 20×. The `if not qs` guard at `:186` can never fire, because
+`generate_self_study_queries` always tops up to `n`; it was giving false assurance.
+
+### KL is decoupled from grounding — proven both directions
+
+`40615ba9` reached **KL 0.227** — better than CM-A.1-retry's passing 0.219 — and
+grounded **0/3**. Do not read KL as a proxy for the gate. CM-A.2 made the same mistake.
+
+### Diagnostics (zero compute)
+
+**1. The 4096-char verbatim cap discards most of some buckets.**
+
+| bucket | true content | distilled | discarded |
+|---|---|---|---|
+| `40615ba9` | 14,852 ch | 4,126 | **72%** |
+| `fe7ded0d` | 11,999 ch | 4,102 | **66%** |
+| `bc6b90e2` | 4,661 ch | 4,132 | 11% |
+
+Query-gen sees only `bucket_text[:3000]` (`self_study.py:98`) — 73% of the kept text,
+20% of 40615ba9's real content. Cross-bucket KL comparisons are invalid while
+truncation ratios differ this much: a heavily-truncated bucket has an easier target.
+
+**2. The eval ceiling is 20/25, not 25/25.** Under `grounding_score` (≥50% of keywords),
+five fixtures cannot be answered from the routed bucket's kept verbatim:
+echoswarm_05 (1/3), 06 (0/3), 07 (0/4), 16 (0/5), 23 (1/5). On the 13-fixture subset the
+ceiling is **10/13**. Raising the cap would fix only **05 and 06** — 07, 16 and 23 fail
+because their keywords are not in the routed bucket at all, which is a *routing* defect.
+
+**3. Truncation is NOT what blocks 40615ba9.** All six identifiers echoswarm_11 needs
+(`who`, `what`, `where`, `when`, `which_route`, `source_justification`) were inside the
+3,000 chars query-gen read *and* the 4,126 distilled. KL 0.227. The answer invented
+`"message"`, `"location"`, `"time"`… — fluent, plausible, wrong. Nothing was missing,
+nothing unqueried, convergence excellent, identifiers still not retained. This is
+CM-A.2's "structure, not identifiers" under the cleanest possible conditions.
+
+**4. The truncation fix (`30ee434`, 2026-07-03) is not the regression cause.** Pre- vs
+post-fix verbatim: 40615ba9 3,325→4,126, bc6b90e2 **3,868→4,132 (+7%)**, fe7ded0d
+2,809→4,102. A 7% content change cannot explain bc6b90e2's initial KL going 0.749→5.443.
+
+**The one variable never tested**: CM-A.1-retry used **200 queries and
+`max_answer_tokens=48`**. CM-A.2 used 120/32. CM-B.0b used **120/32 again**. Listing six
+JSON keys does not fit in 32 tokens, so the teacher never demonstrated the full fact.
+
+**Next**: CM-B.0c — faithful CM-A.1-retry reproduction on bc6b90e2 (200 q,
+`max_answer_tokens=48`, P=128, 4ep, last-epoch save to match the original protocol).
+8 fixtures = the best-powered readout available. If 4/8 does not return, no result in
+this track is trustworthy and that supersedes every downstream plan.
 
 ---
 

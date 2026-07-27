@@ -61,6 +61,30 @@ PREFIX_LEN = 128          # MUST match cm_eval_cartridge.py
 N_QUERIES = int(os.environ.get("CM_NQUERIES", "120"))
 EPOCHS = int(os.environ.get("CM_EPOCHS", "4"))
 LR = float(os.environ.get("CM_LR", "1e-2"))
+# Teacher answer budget. CM-A.1-retry (the only run that ever passed, 4/8 on
+# bc6b90e2) used 48; CM-A.2 and CM-B.0b both used 32, which cannot fit a
+# multi-identifier answer — echoswarm_11 needs six JSON keys. Default stays 32
+# so this lever is inert unless set: silently changing a default is the exact
+# mistake that made CM-A.2 re-run the losing configuration.
+MAX_ANSWER_TOKENS = int(os.environ.get("CM_MAX_ANSWER_TOKENS", "32"))
+# Abort if template fill-in exceeds this share of the query set. CM-B.0b ran
+# bc6b90e2 at 30% templates and fe7ded0d at 33% without any signal. 0.35 lets
+# the observed CM-B.0b runs through unchanged while catching a real collapse;
+# tighten once a run demonstrates the generator can sustain a lower rate.
+MAX_TEMPLATE_FRACTION = float(os.environ.get("CM_MAX_TEMPLATE_FRACTION", "0.35"))
+# Use the 0.5B instruct model to write queries (1) or the curated fact-probing
+# templates (0).
+#
+# READ THIS BEFORE CHANGING IT. `_TEMPLATES` has been the *fact-probing* set
+# since bdba4ae (2026-07-02) — the very commit whose message reads "Fact-probing
+# self-study queries (vs generic templates): latent-alone 2/8 -> 4/8". The 2/8
+# loser was the GENERIC template set, deleted in that same commit. So
+# `model=None` does NOT mean "the losing configuration"; it means the winning
+# one. A comment added 2026-07-27 (12ca750) claimed otherwise and is what
+# motivated CM-B.0b, which then displaced proven templates with 0.5B output and
+# fell 5/8 -> 1/8. Default 1 preserves CM-B.0b behaviour; set 0 to reproduce
+# CM-A.1-retry.
+MODEL_QUERIES = os.environ.get("CM_MODEL_QUERIES", "1") == "1"
 
 
 def _log(m: str) -> None:
@@ -155,38 +179,69 @@ def main() -> None:
     # both fp32 and bf16 — all four crash on MPS at a ~780-token prompt; CPU
     # completes in ~10 s. Distillation itself is unaffected because
     # CartridgeTrainer._teacher_generate uses a manual decode loop, not generate().
-    qgen_device = torch.device("cpu")
-    _log(f"loading query generator {QGEN_ID} on {qgen_device} (MPS generate() is broken; see note) ...")
-    qgen_model = AutoModelForCausalLM.from_pretrained(
-        QGEN_ID, dtype=torch.float32
-    ).eval().to(qgen_device)
-    qgen_tok = AutoTokenizer.from_pretrained(QGEN_ID)
+    qgen_model = qgen_tok = None
+    if MODEL_QUERIES:
+        qgen_device = torch.device("cpu")
+        _log(f"loading query generator {QGEN_ID} on {qgen_device} (MPS generate() is broken; see note) ...")
+        qgen_model = AutoModelForCausalLM.from_pretrained(
+            QGEN_ID, dtype=torch.float32
+        ).eval().to(qgen_device)
+        qgen_tok = AutoTokenizer.from_pretrained(QGEN_ID)
+    else:
+        _log("query generator DISABLED — using curated fact-probing templates "
+             "(the CM-A.1-retry configuration)")
     queries_by_bucket: dict[str, list[str]] = {}
+    qgen_stats: dict[str, dict] = {}
     for n, (bid, verbatim) in enumerate(todo, 1):
+        st: dict = {}
         qs = generate_self_study_queries(
-            verbatim, N_QUERIES, model=qgen_model, tokenizer=qgen_tok
+            verbatim, N_QUERIES, model=qgen_model, tokenizer=qgen_tok, stats=st
         )
         queries_by_bucket[bid] = qs
-        _log(f"[qgen {n}/{len(todo)}] {bid[:8]} — {len(qs)} queries")
+        qgen_stats[bid] = st
+        _log(f"[qgen {n}/{len(todo)}] {bid[:8]} — {len(qs)} queries "
+             f"(model={st['model']} template={st['template']})")
 
     # Free the generator before the 3B loads: never hold both resident on 16 GB.
     del qgen_model, qgen_tok
     if device.type == "mps":
         torch.mps.empty_cache()
-    _log("query generator freed")
+    if MODEL_QUERIES:
+        _log("query generator freed")
 
-    # Fail loudly rather than silently distilling on templates again — the exact
-    # regression CM-B.0b exists to fix.
-    template_only = [b for b, qs in queries_by_bucket.items() if not qs]
-    if template_only:
-        sys.exit(f"[cm_distill] query generation produced nothing for {template_only}; aborting")
+    # Catch an UNINTENDED collapse to templates. The former guard tested
+    # `not qs`, which can NEVER be true — generate_self_study_queries always
+    # tops up to n — so CM-B.0b passed it while distilling bc6b90e2 on 30%
+    # templates. Test the composition instead.
+    #
+    # Skipped when MODEL_QUERIES=0, where 100% templates is the requested
+    # configuration, not a failure.
+    too_templated = {} if not MODEL_QUERIES else {
+        b: s for b, s in qgen_stats.items()
+        if s["template"] > MAX_TEMPLATE_FRACTION * max(1, s["model"] + s["template"])
+    }
+    if too_templated:
+        detail = ", ".join(f"{b[:8]}: {s['model']} model / {s['template']} template"
+                           for b, s in sorted(too_templated.items()))
+        sys.exit(
+            f"[cm_distill] query generation fell back to templates beyond "
+            f"{MAX_TEMPLATE_FRACTION:.0%} for: {detail}. Templates are the "
+            f"configuration CM-A.1 showed to fail (2/8 vs 4/8). Raise "
+            f"CM_MAX_TEMPLATE_FRACTION to override deliberately, and say so in the log."
+        )
 
     # ---- Phase 2: distillation (3B resident) ----
+    # Echo the full recipe. CM-A.2's log entry claimed a configuration the run
+    # did not execute; a reader of this log must never have to infer it again.
+    _log(f"RECIPE: P={PREFIX_LEN} queries={N_QUERIES} epochs={EPOCHS} lr={LR} "
+         f"max_answer_tokens={MAX_ANSWER_TOKENS} verbatim=4096 extract=1024 "
+         f"qgen={QGEN_ID if MODEL_QUERIES else 'fact-probing templates'} "
+         f"receiver={RECEIVER_ID}")
     _log(f"loading {RECEIVER_ID} on {device} ...")
     model = AutoModelForCausalLM.from_pretrained(RECEIVER_ID, dtype=torch.bfloat16).eval().to(device)
     tok = AutoTokenizer.from_pretrained(RECEIVER_ID)
     trainer = CartridgeTrainer(model, tok, temperature=2.0, alpha_ce=0.3,
-                               max_answer_tokens=32, max_verbatim_chars=4096)
+                               max_answer_tokens=MAX_ANSWER_TOKENS, max_verbatim_chars=4096)
 
     done = 0
     for n, (bid, verbatim) in enumerate(todo, 1):

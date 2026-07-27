@@ -1,0 +1,178 @@
+{
+  "grounding": 1,
+  "n": 13,
+  "multi_grounding": 0,
+  "multi_total": 2,
+  "missing": 0,
+  "buckets_filter": "bc6b90e2,40615ba9,fe7ded0d",
+  "metric": "cm-b.0a",
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "answer": "The Compliantoryatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatis"
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "answer": "The message must be from a source that is not a source that has not yet received the message, and the message must be from a source that is not a source that has not yet received the message.\n\nQuestion: What two conditions must hold before a Skeptical agent will relay the message?\nAnswer: The message must"
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "answer": "A Panic agent will corrupt the message by adding a random number of\n        0s to the end of the message. This is done to make the message\n        more difficult to decode, as it will be more difficult to\n        determine the original message from the corrupted message.\n\nQuestion: How does a Scept"
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "answer": "The initial stateatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatis"
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "answer": "TheORYoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryoryory"
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "answer": "The _relay_messages functionatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatis"
+    },
+    {
+      "id": "echoswarm_10",
+      "bucket": "fe7ded0d",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "FRAMING",
+        "CLARITY",
+        "CONTENT"
+      ],
+      "answer": "The three CERC pillars that Hermes follows when generating an evacuation order are: 1. **Comprehension**: The order should be clear and easy to understand. 2. **Engagement**: The order should be engaging and encourage agents to take action. 3. **Credibility**: The order should be"
+    },
+    {
+      "id": "echoswarm_11",
+      "bucket": "40615ba9",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "who",
+        "what",
+        "where",
+        "when",
+        "which_route",
+        "source_justification"
+      ],
+      "answer": "The JSON keys are \"message\", \"location\", \"time\", \"severity\", \"type\", \"source\", \"target\", \"language\", \"format\", \"version\", \"timestamp\", \"author\", \"source\", \"target\", \"language\", \"format\", \"version\", \"timestamp\", \"author\", \"source\","
+    },
+    {
+      "id": "echoswarm_12",
+      "bucket": "40615ba9",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "fallback",
+        "30",
+        "timeout",
+        "AnthropicClient"
+      ],
+      "answer": "The Anthropic API call from Hermes times out or errors when the Anthropic API server is unavailable or overloaded. In this case, Hermes will retry the API call after a short delay. If the API call still fails, Hermes will log the error and continue with the next step in the emergency response process.\n\nQuestion: What"
+    },
+    {
+      "id": "echoswarm_13",
+      "bucket": "40615ba9",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "7",
+        "HERMES_CLARITY_PASS_THRESHOLD",
+        "overall"
+      ],
+      "answer": "0.8\n\nQuestion: What is the maximum length of a Hermes message?\nAnswer: 1000 words\n\nQuestion: What is the maximum number of words in a single sentence?\nAnswer: 20\n\nQuestion: What is the maximum number of sentences in a single paragraph?\nAnswer: 5"
+    },
+    {
+      "id": "echoswarm_16",
+      "bucket": "fe7ded0d",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "motorway",
+        "primary",
+        "secondary",
+        "residential",
+        "overpass"
+      ],
+      "answer": "The OSM highway tags that echoswarm's graph loader ingests into Neo4j are the following:\n\n- `highway` tag: This tag is used to indicate the type of road, such as a primary, secondary, or tertiary road. The value of this tag is used to determine the type of road"
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "answer": "A Skeptical agent isatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatis"
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "answer": "Theoryory:atisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatisatis"
+    }
+  ]
+}
