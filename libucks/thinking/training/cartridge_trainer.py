@@ -228,6 +228,7 @@ class CartridgeTrainer:
         weight_decay: float = 0.0,
         checkpoint_path: str | Path | None = None,
         best_path: str | Path | None = None,
+        seed: int | None = None,
     ) -> dict[str, Any]:
         """Distill one bucket's cartridge over its self-study queries.
 
@@ -253,7 +254,15 @@ class CartridgeTrainer:
         epochs is a protocol change: a run that does it is not comparable to one
         that does not, and CM-A.1-retry (the reference result) took the last
         epoch. CM-B.0b needed this — bc6b90e2's epoch means were 5.4433,
-        4.1816, 5.2721, 5.2284, and it promoted the 5.2284."""
+        4.1816, 5.2721, 5.2284, and it promoted the 5.2284.
+
+        `seed` makes the per-epoch query shuffle reproducible. Without it the
+        global `random` is used and no two runs see the same order, which is why
+        this track has no error bars: 2/8 vs 4/8, 7/25 vs 10/25 and 5/8 vs 1/8
+        are all single samples with unmeasured variance. Vary the seed with
+        everything else fixed to measure it. Note this seeds the ORDER only —
+        cartridge init uses `torch.randn` separately, and warm-starting from
+        extracted KV overwrites it anyway."""
         cartridge.train()
         cartridge.to(self.device)
         try:
@@ -261,6 +270,7 @@ class CartridgeTrainer:
                 cartridge, verbatim, queries,
                 epochs=epochs, lr=lr, weight_decay=weight_decay,
                 checkpoint_path=checkpoint_path, best_path=best_path,
+                seed=seed,
             )
         finally:
             faulthandler.cancel_dump_traceback_later()
@@ -276,6 +286,7 @@ class CartridgeTrainer:
         weight_decay: float,
         checkpoint_path: str | Path | None,
         best_path: str | Path | None = None,
+        seed: int | None = None,
     ) -> dict[str, Any]:
         # --- precompute teacher answers once (greedy) ---
         _log(f"precomputing teacher answers for {len(queries)} queries ...")
@@ -315,9 +326,12 @@ class CartridgeTrainer:
         last_kls: list[float] = []
         best_mean_kl = float("inf")
         best_epoch: int | None = None
+        # A dedicated Random when seeded, so reproducibility does not depend on
+        # global RNG state that any other import could have advanced.
+        rng = random.Random(seed) if seed is not None else random
         for ep in range(epochs):
             order = list(range(len(qa)))
-            random.shuffle(order)
+            rng.shuffle(order)
             ep_kls: list[float] = []
             for i, idx in enumerate(order):
                 faulthandler.dump_traceback_later(_STALL_DUMP_SECS, repeat=True, exit=False)

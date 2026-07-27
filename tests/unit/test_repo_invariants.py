@@ -316,3 +316,63 @@ class TestMeasurementIntegrity:
             assert env_at < torch_at, (
                 f"{script} sets the MPS watermark AFTER importing torch — no effect"
             )
+
+
+class TestNoReciprocalConstants:
+    """A constant restated in two files under "MUST match" comments is not an
+    invariant, it is a promise. `PREFIX_LEN = 128` was declared in both
+    cm_distill_buckets.py and cm_eval_cartridge.py, each pointing at the other;
+    cartridge.py's own load() docstring called a mismatch "a question of when,
+    not if". A P sweep would have made it when.
+
+    The fix is to read the value from the artifact
+    (`KVPrefixCartridge.read_geometry`), not to restate it. This test fails if a
+    new reciprocal pair appears.
+    """
+
+    def test_no_module_claims_a_constant_must_match_another_module(self):
+        offenders = []
+        for p in sorted((ROOT / "scripts").rglob("*.py")) + list(_pkg_files()):
+            if "archive" in p.parts:
+                continue
+            for i, line in enumerate(p.read_text().splitlines(), 1):
+                if "MUST match" not in line:
+                    continue
+                # Only flag it when the SAME line also assigns a literal — that
+                # is the restated-constant shape. Prose references are fine.
+                if "=" in line.split("#")[0] and any(c.isdigit() for c in line.split("#")[0]):
+                    offenders.append(f"{p.relative_to(ROOT)}:{i}: {line.strip()}")
+        assert not offenders, (
+            "constant restated under a MUST-match comment; read it from the "
+            "artifact instead:\n  " + "\n  ".join(offenders)
+        )
+
+    def test_eval_reads_prefix_len_from_the_cartridge_file(self):
+        src = (ROOT / "scripts" / "cm_eval_cartridge.py").read_text()
+        assert "read_geometry" in src, (
+            "cm_eval_cartridge must derive P from the cartridge it loads, so a "
+            "cartridge trained at a different P is evaluable without a code edit"
+        )
+
+
+class TestDistillIsReproducible:
+    """Nothing in the CM pipeline was seeded, so no result in this track has an
+    error bar. `distill_bucket` must at least ACCEPT a seed, and the batch
+    script must expose it."""
+
+    def test_distill_bucket_accepts_a_seed(self):
+        import inspect
+
+        from libucks.thinking.training.cartridge_trainer import CartridgeTrainer
+        assert "seed" in inspect.signature(CartridgeTrainer.distill_bucket).parameters
+
+    def test_batch_distiller_exposes_and_forwards_the_seed(self):
+        src = (ROOT / "scripts" / "cm_distill_buckets.py").read_text()
+        assert "CM_SEED" in src, "no way to request a reproducible run"
+        assert "seed=SEED" in src, "the seed is read but never forwarded to the trainer"
+
+    def test_recipe_banner_reports_the_seed(self):
+        """CM-A.2's log claimed a configuration it did not run; the banner exists
+        so that can't recur, and an unseeded run must say so out loud."""
+        src = (ROOT / "scripts" / "cm_distill_buckets.py").read_text()
+        assert "UNSEEDED" in src

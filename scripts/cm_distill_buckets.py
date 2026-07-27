@@ -57,7 +57,11 @@ REPO = Path("/Users/ecaterina/Developer/test-repos/echoswarm")
 FIXTURES = Path(__file__).resolve().parent.parent / "tests/eval/fixtures/echoswarm_qa.json"
 RECEIVER_ID = "Qwen/Qwen2.5-3B"
 QGEN_ID = "Qwen/Qwen2.5-0.5B-Instruct"   # fact-probing query generator (CM-B.0b)
-PREFIX_LEN = 128          # MUST match cm_eval_cartridge.py
+# Prefix length to TRAIN at. This is the source of truth: it is written into
+# each cartridge's safetensors metadata, and cm_eval_cartridge reads it back via
+# KVPrefixCartridge.read_geometry. It used to be restated there under reciprocal
+# "MUST match" comments, which made a P sweep impossible without editing both.
+PREFIX_LEN = int(os.environ.get("CM_PREFIX_LEN", "128"))
 N_QUERIES = int(os.environ.get("CM_NQUERIES", "120"))
 EPOCHS = int(os.environ.get("CM_EPOCHS", "4"))
 LR = float(os.environ.get("CM_LR", "1e-2"))
@@ -85,6 +89,12 @@ MAX_TEMPLATE_FRACTION = float(os.environ.get("CM_MAX_TEMPLATE_FRACTION", "0.35")
 # fell 5/8 -> 1/8. Default 1 preserves CM-B.0b behaviour; set 0 to reproduce
 # CM-A.1-retry.
 MODEL_QUERIES = os.environ.get("CM_MODEL_QUERIES", "1") == "1"
+# Query-order seed. Unset reproduces the historical unseeded behaviour, under
+# which no two runs of this script ever saw the same order — which is why every
+# number in this track (2/8 vs 4/8, 7/25 vs 10/25, 5/8 vs 1/8) is a single
+# sample with no error bar. Set it to make a run replayable; vary it, holding
+# everything else fixed, to finally measure run-to-run variance.
+SEED = int(os.environ["CM_SEED"]) if os.environ.get("CM_SEED") else None
 
 
 def _log(m: str) -> None:
@@ -236,7 +246,7 @@ def main() -> None:
     _log(f"RECIPE: P={PREFIX_LEN} queries={N_QUERIES} epochs={EPOCHS} lr={LR} "
          f"max_answer_tokens={MAX_ANSWER_TOKENS} verbatim=4096 extract=1024 "
          f"qgen={QGEN_ID if MODEL_QUERIES else 'fact-probing templates'} "
-         f"receiver={RECEIVER_ID}")
+         f"receiver={RECEIVER_ID} seed={SEED if SEED is not None else 'UNSEEDED'}")
     _log(f"loading {RECEIVER_ID} on {device} ...")
     model = AutoModelForCausalLM.from_pretrained(RECEIVER_ID, dtype=torch.bfloat16).eval().to(device)
     tok = AutoTokenizer.from_pretrained(RECEIVER_ID)
@@ -289,7 +299,7 @@ def main() -> None:
             _log(f"[{n}/{len(todo)}] {bid[:8]} — distilling ({len(queries)} q, "
                  f"P={PREFIX_LEN}, {remaining}ep{f' of {EPOCHS}, resumed' if epochs_done else ''}) ...")
             res = trainer.distill_bucket(cart, verbatim, queries, epochs=remaining, lr=LR,
-                                         checkpoint_path=ckpt_path)
+                                         checkpoint_path=ckpt_path, seed=SEED)
             cart.save(out_path)
             ckpt_path.unlink(missing_ok=True)
             side_path.unlink(missing_ok=True)

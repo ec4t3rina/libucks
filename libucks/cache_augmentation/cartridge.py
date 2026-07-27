@@ -121,6 +121,34 @@ class KVPrefixCartridge(nn.Module):
         }
         save_file(flat, str(path), metadata=meta)
 
+    @staticmethod
+    def read_geometry(path: str | Path) -> dict[str, int]:
+        """Return the geometry a cartridge file was saved with.
+
+        `PREFIX_LEN = 128` is duplicated in cm_distill_buckets.py and
+        cm_eval_cartridge.py under reciprocal "MUST match" comments — the manual
+        cross-file invariant this class's own load() docstring calls "a question
+        of when, not if". Callers should read the geometry off the file instead
+        of restating it, which also lets one eval handle cartridges trained at
+        different P.
+
+        Raises ValueError if the file carries no geometry metadata: guessing is
+        exactly the silent-corruption path load() exists to prevent.
+        """
+        from safetensors import safe_open
+
+        with safe_open(str(path), framework="pt") as f:
+            meta = f.metadata() or {}
+        keys = ("n_layers", "n_kv_heads", "prefix_len", "head_dim")
+        missing = [k for k in keys if k not in meta]
+        if missing:
+            raise ValueError(
+                f"{path} has no geometry metadata ({missing} absent). It predates "
+                f"metadata-writing saves; re-save it or construct the cartridge "
+                f"explicitly rather than inferring its shape."
+            )
+        return {k: int(meta[k]) for k in keys}
+
     def load(self, path: str | Path) -> None:
         """Load a saved cartridge, refusing any geometry that isn't an exact match.
 

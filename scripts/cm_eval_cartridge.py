@@ -43,7 +43,9 @@ REPO = Path("/Users/ecaterina/Developer/test-repos/echoswarm")
 FIXTURES = Path(__file__).resolve().parent.parent / "tests/eval/fixtures/echoswarm_qa.json"
 RESULTS = Path(__file__).resolve().parent.parent / "tests/eval/results/cm"
 RECEIVER_ID = "Qwen/Qwen2.5-3B"
-PREFIX_LEN = 128          # MUST match cm_distill_buckets.py
+# Fallback only, for reporting. The real P is read from each cartridge file via
+# KVPrefixCartridge.read_geometry, so this no longer has to match the distiller.
+PREFIX_LEN = 128
 
 
 def _log(m: str) -> None:
@@ -111,7 +113,15 @@ def main() -> None:
         if not p.exists():
             loaded[bid] = None
             return None
-        c = KVPrefixCartridge.for_model(model, prefix_len=PREFIX_LEN, dtype=torch.float32)
+        # Read P off the file rather than assuming PREFIX_LEN. The two scripts
+        # used to restate the constant at each other under reciprocal "MUST
+        # match" comments; this makes a P sweep evaluable without editing code,
+        # and a stale constant can no longer silently mis-shape the cartridge.
+        saved_p = KVPrefixCartridge.read_geometry(p)["prefix_len"]
+        if saved_p != PREFIX_LEN:
+            _log(f"{bid[:8]} — cartridge was trained at P={saved_p}, not the "
+                 f"script default {PREFIX_LEN}; using the file's value")
+        c = KVPrefixCartridge.for_model(model, prefix_len=saved_p, dtype=torch.float32)
         c.load(p)
         c.to(device)
         loaded[bid] = c
