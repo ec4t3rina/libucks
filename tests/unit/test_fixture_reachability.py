@@ -139,3 +139,41 @@ class TestRouting:
         assert not misrouted, (
             "fixtures routing away from " + TARGET + ":\n  " + "\n  ".join(misrouted)
         )
+
+
+class TestNoQuestionEcho:
+    """A fixture whose keywords sit in its own question grades parroting.
+
+    CM-B.0e measured this set's floor at 4/16, and three of those four leaks were
+    exactly this: x09 echoed 3 of 4 keywords, x11 3 of 4, x12 2 of 3, each enough
+    to clear the >=50% bar with no memory involved. The rule below is the static
+    part of the fix.
+
+    It is NOT sufficient on its own — x15 leaked with only 1 of 4 echoed, because
+    `int` and `bool` are guessable for any method signature. That failure mode
+    cannot be detected statically, so a floor re-measurement is still required
+    before a replacement fixture is trusted.
+    """
+
+    def test_echo_alone_cannot_reach_the_grounding_threshold(self):
+        offenders = []
+        for f in _ext():
+            q = f["question"].lower()
+            echoed = [k for k in f["answer_keywords"] if k.lower() in q]
+            if len(echoed) >= len(f["answer_keywords"]) / 2.0:
+                offenders.append(
+                    f"{f['id']}: {len(echoed)}/{len(f['answer_keywords'])} keywords "
+                    f"are in the question ({echoed}) — parroting it scores"
+                )
+        assert not offenders, "\n  " + "\n  ".join(offenders)
+
+    def test_generic_type_names_are_not_load_bearing_keywords(self):
+        """x15's leak: `int`/`bool` are free guesses for any signature question."""
+        GENERIC = {"int", "bool", "str", "float", "none", "true", "false", "list", "dict"}
+        offenders = []
+        for f in _ext():
+            kws = f["answer_keywords"]
+            generic = [k for k in kws if k.lower() in GENERIC]
+            if len(generic) >= len(kws) / 2.0:
+                offenders.append(f"{f['id']}: {generic} of {len(kws)} keywords are generic")
+        assert not offenders, "\n  " + "\n  ".join(offenders)
