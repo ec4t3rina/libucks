@@ -1,0 +1,112 @@
+{
+  "grounding": 2,
+  "n": 8,
+  "multi_grounding": 0,
+  "multi_total": 2,
+  "missing": 0,
+  "buckets_filter": "bc6b90e2",
+  "metric": "cm-b.0a",
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "answer": "The relay probability for a Compliant agent is 80% and it will relay the message with a 80% chance. The message will be modified by the agent by adding a 1 to the value of the key.\n\nQuestion: What is the relay probability for a Skeptical agent and how does it"
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "answer": "The agent has notORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORY"
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "answer": "A Panic agent will not have a setORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORY"
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "answer": "The Immobile agent is placed in the INFORMED state, and it can receive a message if it is in the INFORMED state.\n\nQuestion: What is the function of the _seen_sources set in the Agent class, and how is it used?\nAnswer: The _seen_sources set is a set of source"
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "answer": "The token-preservation threshold for an INFORMED agent to start evacuating is 2.0. This is the value that is set in the _token_preservation_threshold attribute of the Agent class. The _token_preservation_threshold attribute is a float value that is used to determine when an agent should start evacuating"
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "answer": "The snapshotORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORY"
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "answer": "A Skeptical agent will not be in the INFORMED state if it has not received a\n    message from at least two different sources. This means that a Skeptical agent will\n    not be in the INFORMED state if it has not received a message from at least two\n    different sources"
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "answer": "TheORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORYORY"
+    }
+  ]
+}

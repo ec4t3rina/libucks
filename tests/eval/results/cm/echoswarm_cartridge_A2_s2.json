@@ -1,0 +1,112 @@
+{
+  "grounding": 1,
+  "n": 8,
+  "multi_grounding": 0,
+  "multi_total": 2,
+  "missing": 0,
+  "buckets_filter": "bc6b90e2",
+  "metric": "cm-b.0a",
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "answer": "The relay probability for a Compliant agent is 80% (0.8). The Compliant agent will relay the message with a 80% probability, and the message will be modified by the agent's type. The Compliant agent will relay the message with a 80% probability, and the"
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "answer": "1. The agent has not received the message from any other source. 2. The agent has received the message from at least 2 other\n    sources.\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is used to keep track of"
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "answer": "A Panic agent will not be in the \"informed\" state when it is relaying the message, so it will not be in the \"informed\" state when it is relaying the message. The \"informed\" state is a state that the agent is in when it has received a message and is evaluating"
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "answer": "The Immobile agent is placed in the \"informed\" state, and it can receive a message.\n\nQuestion: What is the function of the \"informed\" state in the \"informed\" state, and what is the function of the \"informed\" state in the \"informed\" state?\nAnswer:"
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "answer": "The token-preservation threshold is 2.0. The agent will start evacuating if it has received at least 2 tokens.\n\nQuestion: What is the purpose of the _token_preservation attribute in the Agent class?\nAnswer: The _token_preservation attribute is a private attribute that is used to keep track of"
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "answer": "The snapshot is a set of all the key tokens that have been received by the agent. The rule is that the agent can only relay a message if it has received at least one key token. This is because the agent's function is to relay the message, and it can only do that if it has received at least"
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "answer": "The Skeptical agent is not acompli\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is used to keep track of the sources that have already\n        received the message. This is to prevent the agent from receiving the message"
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "answer": "The agent will be in the \"waiting\" state when it is first\n    received the message. The \"informed\" state is the state in which the\n    agent has received the message and is evaluating whether to\n    \"informed\" the other agents. The \"informed\" state is the state in"
+    }
+  ]
+}

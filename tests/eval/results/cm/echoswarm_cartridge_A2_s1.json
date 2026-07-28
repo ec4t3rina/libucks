@@ -1,0 +1,112 @@
+{
+  "grounding": 1,
+  "n": 8,
+  "multi_grounding": 0,
+  "multi_total": 2,
+  "missing": 0,
+  "buckets_filter": "bc6b90e2",
+  "metric": "cm-b.0a",
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "answer": "The relay probability for a Compliant agent is 80% (0.8) and it will relay the message with a 80% probability. The message will be relayed with a 80% probability, and the message will be relayed with a 80% probability.\n\nQuestion: What"
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "answer": "1. The agent has not been in the INFORMED state for at least 2000000000000000000000000000000000000000000000"
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "answer": "A Panic agent will not have a \"key\" to the message, so it will not have a \"key\" to the message, so it will not have a \"key\" to the message, so it will not have a \"key\" to the message, so it will not have a \"key\" to the"
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "answer": "The Immobile agent is placed in the INFORMED state, and it can receive a message if it is not in the\n    immobile state.\n\nQuestion: What is the function of the _has_received_message attribute in the Agent class, and how is it\n    used in the _has_received_message method?"
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "answer": "The token-preservation threshold is 2.0. The agent will start evacuating if it has 2 or more tokens.\n\nQuestion: What is the function of the _token_count attribute in the Agent class?\nAnswer: The _token_count attribute is a private attribute that is used to keep track of the number of"
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "answer": "The _relay_messages function is a function that is used to relay the message to the other agents in the\n    swarm. The snapshot semantics rule is that the function will not be called if the agent is in the\n    INFORMED state. This is because the function is only called when the agent is in the"
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "answer": "A Skeptical agent will not be in the INFORMED state if it has not received the message from at least 2\n    different sources. In the case of a message from a single source, the agent will not be in the INFORMED\n    state because it has not received the message from at"
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "answer": "The agent will be in the \"waiting\" state, which is the \"W\" in the \"W\" \"I\" \"E\" \"E\" \"E\" \"E\" \"E\" \"E\" \"E\" \"E\" \"E\" \"E\" \"E\" \"E\" \"E\""
+    }
+  ]
+}
