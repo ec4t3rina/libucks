@@ -20,7 +20,94 @@ finding.
 - CM-B.0b — Query-gen fix + 3-bucket re-distill — ❌ GATE FAIL 2026-07-27 (**1/13 vs a 5/13 baseline — a regression, not a near miss. bc6b90e2 5/8→1/8 with 6/13 answers degenerate token loops. Confounded: still 120 queries, not the proven 200. Diagnostics found the verbatim cap discards 66–72% of two buckets and the eval ceiling is 20/25, not 25/25**)
 - CM-B.0b-repro — CM-A.1-retry reproduction, 3 seeded draws — ❌ DOES NOT REPRODUCE 2026-07-28 (**2/8, 1/8, 1/8 — spread 1, so this is NOT noise**)
 - CM-B.0d — CM-A.2's exact config, 3 seeded draws — ❌ DOES NOT REPRODUCE 2026-07-28 (**0/8, 1/8, 1/8. CM-A.2's 5/8 was a single lucky draw. Six modern draws across two configs all land at 0–2/8 against two historical single draws of 4/8 and 5/8**)
-- CM-B.0e — no-context floor, 3 arms × 3 seeds — ❌ **LATENT CHANNEL INERT** 2026-07-28 (**cartridge − floor = +0.67/8 and +0.33/16, i.e. zero at spread ±1. On the non-leaky set the base 3B scores 0.00/8 cold and the cartridge scores 0.67/8. A random prefix is ACTIVELY HARMFUL (2.33 vs floor 4.00), so `cartridge − random` overstates the benefit and must not be quoted**)
+- CM-B.0e — no-context floor, 3 arms × 3 seeds — ❌ **LATENT CHANNEL INERT AT P=128** 2026-07-28 (**cartridge − floor = +0.67/8 and +0.33/16, i.e. zero at spread ±1. On the non-leaky set the base 3B scores 0.00/8 cold and the cartridge scores 0.67/8. A random prefix is ACTIVELY HARMFUL (2.33 vs floor 4.00), so `cartridge − random` overstates the benefit and must not be quoted**)
+- CM-B.0f — the two surviving objections: best-epoch and P — ⚠️ **P WAS THE BINDING CONSTRAINT** 2026-07-29 (**P=384 gives c−floor +3/8 and +5/16 vs +0.67 and +0.33 at P=128, and initial KL 5.68→3.63 from capacity alone. The CM-B.0e "inert" verdict was a P=128 artifact. n=1 — confirmation running as CM-B.0g**)
+
+---
+
+## CM-B.0f — the two objections that survived the bug audit (2026-07-29)
+
+**Status**: ⚠️ The CM-B.0e negative does not hold at larger P. **P, not the recipe,
+was the binding constraint** — and every negative in this track, Phase 4-C
+included, was measured at P=64 or P=128.
+
+**Why only these two arms.** CM-B.0e found cartridge − floor ≈ 0. Most defects
+found in the audit bias *downward* (verbatim truncation, unreachable fixtures,
+template padding, last-epoch save), and cartridge−floor is a within-run contrast
+where nearly all of them cancel: all three arms share fixtures, metric, decoder
+and model. Exactly two objections survived, and neither had ever been tested.
+
+Both arms: CM-A.2's config (120 q, 32 answer tokens, fact-probing templates),
+seed 1, scored against all three floor arms on both fixture sets.
+
+### Arm 1 — best-epoch promotion (P=128, `CM_KEEP_BEST=1`)
+
+```
+epoch 0: 5.6837   epoch 1: 3.9904  <- best, PROMOTED
+epoch 2: 4.0649   epoch 3: 4.0392  <- would have shipped
+```
+
+| | floor | random | cartridge | **c−floor** |
+|---|---|---|---|---|
+| orig 8 | 0 | 1 | 2 | **+2** |
+| ext 16 | 4 | 2 | 6 | **+2** |
+
+Better than the +0.67 / +0.33 of three last-epoch seeds — but the KL gain was
+only **0.05** (3.9904 vs 4.0392). A 1.2% KL improvement producing +2 fixtures on
+both sets is not a proportionate mechanism; it is more consistent with the
+fixture score being a coarse readout of an almost-unchanged cartridge. Treat as
+weak.
+
+### Arm 2 — P=384 (`CM_PREFIX_LEN=384`, last-epoch)
+
+```
+epoch 0: 3.6252   epoch 1: 3.3418
+epoch 2: 3.3194   epoch 3: 4.7843  <- SHIPPED (keep_best=False on this arm)
+```
+
+| | floor | random | cartridge | **c−floor** |
+|---|---|---|---|---|
+| orig 8 | 0 | 1 | **3** | **+3** |
+| ext 16 | 4 | 3 | **9** | **+5** |
+
+**Initial KL fell 5.68 → 3.63 from the capacity change alone**, and this arm
+shipped its *worst* epoch (4.7843 against epoch 2's 3.3194) because best-epoch
+was off — so there is headroom on top of these numbers.
+
+### Reading
+
+P is a **positional bandwidth** constraint, not a parameter-count one. At P=128
+the cartridge has 2.36 M parameters for 4,132 characters — ~570 parameters per
+character, wildly overparameterised. What it lacks is *places to look*: the
+verbatim occupies ~1,009 token positions and attention can only attend to P of
+them. P=128 is 7.9× positional compression; P=384 is 2.6×. That is also the
+cleanest explanation yet for the recurring "structure, not identifiers" failure —
+structure compresses, literal strings like `source_justification` do not.
+
+**Correction to the CM-B.0e entry**: its verdict should read "inert **at P=128**".
+The conclusion was correct for the configuration measured and wrong as a general
+claim about the channel. The session estimate that these two levers had a ~15–20%
+chance of overturning the negative was too pessimistic.
+
+**Still true and unchanged**: `cartridge − random` remains unquotable (a random
+prefix is actively harmful, so it is a negative baseline), and the extension set
+still leaks with a floor of 4/16.
+
+**Interpretive limit for the sweep that follows.** bc6b90e2's verbatim is ~1,009
+tokens, so P=128 is 7.9× compression, P=384 2.6×, P=512 2.0× and P=768 only 1.3×.
+As P approaches seq_len the cartridge stops being a compression of the KV cache
+and becomes a reparameterisation of it — at which point training-free KV-cache
+pruning (SnapKV/H2O-style attention-score selection of the *real* cache) is the
+simpler answer to the same problem, and one that cannot lose literal identifiers
+because it never has to relearn them. P=768 is an upper bound, not a proposal.
+
+**Consequence for Stage 1**: the CM-B.0e entry declared Living Cartridges dead as
+designed. That is **suspended pending CM-B.0g**. If P=384 holds across seeds, a
+cartridge that carries real content exists and cheap repair of it is a live
+question again.
+
+**Next**: CM-B.0g — P=384 across seeds 1–3 with best-epoch on (confirmation), then
+P=512 and P=768 at one seed each (scaling).
 
 ---
 

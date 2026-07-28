@@ -1,0 +1,360 @@
+{
+  "fixtures_file": "echoswarm_qa_bc6b90e2_ext.json",
+  "n": 16,
+  "max_new_tokens": 64,
+  "metric": "grounding_score (CM-B.0a)",
+  "scores": {
+    "floor": 4,
+    "random": 3,
+    "cartridge": 9
+  },
+  "per_question": [
+    {
+      "id": "echoswarm_x01",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "COMPLIANT",
+        "SKEPTICAL",
+        "PANIC",
+        "IMMOBILE"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The four agent types defined in the AgentType enum are Agent, AgentGroup, AgentGroupMember, and AgentGroupMemberGroup."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The four agent types defined in the AgentType enum are:"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The four agent types are: COMPLIANT, SKEPTICAL, PANIC, and IMMOBILE.\n\nQuestion: What is the purpose of the AgentType enum in the given code?\nAnswer: The purpose of the AgentType enum is to define the four different types of agents that can be used in the"
+      }
+    },
+    {
+      "id": "echoswarm_x02",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "WAITING",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "STRANDED"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent can be in one of five states: idle, waiting for a request, processing a request, waiting for a response, or finished.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nAvailable options:\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The five states an agent can be in are: 1. Unconscious 2. Unconscious 3. Unconscious 4. Unconscious 5. Unconscious 4. Unconscious"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The five states an agent can be in are: WAITING, INFORMED, EVACUATING, SAFE, and STRANDED.\n\nQuestion: What is the purpose of the AgentType enum in the code?\nAnswer: The purpose of the AgentType enum in the code is to define the different types of agents"
+      }
+    },
+    {
+      "id": "echoswarm_x03",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "__post_init__"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent is then placed in the \"IMMOBILE\" state.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nChoose your answer from:\n (a). yes\n (b). no\n(a)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "To answer this question, we need to understand the context of of the term \"IMMOBILE agent\" and \"as soon as it is constructed.\"\n\nStep 1: Identify the main subject and its related terms.\n- IMMOBILE agent: A type of of agent or software\n- as soon as it is constructed"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The IMMOBILE agent is placed in the \"stranded\" state when it is\nconstructed. This is because the \"stranded\" state is the default value for\nthe \"state\" attribute of the Agent class, and the \"stranded\" state is the\nstate that an IMMOBILE agent is placed"
+      }
+    },
+    {
+      "id": "echoswarm_x04",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "EVACUATING",
+        "SAFE",
+        "STRANDED",
+        "IMMOBILE"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent state is not in the list of states that the agent is allowed to be in."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "In the context of the given question, the agent states do not receive_message the message and return False. This is because the agent's primary function is to process and interpret the message, and if the message is not received, it will return False. The agent does not have the ability to accept or reject the message,"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "In the SKEPTICAL and PANIC agent types, the receive_message function will return False if the message is not from a set of trusted sources. In the SKEPTICAL agent type, the message will be accepted if it is from a set of 2 or more trusted sources, and in the PANIC"
+      }
+    },
+    {
+      "id": "echoswarm_x05",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "tokens",
+        "hop_count",
+        "INFORMED",
+        "WAITING"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent will then wait for the next message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nAvailable choices:\n (a). yes\n (b). no\n(b)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The first time an agent receives a message while waiting is a classic example of of the agent's ability to learn from its environment. The agent is an entity that can perform actions and learn from its environment. The agent is a computer program that is designed to reason and make decisions like a human. The agent is a machine"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The agent will be in the INFORMED state and will be in the INFORMED state for the first time.\n\nQuestion: What is the purpose of the _seen_sources attribute in the Agent class?\nAnswer: The _seen_sources attribute is used to track the set of unique source IDs that have relayed the message"
+      }
+    },
+    {
+      "id": "echoswarm_x06",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "_seen_sources",
+        "source_id",
+        "distinct"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The Agent will only count a neighbour as a confirmation if it has not been counted as a confirmation in the last 10 seconds.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes\n (2). no\n(2)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": ".\nAnswer: An Agent can stop the same neighbour being counted twice as a confirmation by not allowing the same neighbour to be counted more than once."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The function _set_ the value of the 'confirmations' attribute to 1 when the 'SKEPTICAL' type is set. This is done in the 'SKEPTICAL' type's 'on_message' function. The function 'on_message' is called when a message is received by the agent"
+      }
+    },
+    {
+      "id": "echoswarm_x07",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "WAITING",
+        "STRANDED",
+        "SAFE",
+        "None"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "relay_tokens returns None in the following states: 1. The state is not a valid state. 2. The state is not a valid state. 3. The state is not a valid state. 4. The state is not a valid state. 5. The state is not a valid state."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "To answer this question, I would need to gather information about the states where relay_tokens return None instead of broadcasting. After conducting research, I found that relay_tokens return None instead of broadcasting is a feature in some programming languages, such as Python, where the value is not sent directly to the destination, but is first stored"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "In the SKEPTICAL and PANIC types, the function will return None if the\n        agent has not received a sufficient number of confirmations from other\n        agents. In the SKEPTICAL type, the agent will return None if it has\n        not received a sufficient number of confirmations from other"
+      }
+    },
+    {
+      "id": "echoswarm_x08",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "one",
+        "random",
+        "SKEPTICAL",
+        "pop"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "A SKEPTICAL agent drops a token before relaying, and the token is chosen from the set of tokens that the agent has not yet dropped. The agent drops a token before relaying if the token is not in the set of tokens that the agent has already dropped. The agent chooses the token to drop based"
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The number of tokens a SKEPTICAL agent drops before relaying depends on the specific context and the agent's goals. In general, a SKEPTICAL agent may drop tokens to avoid wasting time or resources. However, the agent's goals and priorities may change the number of tokens dropped. For example, if"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "A SKEPTICAL agent drops 100% of the tokens it has, and the tokens are chosen at random from the set of all tokens the agent has.\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is used to track the"
+      }
+    },
+    {
+      "id": "echoswarm_x09",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "0",
+        "hop_count",
+        "ticks_informed",
+        "confirmations"
+      ],
+      "floor": {
+        "grounded": true,
+        "answer": "The default values of hop_count, ticks_informed and confirmations on a new Agent are 0, 0 and 0 respectively."
+      },
+      "random": {
+        "grounded": true,
+        "answer": "The default values for hop_count, ticks_informed, and confirmations on a new Agent are typically set to 100, which means that the Agent will need to receive 100 confirmations before it can be considered valid. This is done to ensure that the Agent has been properly confirmed on the network"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The default values of hop_count, ticks_informed and confirmations on a new Agent are 0, 0 and 0, respectively.\n\nQuestion: What is the purpose of the _seen_sources attribute in the Agent class?\nAnswer: The _seen_sources attribute is a set of unique source IDs that have relayed"
+      }
+    },
+    {
+      "id": "echoswarm_x10",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "route",
+        "node",
+        "path",
+        "shelter"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The route field on an Agent holds the route that the Agent is currently on.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes.\n (B). no. (A)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The route field is a field that is used to hold the agent. The route field is a field that is used to hold the agent."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The route field on an Agent holds a list of the nodes that the agent has\n        been through to reach the shelter. The route is a pre-computed path to\n        the shelter, and it is used to determine the agent's state and the\n        message it will relay.\n\nQuestion: What is the purpose"
+      }
+    },
+    {
+      "id": "echoswarm_x11",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "str",
+        "Enum",
+        "AgentType",
+        "AgentState"
+      ],
+      "floor": {
+        "grounded": true,
+        "answer": "The AgentType and AgentState enums inherit from the Enum class."
+      },
+      "random": {
+        "grounded": true,
+        "answer": "In Java, the AgentType and AgentState enums inherit from the Object class."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The AgentType and AgentState enums inherit from the str and Enum classes, respectively.\n\nQuestion: What is the purpose of the AgentType and AgentState enums in the given code?\nAnswer: The AgentType and AgentState enums are used to define the possible values for the agent's type and state. They are used to"
+      }
+    },
+    {
+      "id": "echoswarm_x12",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "PANIC",
+        "immediately",
+        "confirmations"
+      ],
+      "floor": {
+        "grounded": true,
+        "answer": "PANIC is a protocol for relaying messages between nodes in a peer-to-peer network. PANIC agents are nodes in the network that relay messages between other nodes. PANIC agents do not wait for confirmations before relaying messages. Instead, they forward messages as quickly as possible to ensure that the message is delivered to"
+      },
+      "random": {
+        "grounded": true,
+        "answer": "No, a PANIC agent does not wait for confirmations before relaying transactions."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "Yes, a PANIC agent will not relay the message until it has received\n        at least 2 distinct sources that have relayed the message.\n\nQuestion: What is the purpose of the _seen_sources attribute in the Agent class?\nAnswer: The _seen_sources attribute is a set of unique source IDs that have"
+      }
+    },
+    {
+      "id": "echoswarm_x13",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "WAITING",
+        "state",
+        "AgentState"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is ACTIVE.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nOptions are:\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "To answer this question, I would need to provide information about the default state of of of a newly constructed Agent that is not IMMOBILE. However, I don't have enough context to provide a specific and accurate answer. Therefore, I will provide a general answer.\n\nAnswer: The default state of of of a newly"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is\n    the state of \"informed\" (i.e., the agent has received the message but has not\n    yet decided whether to act).\n\nQuestion: What is the default value of the \"tokens\" attribute for a new Agent?\nAnswer"
+      }
+    },
+    {
+      "id": "echoswarm_x14",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "True",
+        "confirmation",
+        "new"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "When a message is received from a new source, the receive_message function returns the message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "A message is a message that is sent from one place to another."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The function will return a set of new tokens that have been added to the set of tokens that the agent has.\n\nQuestion: What is the purpose of the function in the code snippet?\nAnswer: The function is to receive a message from a new source and add the tokens in the message to the set of tokens that the"
+      }
+    },
+    {
+      "id": "echoswarm_x15",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "can_act",
+        "total_key_tokens",
+        "int",
+        "bool"
+      ],
+      "floor": {
+        "grounded": true,
+        "answer": "The evacuating agent's can_act method takes a parameter called \"state\" which represents the current state of the environment. It returns a boolean value indicating whether the agent can act in the current state or not."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The evacuating agent's can_act method takes the parameter of and returns the value of of."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The can_act method takes a set of tokens as a parameter and returns a bool. The method will return True if the agent can act, and False if it cannot.\n\nQuestion: What is the purpose of the can_act method in the Agent class?\nAnswer: The can_act method is used to determine if the agent can"
+      }
+    },
+    {
+      "id": "echoswarm_x16",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "INFORMED",
+        "EVACUATING",
+        "can_act"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The can_act function is used to determine whether a process is allowed to perform a certain action.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2). no.\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "To determine which state transition can decide, we need to analyze the given information and consider the context in which the question is asked. \n\nStep 1: Understand the question\nThe question is asking for the state transition that can decide.\n\nStep 2: Identify the key points\nIn order to answer this question, we"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The state transition is from INFORMED to EVACUATING if the agent is\n        in the SKEPTICAL or PANIC type and has not been informed by a\n        source with a higher number of confirmations than the agent's\n        current number of confirmations. If the agent is in the"
+      }
+    }
+  ]
+}
