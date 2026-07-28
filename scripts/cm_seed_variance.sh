@@ -1,63 +1,74 @@
 #!/usr/bin/env bash
-# CM-B.0b-repro — three independent draws of the SAME config, to finally put an
-# error bar on this track.
+# Run one distill config N times with different seeds, to get an error bar.
 #
-# Every headline so far (2/8 vs 4/8, 7/25 vs 10/25, 5/8 vs 1/8) is one sample
-# against another with unmeasured variance. Nothing in the pipeline was seeded
-# until 2026-07-28, so run-to-run spread has never been observed even once.
+# Every headline in this track was a single sample until 2026-07-28: 2/8 vs 4/8,
+# 7/25 vs 10/25, 5/8 vs 1/8. The first three-draw run (CM-B.0b-repro) measured a
+# spread of 1 on an 8-fixture test, which is what finally made those comparisons
+# interpretable — and showed the "proven" 200q/48tok recipe to be reproducibly
+# worse than CM-A.2's 120q/32tok.
 #
-# Draw 1 is the already-running unseeded job (an independent draw, just not
-# replayable). Draws 2 and 3 are seeded so they can be replayed exactly.
+# Each draw: distill -> eval -> archive cartridge and results, so no draw can
+# clobber another. A failed distill skips its eval rather than scoring the
+# previous draw's stale cartridge.
 #
-# Each draw: distill -> eval -> archive the cartridge and the results JSON, so
-# the next draw cannot clobber them. A failed distill skips its eval rather
-# than scoring a stale cartridge from the previous draw.
+# Config comes from the environment, so the caller states it explicitly and it
+# lands in the RECIPE banner of every log. Nothing is defaulted silently here.
+#
+# Usage:
+#   CM_TAG=b0d CM_SEEDS="1 2 3" \
+#   CM_MODEL_QUERIES=0 CM_NQUERIES=120 CM_MAX_ANSWER_TOKENS=32 \
+#     nohup caffeinate -dimsu bash scripts/cm_seed_variance.sh [WAIT_PID] &
 set -uo pipefail
 
 cd /Users/ecaterina/Developer/libucks || exit 1
 
 WAIT_PID="${1:-}"
-BUCKET=bc6b90e2
+BUCKET="${CM_BUCKET:-bc6b90e2}"
+TAG="${CM_TAG:?set CM_TAG, e.g. b0d — it names the archived cartridges and results}"
+SEEDS="${CM_SEEDS:?set CM_SEEDS, e.g. \"1 2 3\"}"
 KV=/Users/ecaterina/Developer/test-repos/echoswarm/.libucks/kv_cache
 CART="$KV/$BUCKET.cartridge.safetensors"
+LOG="cm_${TAG}.log"
 
-export CM_MODEL_QUERIES=0
-export CM_NQUERIES=200
-export CM_MAX_ANSWER_TOKENS=48
+# Passed through to the distiller by name so the banner records them.
+export CM_MODEL_QUERIES CM_NQUERIES CM_MAX_ANSWER_TOKENS
 
-log() { echo "[seed-variance $(date '+%H:%M:%S')] $*"; }
+log() { echo "[$TAG $(date '+%H:%M:%S')] $*"; }
 
 if [[ -n "$WAIT_PID" ]]; then
-  log "waiting for running distill (PID $WAIT_PID) ..."
+  log "waiting for PID $WAIT_PID ..."
   while ps -p "$WAIT_PID" >/dev/null 2>&1; do sleep 60; done
   log "PID $WAIT_PID exited"
 fi
 
-# ---- draw 1: score whatever the already-running unseeded job produced ----
-if [[ -f "$CART" ]]; then
-  log "draw 1 (unseeded) — evaluating"
-  uv run python scripts/cm_eval_cartridge.py --buckets "$BUCKET" --tag s0_unseeded \
-    >> cm_seed_variance.log 2>&1
-  cp "$CART" "$KV/$BUCKET.cartridge.s0_unseeded.bak"
-  log "draw 1 archived"
-else
-  log "draw 1 SKIPPED — no cartridge at $CART (the run failed?)"
-fi
+log "config: bucket=$BUCKET seeds=[$SEEDS] model_queries=${CM_MODEL_QUERIES:-unset}" \
+    "nqueries=${CM_NQUERIES:-unset} max_answer_tokens=${CM_MAX_ANSWER_TOKENS:-unset}"
 
-# ---- draws 2 and 3: seeded, replayable ----
-for SEED in 1 2; do
-  log "draw $((SEED + 1)) — distilling with CM_SEED=$SEED"
-  if CM_SEED=$SEED uv run python scripts/cm_distill_buckets.py \
-       --buckets "$BUCKET" --force >> cm_seed_variance.log 2>&1; then
-    log "draw $((SEED + 1)) distilled — evaluating"
-    uv run python scripts/cm_eval_cartridge.py --buckets "$BUCKET" --tag "s${SEED}" \
-      >> cm_seed_variance.log 2>&1
-    cp "$CART" "$KV/$BUCKET.cartridge.s${SEED}.bak"
-    log "draw $((SEED + 1)) archived"
+for SEED in $SEEDS; do
+  log "draw seed=$SEED — distilling"
+  if CM_SEED="$SEED" uv run python scripts/cm_distill_buckets.py \
+       --buckets "$BUCKET" --force >> "$LOG" 2>&1; then
+    log "draw seed=$SEED distilled — evaluating (default 25-fixture set)"
+    uv run python scripts/cm_eval_cartridge.py --buckets "$BUCKET" \
+      --tag "${TAG}_s${SEED}" >> "$LOG" 2>&1
+
+    # Second, better-powered read on the same cartridge. Separate fixture set =
+    # separate denominator, so these scores are never mixed with the 25-set.
+    log "draw seed=$SEED — evaluating extension set (16 fixtures)"
+    uv run python scripts/cm_eval_cartridge.py --buckets "$BUCKET" \
+      --fixtures tests/eval/fixtures/echoswarm_qa_bc6b90e2_ext.json \
+      --tag "${TAG}ext_s${SEED}" >> "$LOG" 2>&1
+
+    cp "$CART" "$KV/$BUCKET.cartridge.${TAG}_s${SEED}.bak"
+    log "draw seed=$SEED archived"
   else
-    log "draw $((SEED + 1)) FAILED to distill — skipping its eval, not scoring a stale cartridge"
+    log "draw seed=$SEED FAILED to distill — skipping its evals, not scoring a stale cartridge"
   fi
 done
 
 log "=== all draws done ==="
-grep -hE "cartridge latent-alone grounding" cm_seed_variance.log || true
+grep -hE "cartridge latent-alone grounding|fixture set:" "$LOG" || true
+echo
+echo "Analyse with:"
+echo "  uv run python scripts/cm_variance_report.py --glob 'echoswarm_cartridge_A2_${TAG}_s*.json'"
+echo "  uv run python scripts/cm_variance_report.py --glob 'echoswarm_cartridge_A2_${TAG}ext_s*.json'"

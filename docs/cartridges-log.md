@@ -18,6 +18,92 @@ finding.
 - CM-A.2 — All-bucket distill + eval gate — ❌ GATE FAIL 2026-07-07 (latent-alone 7/25 vs gate ≥8, bit-identical across 2 evals; fe7ded0d redistill r6 clean (KL 3.69→2.69) but converts neither of its fixtures; `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` proven causally necessary) — **SUPERSEDED by CM-B.0a: the 7/25 was a metric artifact; re-scores to 10/25 = GATE PASS. Also ran templated queries, not the fact-probing ones the entry claims.**
 - CM-B.0a — Grounding metric audit + full re-score — ✅ GATE PASS 2026-07-27 (**cartridge latent-alone 7/25 → 10/25 vs gate ≥8; baselines move ≤+1, so not general inflation; CM-A.2's negative result is overturned**)
 - CM-B.0b — Query-gen fix + 3-bucket re-distill — ❌ GATE FAIL 2026-07-27 (**1/13 vs a 5/13 baseline — a regression, not a near miss. bc6b90e2 5/8→1/8 with 6/13 answers degenerate token loops. Confounded: still 120 queries, not the proven 200. Diagnostics found the verbatim cap discards 66–72% of two buckets and the eval ceiling is 20/25, not 25/25**)
+- CM-B.0b-repro — CM-A.1-retry reproduction, 3 seeded draws — ❌ DOES NOT REPRODUCE 2026-07-28 (**2/8, 1/8, 1/8 — spread 1, so this is NOT noise. The "proven recipe" (200 q / 48 answer tokens) is reproducibly WORSE than CM-A.2's 120/32, which scores 5/8 on the same bucket with the same verbatim. CM-A.2 is the best configuration this project has found; everything since has degraded it**)
+
+---
+
+## CM-B.0b-repro — CM-A.1-retry reproduction, 3 seeded draws (2026-07-28)
+
+**Status**: ❌ The only "pass" in this track does not reproduce — and the recipe
+credited for it is actively harmful.
+
+**Ran**: bc6b90e2, the exact CM-A.1-retry recipe — 200 queries,
+`max_answer_tokens=48`, fact-probing templates (`CM_MODEL_QUERIES=0`), P=128,
+4 epochs, lr 1e-2, verbatim 4096, extract 1024, last-epoch save (matching the
+original protocol; best-epoch selection deliberately deferred). Draw 1 unseeded,
+draws 2–3 at `CM_SEED=1,2`. 12,945 s + 2×~10,000 s.
+
+| draw | KL init → final | score |
+|---|---|---|
+| s0 (unseeded) | 5.763 → 4.335 | 2/8 |
+| s1 (seed=1) | — | 1/8 |
+| s2 (seed=2) | — | 1/8 |
+
+**mean 1.33, range 1–2, spread 1, stdev 0.58.** First error bar this track has
+ever had. The pre-registered read was "spread ≥3 means every finding collapses
+into noise" — it is 1, so the findings are real.
+
+### The recipe is the problem, not the environment
+
+| run | date | queries | ans tok | qgen | score |
+|---|---|---|---|---|---|
+| CM-A.1-retry | Jul 2 | 200 | 48 | templates | 4/8 (claimed) |
+| **CM-A.2** | Jul 7 | **120** | **32** | templates | **5/8** |
+| CM-B.0b | Jul 27 | 120 | 32 | 0.5B model | 1/8 |
+| CM-B.0b-repro | Jul 28 | 200 | 48 | templates | 1–2/8 |
+
+Per-fixture, today's config loses **echoswarm_02, 03, 04 in all three draws** and
+gains nothing. echoswarm_01 always grounds; 07/19/20 never ground in any config.
+A consistent monotone loss, not sampling.
+
+**CM-A.2 ran 2026-07-07, four days AFTER the slice-on-overflow fix (30ee434,
+07-03).** It therefore had the identical post-fix verbatim, identical templates,
+identical P and epochs. The only differences from today are query count
+(120 vs 200) and answer budget (32 vs 48). So:
+
+- **Verbatim slicing is ruled out** as the cause. `CM_VERBATIM_CHARS` still
+  reproduces the pre-fix text byte-for-byte (=3868 → 3898 chars, clean chunk
+  boundary) and remains available, but it is no longer the suspect.
+- **Environment drift is ruled out**: torch 2.11.0 (site-packages May 14),
+  transformers 5.4.0 (Mar 31), safetensors (Mar 31), Qwen2.5-3B weights snapshot
+  `3aab1f19` (Apr 4). All predate Jul 2. The only lockfile change since
+  (`4d6d982`) merely dropped `bitsandbytes` on macOS.
+- **CM-B.0b's collapse was not mainly the 0.5B generator.** Templates at 200/48
+  also give 1/8. Two independent changes were each harmful.
+
+### Corrections to the record
+
+1. **KL is not comparable across runs with different query sets.** It is measured
+   against teacher answers for that run's queries, and the query sets differ (the
+   identifier list shifts: `agent`/`bool` in, `n_drop`/`pop` out). An earlier
+   claim in this session that "the 20× KL gap is too stable to be noise" was
+   unsound. The score comparison, called the weaker evidence at the time, is what
+   held up.
+2. **The eval is not bit-deterministic.** `echoswarm_cartridge_A2.json` and
+   `A2_r1_fail7.json` are the same cartridge scored twice: verdicts identical
+   (7/25), but answer TEXT differs on echoswarm_10 and echoswarm_16. CM-A.2's
+   "bit-identical across 2 evals" is wrong — the score matched, the text did not.
+   Likely MPS reduction ordering flipping an argmax.
+3. **`_collect_source_text` overshoots `max_chars`** by (blocks−1)×6, because it
+   sums block lengths but joins with a 6-char separator (+36 at the 4096
+   default). Left unchanged and documented: fixing it would shift every verbatim
+   length and break comparability. Also: pre-fix verbatim is 3898 chars, not the
+   3868 quoted earlier in this session (that figure omitted separators).
+
+### Leading hypothesis
+
+At P=128 the prefix cannot absorb 200 queries' worth of signal, and 48-token
+teacher answers dilute it further — so *more* self-study makes the cartridge
+worse, not better. This is the opposite of the CM-A.2 log's own recommendation to
+scale queries to 512–1000, which should now be considered withdrawn.
+
+**Next**: CM-B.0d — reproduce CM-A.2's exact config (120 q, 32 answer tokens,
+templates) on bc6b90e2 across 3 seeds. If 5/8 returns, the finding is "more
+queries and longer answers hurt at P=128" and we have a working recipe for the
+first time. If it does not, CM-A.2's 5/8 was itself one lucky draw and nothing in
+this track has ever worked — which supersedes Stage 1 and every downstream plan.
+Also queued: the 16-fixture bc6b90e2 extension set (24 items total) for a
+better-powered read, scored separately since it changes the denominator.
 
 ---
 
