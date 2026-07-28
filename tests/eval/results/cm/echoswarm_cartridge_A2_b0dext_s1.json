@@ -1,0 +1,214 @@
+{
+  "grounding": 3,
+  "n": 16,
+  "multi_grounding": 0,
+  "multi_total": 0,
+  "missing": 0,
+  "buckets_filter": "bc6b90e2",
+  "metric": "cm-b.0a",
+  "per_question": [
+    {
+      "id": "echoswarm_x01",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "COMPLIANT",
+        "SKEPTICAL",
+        "PANIC",
+        "IMMOBILE"
+      ],
+      "answer": "The four agent types are: \"compliant\", \"skeptical\", \"panic\", and \"immobile\".\n\nQuestion: What is the purpose of the AgentType enum in the Agent class?\nAnswer: The AgentType enum is used to define the four types of agents that can be in the\n    swarm. The"
+    },
+    {
+      "id": "echoswarm_x02",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "WAITING",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "STRANDED"
+      ],
+      "answer": "The five states an agent can be in are: WAITING, INFORMED, ECHOING, ECHOING, and ECHOING.\n\nQuestion: What is the purpose of the Agent class in the Echoswarm project?\nAnswer: The purpose of the Agent class in the Echoswarm project is to represent"
+    },
+    {
+      "id": "echoswarm_x03",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "__post_init__"
+      ],
+      "answer": "The IMMOBILE agent is placed in the \"informed\" state as soon as it is constructed.\n\nQuestion: What is the function of the \"informed\" state in the agent's state?\nAnswer: The \"informed\" state is the state in which the agent has received the message and is\n    evaluating"
+    },
+    {
+      "id": "echoswarm_x04",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "EVACUATING",
+        "SAFE",
+        "STRANDED",
+        "IMMOBILE"
+      ],
+      "answer": "In the SKEP\n\nQuestion: In which agent states does receive_message return True?\nAnswer: In the SKEP, PANIC, and IMMOBILE\n\nQuestion: In which agent states does receive_message return True and the agent is not in the\n    INFORMED state?\nAnswer: In the S"
+    },
+    {
+      "id": "echoswarm_x05",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "tokens",
+        "hop_count",
+        "INFORMED",
+        "WAITING"
+      ],
+      "answer": "The agent will be in the INFORMED state and will be able to\n        - if the agent is a Compliant agent, it will be in the INFORMED state and will be able to\n        - if the agent is a Sceptical agent, it will be in the INFORMED state and"
+    },
+    {
+      "id": "echoswarm_x06",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "_seen_sources",
+        "source_id",
+        "distinct"
+      ],
+      "answer": "The Agent will not be counted as a confirmation if it has not been in the\n        INFORMED state for at least 10 seconds. This is to prevent the\n        Agent from being counted as a confirmation if it has not yet\n        received the message.\n\n    The Agent will not be counted as a"
+    },
+    {
+      "id": "echoswarm_x07",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "WAITING",
+        "STRANDED",
+        "SAFE",
+        "None"
+      ],
+      "answer": "In the SKEP\n\nQuestion: In which states does relay_tokens return None instead of broadcasting?\nAnswer: In the SKEP\n\nQuestion: In which states does relay_tokens return None instead of broadcasting?\nAnswer: In the SKEP\n\nQuestion: In which states does relay_tokens return None instead of broadcasting?"
+    },
+    {
+      "id": "echoswarm_x08",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "one",
+        "random",
+        "SKEPTICAL",
+        "pop"
+      ],
+      "answer": "A SKEP\n\nQuestion: How many tokens does a SKEPTICAL agent drop before relaying, and how are they chosen?\nAnswer: A SKEP\n\nQuestion: How many tokens does a SKEPTICAL agent drop before relaying, and how are they chosen?\nAnswer: A SKEP"
+    },
+    {
+      "id": "echoswarm_x09",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "0",
+        "hop_count",
+        "ticks_informed",
+        "confirmations"
+      ],
+      "answer": "The default values of hop_count, ticks_informed and confirmations on a new Agent are 0, 0 and 0, respectively.\n\nQuestion: What is the purpose of the _hops and _confirmations attributes in the Agent class?\nAnswer: The _hops and _confirmations attributes in the Agent"
+    },
+    {
+      "id": "echoswarm_x10",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "route",
+        "node",
+        "path",
+        "shelter"
+      ],
+      "answer": "The route is a list of the agents that the agent has to pass through to reach the destination. The route is a list of the agents that the agent has to pass through to reach the destination. The route is a list of the agents that the agent has to pass through to reach the destination. The route is a"
+    },
+    {
+      "id": "echoswarm_x11",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "str",
+        "Enum",
+        "AgentType",
+        "AgentState"
+      ],
+      "answer": "The AgentType and AgentState enums in the given code are not a class, but a class type. They are not a class, but a class type. They are not a class, but a class type. They are not a class, but a class type. They are not a class, but a class type"
+    },
+    {
+      "id": "echoswarm_x12",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "PANIC",
+        "immediately",
+        "confirmations"
+      ],
+      "answer": "Yes, a PANIC agent will not relay the message until it has received\n        at least one confirmation from a compliant or skeptical agent.\n\nQuestion: What is the function of the \"informed\" state in the Agent class?\nAnswer: The \"informed\" state is the state of an agent that has received"
+    },
+    {
+      "id": "echoswarm_x13",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "WAITING",
+        "state",
+        "AgentState"
+      ],
+      "answer": "The default state of a newly constructed Agent that is not IMMOBILE is INFORMED.\n\nQuestion: What is the default state of a newly constructed Agent that is IMMOBILE?\nAnswer: The default state of a newly constructed Agent that is IMMOBILE is IMMOBILE.\n\nQuestion: What is the default state"
+    },
+    {
+      "id": "echoswarm_x14",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "True",
+        "confirmation",
+        "new"
+      ],
+      "answer": "The function receive_message is a function that is used to receive a message from a new source. It is a function that is used to receive a message from a new source. The function is a function that is used to receive a message from a new source. The function is a function that is used to receive a message"
+    },
+    {
+      "id": "echoswarm_x15",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "can_act",
+        "total_key_tokens",
+        "int",
+        "bool"
+      ],
+      "answer": "The can_act method of the evacuating agent has a parameter of a set of\n        set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of set of"
+    },
+    {
+      "id": "echoswarm_x16",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "INFORMED",
+        "EVACUATING",
+        "can_act"
+      ],
+      "answer": "The function can_act is a function that returns a boolean value, which is the result of the function. The function can_act is a function that returns a boolean value, which is the result of the function. The function can_act is a function that returns a boolean value, which is the result of the function. The"
+    }
+  ]
+}

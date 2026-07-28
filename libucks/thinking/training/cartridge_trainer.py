@@ -387,19 +387,35 @@ class CartridgeTrainer:
     # ------------------------------------------------------------------
     @torch.no_grad()
     def generate_answer(
-        self, cartridge: KVPrefixCartridge, query: str,
+        self, cartridge: KVPrefixCartridge | None, query: str,
         *, max_new_tokens: int = 64, verbatim: str = "",
     ) -> str:
         """Greedy-decode an answer from the cartridge prefix (latent-alone when
-        verbatim=""). Used for the CM-A.1 proof and eval."""
+        verbatim=""). Used for the CM-A.1 proof and eval.
+
+        `cartridge=None` attaches no prefix at all — the no-context FLOOR. It
+        exists here, rather than as a separate decode loop in a script, so the
+        floor and the cartridge run differ in exactly one respect: the presence
+        of the prefix. Tokenisation, the query template, greedy selection, EOS
+        handling and mask construction are shared by construction, so a
+        cartridge-minus-floor delta cannot be an artefact of two decoders
+        disagreeing. CM-B.0d made this the load-bearing number: 4.33/16 means
+        nothing until the floor is known.
+        """
         with torch.inference_mode(False), torch.no_grad():
-            cartridge.eval()
-            prefix_cache = cartridge.to_dynamic_cache(self.device, dtype=self.receiver_dtype)
+            prefix_cache = None
+            prefix_len = 0
+            if cartridge is not None:
+                cartridge.eval()
+                prefix_cache = cartridge.to_dynamic_cache(
+                    self.device, dtype=self.receiver_dtype
+                )
+                prefix_len = cartridge.prefix_len
             q_ids = self.tokenizer(
                 self._q_text(query, verbatim), return_tensors="pt",
                 truncation=True, max_length=3500,
             )["input_ids"].to(self.device)
-            cur_len = cartridge.prefix_len + q_ids.shape[1]
+            cur_len = prefix_len + q_ids.shape[1]
             attn = torch.ones(1, cur_len, dtype=torch.long, device=self.device)
             out = self.model(
                 input_ids=q_ids, past_key_values=prefix_cache,

@@ -1,0 +1,112 @@
+{
+  "grounding": 1,
+  "n": 8,
+  "multi_grounding": 0,
+  "multi_total": 2,
+  "missing": 0,
+  "buckets_filter": "bc6b90e2",
+  "metric": "cm-b.0a",
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "answer": "The relay probability for a Compliant agent is 0.5. This means that the agent will relay the message with a 50% chance. If the agent is not Compliant, the relay probability will be 1, meaning the agent will always relay the message.\n\nQuestion: What is the relay probability for"
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "answer": "The message must be from aCompliant agent and the message must be from aCompliant agent and the message must be from aCompliant agent and the message must be from aCompliant agent and the message must be from aCompliant agent and the message must be from aCompliant agent and the message must be"
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "answer": "A Panic agent will corrupt the message by adding a random number to the message, which can be used to create a new message that is not the same as the original message. This can be used to create a new message that is not the same as the original message, which can be used to create a new message that"
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "answer": "The initial state of an Immobile agent is \"informed\" and it can receive a message.\n\nQuestion: What is the function of the `receive_message` method in the `Agent` class?\nAnswer: The `receive_message` method is used to receive a message from a source and update the agent's state and"
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "grounded": true,
+      "multi": false,
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "answer": "The token-preservation threshold for an INFORMed agent to start evacuating is 2. This is because the agent will start evacuating when it has received at least 2 tokens, which is the minimum number of tokens required to be in the \"informed\" state.\n\nQuestion: What is the maximum number of"
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": false,
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "answer": "The snapshot semantics rule is that the _relay_messages function will not\n        return a new snapshot if the message has not been received by all\n        agents. This is important because it ensures that the snapshot is\n        only updated when all agents have received the message, which is\n        a necessary condition for the message"
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "answer": "A Skeptical agent is more likely to be in the WAITING state because it is more\n        likely to be in the WAITING state when it has not received the message. This is\n        because the agent is more likely to be in the WAITING state when it has not\n        received the message,"
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "grounded": false,
+      "multi": true,
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "answer": "The agent will receive the message from Hermes and will then evaluate the message to determine if it is a valid message. If the message is valid, the agent will then evaluate the message to determine if it is a message that the agent can act on. If the message is a message that the agent can act on, the"
+    }
+  ]
+}

@@ -23,6 +23,16 @@ from __future__ import annotations
 
 import re
 
+# Answer length budget for every latent-alone eval arm, defined ONCE.
+#
+# Two answers generated with different token budgets are not comparable: the
+# grounding metric needs >=50% of the keywords to appear, and a shorter answer has
+# fewer chances to emit them. cm_eval_cartridge and cm_floor both read this rather
+# than restating 64, so a cartridge score and its no-context floor cannot drift
+# apart through an edit to one script. This module already owns the shared metric;
+# the answer budget is part of the same protocol.
+EVAL_MAX_NEW_TOKENS = 64
+
 # Word <-> digit for the small integers that realistically appear as fixture
 # keywords. Deliberately stops at 20; beyond that, keywords are written as digits.
 _WORD_TO_DIGIT = {

@@ -35,7 +35,7 @@ from libucks.config import Config
 from libucks.storage.bucket_registry import BucketRegistry
 from libucks.storage.bucket_store import BucketStore
 from libucks.embeddings.embedding_service import EmbeddingService
-from libucks.eval_metrics import grounding_score
+from libucks.eval_metrics import EVAL_MAX_NEW_TOKENS, grounding_score
 from libucks.cache_augmentation.cartridge import KVPrefixCartridge
 from libucks.thinking.training.cartridge_trainer import CartridgeTrainer
 
@@ -157,7 +157,7 @@ def main() -> None:
             ans = ""
             g = False
         else:
-            ans = trainer.generate_answer(cart, fx["question"], max_new_tokens=64, verbatim="")
+            ans = trainer.generate_answer(cart, fx["question"], max_new_tokens=EVAL_MAX_NEW_TOKENS, verbatim="")
             g = _grounded(ans, fx["answer_keywords"])
         grounded += int(g)
         multi_grounded += int(g and is_multi)
