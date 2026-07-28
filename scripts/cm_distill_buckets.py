@@ -65,6 +65,21 @@ PREFIX_LEN = int(os.environ.get("CM_PREFIX_LEN", "128"))
 N_QUERIES = int(os.environ.get("CM_NQUERIES", "120"))
 EPOCHS = int(os.environ.get("CM_EPOCHS", "4"))
 LR = float(os.environ.get("CM_LR", "1e-2"))
+# Verbatim budget, in characters. Feeds THREE places that must agree: the text
+# collected from chunks, the teacher's context window, and the KV extraction
+# length. They were three separate literals; a mismatch means the teacher answers
+# from text the cartridge never encoded.
+#
+# Also the lever for the slice-on-overflow question. Since 30ee434 an overflowing
+# block is truncated rather than dropped, so the verbatim now ends mid-statement
+# ("if self.agent_") where it used to end at a chunk boundary ("return None").
+# Setting this to a value that lands exactly on a boundary reproduces the old
+# behaviour: for bc6b90e2 that is 3868 (vs 4132 today).
+VERBATIM_CHARS = int(os.environ.get("CM_VERBATIM_CHARS", "4096"))
+# Tokens to extract for the warm-start KV. ~4 chars/token, and it only has to
+# cover PREFIX_LEN positions, but keeping it proportional avoids silently
+# warm-starting from a fraction of a raised verbatim budget.
+EXTRACT_TOKENS = int(os.environ.get("CM_EXTRACT_TOKENS", str(max(1024, VERBATIM_CHARS // 4))))
 # Teacher answer budget. CM-A.1-retry (the only run that ever passed, 4/8 on
 # bc6b90e2) used 48; CM-A.2 and CM-B.0b both used 32, which cannot fit a
 # multi-identifier answer — echoswarm_11 needs six JSON keys. Default stays 32
@@ -155,7 +170,7 @@ def main() -> None:
             skipped += 1
             continue
         fm, _ = store.read(bid)
-        verbatim = _collect_source_text(fm, max_chars=4096) or ""
+        verbatim = _collect_source_text(fm, max_chars=VERBATIM_CHARS) or ""
         if len(verbatim) < 50:
             _log(f"{bid[:8]} — verbatim too short ({len(verbatim)}), skip")
             failed += 1
@@ -244,14 +259,14 @@ def main() -> None:
     # Echo the full recipe. CM-A.2's log entry claimed a configuration the run
     # did not execute; a reader of this log must never have to infer it again.
     _log(f"RECIPE: P={PREFIX_LEN} queries={N_QUERIES} epochs={EPOCHS} lr={LR} "
-         f"max_answer_tokens={MAX_ANSWER_TOKENS} verbatim=4096 extract=1024 "
+         f"max_answer_tokens={MAX_ANSWER_TOKENS} verbatim={VERBATIM_CHARS} extract={EXTRACT_TOKENS} "
          f"qgen={QGEN_ID if MODEL_QUERIES else 'fact-probing templates'} "
          f"receiver={RECEIVER_ID} seed={SEED if SEED is not None else 'UNSEEDED'}")
     _log(f"loading {RECEIVER_ID} on {device} ...")
     model = AutoModelForCausalLM.from_pretrained(RECEIVER_ID, dtype=torch.bfloat16).eval().to(device)
     tok = AutoTokenizer.from_pretrained(RECEIVER_ID)
     trainer = CartridgeTrainer(model, tok, temperature=2.0, alpha_ce=0.3,
-                               max_answer_tokens=MAX_ANSWER_TOKENS, max_verbatim_chars=4096)
+                               max_answer_tokens=MAX_ANSWER_TOKENS, max_verbatim_chars=VERBATIM_CHARS)
 
     done = 0
     for n, (bid, verbatim) in enumerate(todo, 1):
@@ -281,7 +296,7 @@ def main() -> None:
 
             if epochs_done == 0:
                 cart.init_from_extracted_kv(
-                    extract_bucket_kv(model, tok, verbatim, max_tokens=1024)
+                    extract_bucket_kv(model, tok, verbatim, max_tokens=EXTRACT_TOKENS)
                 )
             cart.to(device)
 

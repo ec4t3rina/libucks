@@ -70,6 +70,12 @@ def main() -> None:
         help="comma-separated bucket id prefixes; evaluate only fixtures routing to these",
     )
     ap.add_argument("--tag", default="", help="suffix for the results filename")
+    ap.add_argument(
+        "--fixtures",
+        default="",
+        help="alternate fixture JSON (e.g. tests/eval/fixtures/echoswarm_qa_bc6b90e2_ext.json). "
+             "Changes the denominator — scores are NOT comparable across fixture sets.",
+    )
     args = ap.parse_args()
 
     cfg = Config.load(REPO)
@@ -79,7 +85,16 @@ def main() -> None:
     registry.load()
     store = BucketStore(libucks_dir / "buckets")
     embedder = EmbeddingService.get_instance(cfg.model.embedding_model)
-    fixtures = json.loads(FIXTURES.read_text())["fixtures"]
+    # A DIFFERENT fixture file means a different denominator. Scores from one are
+    # not comparable with scores from another, so the choice is explicit and the
+    # filename is echoed into the results.
+    fixtures_path = Path(args.fixtures) if args.fixtures else FIXTURES
+    if not fixtures_path.is_absolute():
+        fixtures_path = Path(__file__).resolve().parent.parent / fixtures_path
+    fixtures = json.loads(fixtures_path.read_text())["fixtures"]
+    if args.fixtures:
+        _log(f"fixture set: {fixtures_path.name} ({len(fixtures)} fixtures) — "
+             f"NOT comparable with the default 25-fixture numbers")
 
     centroids = registry.get_all_centroids()
     bids = list(centroids.keys())

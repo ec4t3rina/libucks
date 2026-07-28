@@ -1,0 +1,151 @@
+{
+  "_comment": [
+    "Extension fixture set for bucket bc6b90e2 (src/swarm/agents.py).",
+    "",
+    "WHY THIS EXISTS. bc6b90e2 carries 8 fixtures in echoswarm_qa.json, and four",
+    "nominally-similar distill configs scored 1/8, 2/8, 4/8 and 5/8 on it. A spread",
+    "of 4 on an 8-item test means no claim in the cartridge track survives its own",
+    "noise floor. Standard error falls as 1/sqrt(n), so tripling the item count is",
+    "the cheapest real fix — better than any further recipe tuning.",
+    "",
+    "DELIBERATELY A SEPARATE FILE. Appending to echoswarm_qa.json would change the",
+    "denominator of every historical number (7/25, 10/25, 5/13) and destroy",
+    "comparability with the logged results. Pass --fixtures to the eval to use it.",
+    "",
+    "EVERY ANSWER IS IN THE KEPT VERBATIM. The 4096-char cap discards part of some",
+    "buckets, and five of the original 25 fixtures are structurally unanswerable",
+    "because their keywords live in discarded text or in the wrong bucket. These",
+    "were written against the actual distilled text and are checked by",
+    "tests/unit/test_fixture_reachability.py."
+  ],
+  "fixtures": [
+    {
+      "id": "echoswarm_x01",
+      "question": "What are the four agent types defined in the AgentType enum?",
+      "expected_bucket_keywords": ["agents", "agenttype"],
+      "answer_keywords": ["COMPLIANT", "SKEPTICAL", "PANIC", "IMMOBILE"],
+      "ground_truth_answer": "COMPLIANT, SKEPTICAL, PANIC and IMMOBILE.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x02",
+      "question": "What are the five states an agent can be in?",
+      "expected_bucket_keywords": ["agents", "agentstate"],
+      "answer_keywords": ["WAITING", "INFORMED", "EVACUATING", "SAFE", "STRANDED"],
+      "ground_truth_answer": "WAITING, INFORMED, EVACUATING, SAFE and STRANDED.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x03",
+      "question": "What state is an IMMOBILE agent placed in as soon as it is constructed?",
+      "expected_bucket_keywords": ["agents", "immobile"],
+      "answer_keywords": ["STRANDED", "IMMOBILE", "__post_init__"],
+      "ground_truth_answer": "__post_init__ sets an IMMOBILE agent's state to STRANDED immediately.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x04",
+      "question": "In which agent states does receive_message refuse the message and return False?",
+      "expected_bucket_keywords": ["agents", "receive_message"],
+      "answer_keywords": ["EVACUATING", "SAFE", "STRANDED", "IMMOBILE"],
+      "ground_truth_answer": "It returns False for IMMOBILE agents and for agents already EVACUATING, SAFE or STRANDED.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x05",
+      "question": "What does an agent do the first time it receives a message while WAITING?",
+      "expected_bucket_keywords": ["agents", "receive_message"],
+      "answer_keywords": ["tokens", "hop_count", "INFORMED", "WAITING"],
+      "ground_truth_answer": "It stores the tokens and hop_count and moves from WAITING to INFORMED.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x06",
+      "question": "How does an Agent stop the same neighbour being counted twice as a confirmation?",
+      "expected_bucket_keywords": ["agents", "confirmations"],
+      "answer_keywords": ["_seen_sources", "source_id", "distinct"],
+      "ground_truth_answer": "It keeps a _seen_sources set and ignores any source_id already in it, so only distinct sources count.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x07",
+      "question": "In which states does relay_tokens return None instead of broadcasting?",
+      "expected_bucket_keywords": ["agents", "relay_tokens"],
+      "answer_keywords": ["WAITING", "STRANDED", "SAFE", "None"],
+      "ground_truth_answer": "relay_tokens returns None when the agent is WAITING, STRANDED or SAFE, and for IMMOBILE agents.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x08",
+      "question": "How many tokens does a SKEPTICAL agent drop before relaying, and how are they chosen?",
+      "expected_bucket_keywords": ["agents", "skeptical"],
+      "answer_keywords": ["one", "random", "SKEPTICAL", "pop"],
+      "ground_truth_answer": "It pops exactly one random key token from the list before relaying.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x09",
+      "question": "What are the default values of hop_count, ticks_informed and confirmations on a new Agent?",
+      "expected_bucket_keywords": ["agents", "agent"],
+      "answer_keywords": ["0", "hop_count", "ticks_informed", "confirmations"],
+      "ground_truth_answer": "All three default to 0.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x10",
+      "question": "What does the route field on an Agent hold?",
+      "expected_bucket_keywords": ["agents", "route"],
+      "answer_keywords": ["route", "node", "path", "shelter"],
+      "ground_truth_answer": "A pre-computed node path to the shelter, with route_index tracking the current step.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x11",
+      "question": "Which base classes do the AgentType and AgentState enums inherit from?",
+      "expected_bucket_keywords": ["agents", "enum"],
+      "answer_keywords": ["str", "Enum", "AgentType", "AgentState"],
+      "ground_truth_answer": "Both subclass str and Enum.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x12",
+      "question": "Does a PANIC agent wait for confirmations before it relays?",
+      "expected_bucket_keywords": ["agents", "panic"],
+      "answer_keywords": ["PANIC", "immediately", "confirmations"],
+      "ground_truth_answer": "No — a PANIC agent relays immediately, unlike SKEPTICAL which waits for 2 confirmations.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x13",
+      "question": "What is the default state of a newly constructed Agent that is not IMMOBILE?",
+      "expected_bucket_keywords": ["agents", "state"],
+      "answer_keywords": ["WAITING", "state", "AgentState"],
+      "ground_truth_answer": "state defaults to AgentState.WAITING.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x14",
+      "question": "What does receive_message return when it accepts a message from a new source?",
+      "expected_bucket_keywords": ["agents", "receive_message"],
+      "answer_keywords": ["True", "confirmation", "new"],
+      "ground_truth_answer": "True, indicating this was a new confirmation.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x15",
+      "question": "What parameter does the evacuating agent's can_act method take, and what does it return?",
+      "expected_bucket_keywords": ["agents", "can_act"],
+      "answer_keywords": ["can_act", "total_key_tokens", "int", "bool"],
+      "ground_truth_answer": "can_act(self, total_key_tokens: int) -> bool.",
+      "needs_multi_bucket": false
+    },
+    {
+      "id": "echoswarm_x16",
+      "question": "Which state transition does can_act decide?",
+      "expected_bucket_keywords": ["agents", "can_act"],
+      "answer_keywords": ["INFORMED", "EVACUATING", "can_act"],
+      "ground_truth_answer": "Whether the agent should move from INFORMED to EVACUATING.",
+      "needs_multi_bucket": false
+    }
+  ]
+}
