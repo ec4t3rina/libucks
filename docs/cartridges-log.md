@@ -18,7 +18,109 @@ finding.
 - CM-A.2 — All-bucket distill + eval gate — ❌ GATE FAIL 2026-07-07 (latent-alone 7/25 vs gate ≥8, bit-identical across 2 evals; fe7ded0d redistill r6 clean (KL 3.69→2.69) but converts neither of its fixtures; `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` proven causally necessary) — **SUPERSEDED by CM-B.0a: the 7/25 was a metric artifact; re-scores to 10/25 = GATE PASS. Also ran templated queries, not the fact-probing ones the entry claims.**
 - CM-B.0a — Grounding metric audit + full re-score — ✅ GATE PASS 2026-07-27 (**cartridge latent-alone 7/25 → 10/25 vs gate ≥8; baselines move ≤+1, so not general inflation; CM-A.2's negative result is overturned**)
 - CM-B.0b — Query-gen fix + 3-bucket re-distill — ❌ GATE FAIL 2026-07-27 (**1/13 vs a 5/13 baseline — a regression, not a near miss. bc6b90e2 5/8→1/8 with 6/13 answers degenerate token loops. Confounded: still 120 queries, not the proven 200. Diagnostics found the verbatim cap discards 66–72% of two buckets and the eval ceiling is 20/25, not 25/25**)
-- CM-B.0b-repro — CM-A.1-retry reproduction, 3 seeded draws — ❌ DOES NOT REPRODUCE 2026-07-28 (**2/8, 1/8, 1/8 — spread 1, so this is NOT noise. The "proven recipe" (200 q / 48 answer tokens) is reproducibly WORSE than CM-A.2's 120/32, which scores 5/8 on the same bucket with the same verbatim. CM-A.2 is the best configuration this project has found; everything since has degraded it**)
+- CM-B.0b-repro — CM-A.1-retry reproduction, 3 seeded draws — ❌ DOES NOT REPRODUCE 2026-07-28 (**2/8, 1/8, 1/8 — spread 1, so this is NOT noise**)
+- CM-B.0d — CM-A.2's exact config, 3 seeded draws — ❌ DOES NOT REPRODUCE 2026-07-28 (**0/8, 1/8, 1/8. CM-A.2's 5/8 was a single lucky draw. Six modern draws across two configs all land at 0–2/8 against two historical single draws of 4/8 and 5/8**)
+- CM-B.0e — no-context floor, 3 arms × 3 seeds — ❌ **LATENT CHANNEL INERT** 2026-07-28 (**cartridge − floor = +0.67/8 and +0.33/16, i.e. zero at spread ±1. On the non-leaky set the base 3B scores 0.00/8 cold and the cartridge scores 0.67/8. A random prefix is ACTIVELY HARMFUL (2.33 vs floor 4.00), so `cartridge − random` overstates the benefit and must not be quoted**)
+
+---
+
+## CM-B.0d / CM-B.0e — reproduction of CM-A.2, and the no-context floor (2026-07-28)
+
+**Status**: ❌ The cartridge channel is inert on bc6b90e2. Distillation contributes
+nothing measurable over having no memory at all.
+
+### 0d — CM-A.2's exact config does not reproduce either
+
+120 queries, `max_answer_tokens=32`, fact-probing templates, P=128, 4ep, seeds 1–3:
+**0/8, 1/8, 1/8** (mean 0.67, spread 1). KL 5.754→2.987, 5.761→3.341,
+6.171→4.860 — note epoch 2 *rose* in all three runs.
+
+| run | date | queries | ans tok | qgen | score |
+|---|---|---|---|---|---|
+| CM-A.1-retry | Jul 2 | 200 | 48 | templates | 4/8 (n=1) |
+| CM-A.2 | Jul 7 | 120 | 32 | templates | 5/8 (n=1) |
+| CM-B.0b-repro | Jul 28 | 200 | 48 | templates | 2, 1, 1 |
+| CM-B.0d | Jul 28 | 120 | 32 | templates | 0, 1, 1 |
+
+**Correction to the CM-B.0b-repro entry above.** It concluded "200/48 is
+reproducibly worse than 120/32". That was wrong — 120/32 measures 0.67 and 200/48
+measures 1.33; both configs land in the same place. A one-fixture difference was
+read as signal, immediately after warning against exactly that.
+
+All six modern draws start at KL 5.7–6.2 with within-config spread ~0.4, against
+CM-A.1-retry's claimed 0.749. Two *different* query counts landing in the same
+band also refutes the earlier suggestion that query-set composition explains the
+KL level. Every identifiable variable is now excluded: verbatim slicing (CM-A.2
+ran after the fix), environment (torch/transformers/weights all predate Jul 2),
+query count, answer budget, templates-vs-model, P, epochs, lr, and the two
+scripts' setup paths. **No surviving artifact from Jul 2 or Jul 7 exists to
+diagnose against.** The only two "passes" this track recorded are unreproducible
+and unexplained.
+
+### 0e — the floor, 3 arms × 3 seeds
+
+`floor` = no prefix, `random` = untrained prefix of identical geometry,
+`cartridge` = the distilled prefix. All three share the fixtures, metric, decoder
+and model; `generate_answer(cartridge=None)` gives the floor, so the arms differ
+in exactly one respect.
+
+**Original 8 fixtures**
+
+| seed | floor | random | cartridge | c−floor | c−random |
+|---|---|---|---|---|---|
+| 1 | 0 | 1 | 0 | +0 | −1 |
+| 2 | 0 | 0 | 1 | +1 | +1 |
+| 3 | 0 | 1 | 1 | +1 | +0 |
+| **mean** | **0.00** | **0.67** | **0.67** | **+0.67** | **+0.00** |
+
+**Extension 16 fixtures**
+
+| seed | floor | random | cartridge | c−floor | c−random |
+|---|---|---|---|---|---|
+| 1 | 4 | 3 | 3 | −1 | +0 |
+| 2 | 4 | 2 | 5 | +1 | +3 |
+| 3 | 4 | 2 | 5 | +1 | +3 |
+| **mean** | **4.00** | **2.33** | **4.33** | **+0.33** | **+2.00** |
+
+**The result**: `cartridge − floor` is +0.67/8 and +0.33/16 — zero at spread ±1.
+On the non-leaky set the base 3B scores **0.00/8 cold** and the cartridge, holding
+the bucket's entire source distilled into 2.36M parameters, scores **0.67/8**.
+
+### Two corrections, both to work done the same day
+
+1. **`cartridge − random` is a misleading statistic and I introduced it.** It was
+   meant to separate learned content from the mere presence of P extra attendable
+   positions. But a random prefix is *actively harmful* — 2.33 vs a floor of 4.00
+   on the extension set — so it is a negative baseline, not a neutral one. The
+   +2.00 mean therefore mostly measures the cartridge *undoing the damage a random
+   prefix does*, ending back at roughly floor level. **`cartridge − floor` is the
+   only defensible statistic.** The single-seed "+3" reported earlier should not
+   be quoted as a positive signal.
+2. **The extension fixture set leaks.** Its floor is 4.00/16: the base model
+   answers x09, x11, x12, x15 correctly with no memory, because questions like
+   "what are the five states an agent can be in?" invite guesses that are right.
+   Those items must be replaced before the set is used for anything.
+
+### Consequence for the plan
+
+**Stage 1 (Living Cartridges) is dead as designed.** Its premise is "when a bucket
+changes, can its cartridge be repaired cheaply rather than rebuilt?" If the
+cartridge contributes ~0 over no memory, repair is repairing nothing and the
+relative claim (repair ≈ rebuild, cheaper) is trivially true and uninteresting.
+Do not build the model-backed `TrialRunner`.
+
+**Scope of the negative**: this is evidence about context distillation *at laptop
+scale* — Qwen2.5-3B, P=128, ~90 min/cartridge — not about the idea. Published
+Cartridges/CAS results use far larger models and orders of magnitude more compute.
+It is decisive about whether the technique is available to libucks: it is not.
+
+**Next**: CM-B.0f — the only two objections that survive the bug audit, since
+most defects found bias downward and cancel in a within-run contrast:
+(a) every run shipped the LAST epoch though KL rose at epoch 2 in all three 0d
+seeds — `CM_KEEP_BEST=1` promotes the best; (b) P has never been varied —
+`CM_PREFIX_LEN=384`. One seed each, both scored against all three floor arms. If
+the cartridge still fails to beat the floor under both, the negative stands with
+its plausible objections closed rather than merely unexamined.
 
 ---
 

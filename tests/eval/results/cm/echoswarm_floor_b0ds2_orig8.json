@@ -1,0 +1,186 @@
+{
+  "fixtures_file": "echoswarm_qa.json",
+  "n": 8,
+  "max_new_tokens": 64,
+  "metric": "grounding_score (CM-B.0a)",
+  "scores": {
+    "floor": 0,
+    "random": 0,
+    "cartridge": 1
+  },
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent is 0.5. This means that the agent will relay the message with a 50% chance. The message will be modified by the agent's behavior, which is determined by the agent's compliance level. If the agent is compliant, it will relay the message as"
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent refers to the likelihood of that the agent will follow the instructions or rules provided to it. In the context of Compliant agents, the relay probability is modified to ensure that the agent can adapt and modify its behavior based on the environment and the received message. This modification allows the agent"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The relay probability for a Compliant agent is 0.8, and it will relay the message with a 0.8\nprobability. The message will be modified by the agent's type, which in this case is \"compliant\". The\ncompliant agent will not modify the message, so the message will"
+      }
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent must be able to verify that the message is from the sender, and that the message has not been tampered with.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nAvailable choices:\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "the message is true and the message is not a lie"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The message must be from a source that is not the source of the message, and the message must be from a source that is not the source of the message.\n\nQuestion: What two conditions must hold before a Panic agent will relay the message?\nAnswer: The message must be from a source that is not the source"
+      }
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent will corrupt the message by adding a random number to the message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "A Panic agent corrupts the message when relaying by using a technique called \"Panic relaying.\" This method involves sending the message in a way that makes it difficult or impossible for the recipient to understand or interpret the original message. The agent may alter, delete, or add information to the message to make it more"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "A Panic agent will corrupt the message by adding a random\n        0 to the end of the message. This is to make the message\n        more difficult to decode, and to make it more difficult for\n        the other agents to decode the message.\n\nQuestion: How does a Sceptical agent corrupt the message"
+      }
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "An Immobile agent is placed in a state where it cannot move, and it can receive a message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": ""
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The Immobile agent is placed in the \"informed\" state, and it can receive a message.\n\nQuestion: What is the initial state of a Compliant agent, and can it ever receive a message?\nAnswer: The Compliant agent is placed in the \"informed\" state, and it can receive a message"
+      }
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent must be able to evacuate the building before the fire reaches the token-preservation threshold.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nChoose your answer from:\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "100"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The token-preservation threshold is 0.8. This means that if the agent has received 80% of the tokens, it will start evacuating.\n\nQuestion: What is the purpose of the _token_count attribute in the Agent class?\nAnswer: The _token_count attribute is a private attribute that is used"
+      }
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule used by _relay_messages is that it only relays messages that have been sent to the relay server since the last time the relay server was restarted. This means that if a message is sent to the relay server after the last restart, it will be relayed, but if a message is sent before"
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule is used by _relay_messages to ensure that the message is delivered to the correct process. This is important because it ensures that the message is received by the intended recipient, maintaining the integrity and accuracy of of the communication."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule is that the _relay_messages function will not\n        return a new set of messages if the set of messages has not changed. This\n        is important because it ensures that the function will not return a new\n        set of messages if the set of messages has not changed, which can"
+      }
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "A Skeptical agent stays in the WAITING state because it is waiting for the message to be verified by the other agent.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nOptions are:\n (1). yes\n (2). no\n(2)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "A Skeptical agent often stays in the WAITING state even when the message arrives because it is programmed to verify the authenticity and validity of of the information before taking any action. Skeptical agents are designed to be cautious and thorough in their approach to decision-making, which involves scrutinizing the evidence and reasoning behind the"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "A Skeptical agent will not be in the INFORMED state if the message is not from a trusted source. If the message is not from a trusted source, the agent will not be in the INFORMED state, and it will not be in the INFORMED state. The agent will not be in"
+      }
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent is broadcasted to the nearest shelter. The agent is then transported to the shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The process of of of an agent from the moment Hermes broadcasts a message until the agent reaches shelter can be described as a series of interconnected steps, each with its own set of of of events and conditions. These steps can be categorized into three main stages: the broadcast phase, the reception phase, and the shelter phase."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The agent will be in the \"waiting\" state when it is not yet\n    been informed of the message. When it is informed, it will be in the\n    \"informed\" state. If it is in the \"informed\" state, it will\n    evaluate whether it should be \"compliant"
+      }
+    }
+  ]
+}

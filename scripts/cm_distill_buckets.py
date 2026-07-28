@@ -110,6 +110,12 @@ MODEL_QUERIES = os.environ.get("CM_MODEL_QUERIES", "1") == "1"
 # sample with no error bar. Set it to make a run replayable; vary it, holding
 # everything else fixed, to finally measure run-to-run variance.
 SEED = int(os.environ["CM_SEED"]) if os.environ.get("CM_SEED") else None
+# Promote the lowest-mean-KL epoch instead of the last one. Every run in this
+# track shipped the last epoch; CM-B.0d's curves rose at epoch 2 in all three
+# seeds, so the shipped cartridge was repeatedly not the best trained. Default 0
+# preserves the historical protocol — a best-of-N run is NOT comparable with a
+# last-epoch run, and the log says so when this is on.
+KEEP_BEST = os.environ.get("CM_KEEP_BEST", "0") == "1"
 
 
 def _log(m: str) -> None:
@@ -261,7 +267,8 @@ def main() -> None:
     _log(f"RECIPE: P={PREFIX_LEN} queries={N_QUERIES} epochs={EPOCHS} lr={LR} "
          f"max_answer_tokens={MAX_ANSWER_TOKENS} verbatim={VERBATIM_CHARS} extract={EXTRACT_TOKENS} "
          f"qgen={QGEN_ID if MODEL_QUERIES else 'fact-probing templates'} "
-         f"receiver={RECEIVER_ID} seed={SEED if SEED is not None else 'UNSEEDED'}")
+         f"receiver={RECEIVER_ID} seed={SEED if SEED is not None else 'UNSEEDED'} "
+         f"keep_best={KEEP_BEST}")
     _log(f"loading {RECEIVER_ID} on {device} ...")
     model = AutoModelForCausalLM.from_pretrained(RECEIVER_ID, dtype=torch.bfloat16).eval().to(device)
     tok = AutoTokenizer.from_pretrained(RECEIVER_ID)
@@ -313,9 +320,32 @@ def main() -> None:
             queries = queries_by_bucket[bid]
             _log(f"[{n}/{len(todo)}] {bid[:8]} — distilling ({len(queries)} q, "
                  f"P={PREFIX_LEN}, {remaining}ep{f' of {EPOCHS}, resumed' if epochs_done else ''}) ...")
+            best_path = (cart_dir / f"{bid}.cartridge.best.safetensors") if KEEP_BEST else None
             res = trainer.distill_bucket(cart, verbatim, queries, epochs=remaining, lr=LR,
-                                         checkpoint_path=ckpt_path, seed=SEED)
+                                         checkpoint_path=ckpt_path, seed=SEED,
+                                         best_path=best_path)
             cart.save(out_path)
+            # Promote the best epoch over the last one when asked. Every run so far
+            # shipped the LAST epoch, and CM-B.0d's epoch means rose at epoch 2 in
+            # all three seeds (e.g. 5.754, 3.207, 4.753, 2.987), so the promoted
+            # cartridge was repeatedly not the best one trained. Opt-in, because
+            # best-of-N selection makes a run non-comparable with the ones that
+            # took the last epoch — say so in the log when using it.
+            if KEEP_BEST and best_path is not None and best_path.exists():
+                be, bkl = res.get("best_epoch"), res.get("best_mean_kl")
+                last_kl = res.get("final_mean_kl")
+                if be is not None and be != remaining - 1:
+                    import shutil
+                    shutil.copyfile(best_path, out_path)
+                    _log(f"[{n}/{len(todo)}] {bid[:8]} — PROMOTED epoch {be} "
+                         f"(mean_kl={bkl:.4f}) over last epoch {remaining-1} "
+                         f"(mean_kl={last_kl:.4f}). This run is NOT comparable with "
+                         f"last-epoch runs.")
+                else:
+                    _log(f"[{n}/{len(todo)}] {bid[:8]} — best epoch WAS the last "
+                         f"({be}); nothing promoted")
+                best_path.unlink(missing_ok=True)
+                Path(str(best_path) + ".json").unlink(missing_ok=True)
             ckpt_path.unlink(missing_ok=True)
             side_path.unlink(missing_ok=True)
             resumed = " (RESUMED — init_mean_kl is the first resumed epoch, "
