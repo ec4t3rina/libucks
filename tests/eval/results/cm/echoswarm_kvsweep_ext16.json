@@ -1,0 +1,759 @@
+{
+  "fixtures_file": "echoswarm_qa_bc6b90e2_ext.json",
+  "n": 16,
+  "seq_len": 1009,
+  "prefix_lens": [
+    32,
+    64,
+    128,
+    256,
+    384,
+    512,
+    768
+  ],
+  "trained_P": 768,
+  "max_new_tokens": 64,
+  "metric": "grounding_score (CM-B.0a)",
+  "scores": {
+    "floor": 0,
+    "cartridge": 8,
+    "kv_first@32": 1,
+    "kv_first@64": 3,
+    "kv_first@128": 8,
+    "kv_first@256": 11,
+    "kv_first@384": 12,
+    "kv_first@512": 12,
+    "kv_first@768": 13
+  },
+  "per_question": [
+    {
+      "id": "echoswarm_x01",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "COMPLIANT",
+        "SKEPTICAL",
+        "PANIC",
+        "IMMOBILE"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The four agent types defined in the AgentType enum are Agent, AgentGroup, AgentGroupMember, and AgentGroupMemberGroup."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The four agent types are: \"compliant\", \"skeptical\", \"panic\", and \"immobile\".\n\nQuestion: What is the purpose of the AgentType enum in the given code?\nAnswer: The purpose of the AgentType enum is to define the four types of agents that can be\n        in the E"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The four agent types defined in the AgentType enum are \"COMPLQuestion\", \"COMPLAnswer\", \"COMPLQuestionAnswer\", and \"COMPLQuestionAnswerQuestion\".\n\nclass AgentType(str, Enum):\n    COMPLQuestion: What are the four agent types defined in the AgentType enum?\nAnswer: The four"
+      },
+      "kv_first@64": {
+        "grounded": true,
+        "answer": "The four agent types defined in the AgentType enum are \"compliant\", \"skeptical\", \"panic\", and \"immobile\"."
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "The four agent types defined in the AgentType enum are \"compliant\", \"skeptical\", \"panic\", and \"immobile\".\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass AgentState(str, Enum):\n    WAITING = \"waiting"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "The four agent types defined in the AgentType enum are Compliant, Skeptical, Panic, and Immobile. These agent types represent different behaviors and attitudes towards the message and the environment in which the agent operates. The Compliant agent follows the message, the Skeptical agent evaluates the message before acting, the"
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "The four agent types defined in the AgentType enum are \"compliant\", \"skeptical\", \"panic\", and \"immobile\".\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass Agent:\n    id: str\n    agent_type: Agent"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "The four agent types defined in the AgentType enum are Compliant, Skeptical, Panic, and Immobile.\nThe Compliant agent type is the default agent type and is used for testing purposes.\nThe Skeptical agent type is used to test the behavior of agents that are skeptical of the message.\nThe Panic"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The four agent types defined in the AgentType enum are:\n1. Compliant\n2. Skeptical\n3. Panic\n4. Immobile\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\n        if self.agent_type == AgentType.S"
+      }
+    },
+    {
+      "id": "echoswarm_x02",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "WAITING",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "STRANDED"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent can be in one of five states: idle, waiting for a request, processing a request, waiting for a response, or finished.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nAvailable options:\n (1). yes\n (2). no\n(1)."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The five states an agent can be in are: \"waiting\", \"informed\", \"evacuating\", \"safe\", and \"stran\n\nQuestion: What is the function of the function \"receive_message\" in the \"Agent\" class?\nAnswer: The function \"receive_message\" is a function that is"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The five states an agent can be in are: \n1. Idle: The agent is not currently performing any task or waiting for a task to be assigned.\n2. Active: The agent is currently performing a task.\n3. Completed: The agent has completed a task and is now available for other tasks.\n4."
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "An agent can be in one of five states: compliant, skeptical, panic, immobile, or mobile.\n\nQuestion: What is the difference between a compliant and a skeptical agent?\nAnswer: A compliant agent follows the rules of the environment, while a skeptical agent questions the rules and may deviate from them.\n\nQuestion:"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The five states an agent can be in are: waiting, informed, compliant, skeptical, and panic."
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "The five states an agent can be in are: waiting, informed, evacuating, safe, and stranded. The waiting state is when the agent has not yet received the message. The informed state is when the agent has received the message and is evaluating whether to act. The evacuating state is when the agent is moving"
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "The five states an agent can be in are: waiting, informed, evacuating, safe, and stranded.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass Agent:\n    id: str\n    agent_type: AgentType\n    node_id:"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "The five states an agent can be in are: waiting, informed, evacuating, safe, and stranded.\nThe waiting state is the initial state of an agent, and it represents the state of an agent that has not yet received a message.\nThe informed state is the state of an agent that has received a message but"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The five states an agent can be in are: WAITING, INFORMED, EVACUATING, SAFE, and STRANDED.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\n        if self.agent_type == AgentType.SKEPTICAL"
+      }
+    },
+    {
+      "id": "echoswarm_x03",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "__post_init__"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent is then placed in the \"IMMOBILE\" state.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nChoose your answer from:\n (a). yes\n (b). no\n(a)."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The IMMOBILE agent is placed in the \"stranded\" state when it is\n    constructed. This is a pre-1.0.0 version of the class, and the\n    \"stranded\" state is not a data class, so it is not a data class.\n    The \"stranded"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "COMPLQuestion\n    COMPLAnswer: What state is an IMMOBILE agent placed in as soon as it is constructed?\nAnswer: COMPLAnswer\n    COMPLQuestion: What state is an IMMOBILE agent placed in as soon as it is constructed?\nAnswer: COMPLQuestion\n    COMPLAnswer"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "An IMMOBILE agent is placed in a state where it cannot move or take any actions. This is typically represented by a state where the agent is stationary and cannot interact with the environment or other agents.\n\nQuestion: What is the purpose of the `Agent` class in the `swarm.agents` module?\nAnswer"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "IMMOBILE\n    CONFIRMED = \"confirmed\"    # has confirmed the message\n    DISCONFIRMED = \"disconfirmed\" # has disconfirmed the message\n    DISMISSED = \"dismissed\"    # has dismissed the message\n    DISMISSED_CONFIRMED = \"dismissed"
+      },
+      "kv_first@256": {
+        "grounded": false,
+        "answer": "IMMOBILE\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass Agent:\n    id: str\n    agent_type: AgentType\n    node_id: str\n    origin_node_id: str\n    state: AgentState = field(default="
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "An IMMOBILE agent is placed in the \"stranded\" state as soon as it is constructed.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass Agent:\n    id: str\n    agent_type: AgentType\n    node_id: str"
+      },
+      "kv_first@512": {
+        "grounded": false,
+        "answer": "IMMOBILE\n        \"\"\"\n        if self.agent_type == AgentType.IMMOBILE:\n            return False\n        self.tokens = tokens\n        self.hop_count = hop_count\n        self.confirmations = 1\n        self._seen_sources.add(source_id)\n        self.ticks_informed = self.ticks"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "IMMOBILE agents are placed in the STRANDED state as soon as they are constructed.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\n        if self.agent_type == AgentType.SKEPTICAL:\n            # If tokens are not all unique,"
+      }
+    },
+    {
+      "id": "echoswarm_x04",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "EVACUATING",
+        "SAFE",
+        "STRANDED",
+        "IMMOBILE"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent state is not in the list of states that the agent is allowed to be in."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The agent will not receive the message and return False if it is in the\n        in the 'stranded' or 'stran\n\nQuestion: In which agent states does receive_message return a new\n        'new' or 'new' or 'new' or 'new' or 'new' or 'new"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "In the following agent states, receive_message will refuse the message and return False:\n1. Agent is in the \"waiting\" state.\n2. Agent is in the \"processing\" state.\n3. Agent is in the \"processing\" state and the message is not relevant to the agent's current task.\n4. Agent"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "In the \"immobile\" agent state, the receive_message method will return False and refuse the message.\n\nQuestion: What is the purpose of the \"receive_message\" method in the Agent class?\nAnswer: The \"receive_message\" method is used to handle incoming messages from other agents in the swarm. It checks the message"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "In the WAITING state, the agent has not yet received the message, so it will refuse the message and return False. In the INFORMED state, the agent has received the message and is evaluating whether to accept it, so it will return True if the message is accepted and False if it is rejected.\n\n---"
+      },
+      "kv_first@256": {
+        "grounded": false,
+        "answer": "The receive_message method in the Agent class returns False in the following agent states:\n\n1. **WAITING**: The agent is waiting for a message and has not yet received any.\n2. **INFORMED**: The agent has received a message but has not yet evaluated whether to act.\n3. **EVACU"
+      },
+      "kv_first@384": {
+        "grounded": false,
+        "answer": "In the following states, the receive_message method will refuse the message and return False:\n\n1. **WAITING**: The agent has not yet received the message.\n2. **INFORMED**: The agent has received the message but has not yet evaluated whether to act.\n3. **EVACUATING**: The agent"
+      },
+      "kv_first@512": {
+        "grounded": false,
+        "answer": "In the following states, the agent refuses the message and returns False:\n- Waiting: The agent is waiting for the message and has not yet received it.\n- Informed: The agent has received the message but has not yet evaluated whether to act.\n- Evacuating: The agent is currently evacuating and has not"
+      },
+      "kv_first@768": {
+        "grounded": false,
+        "answer": "receive_message refuses the message and returns False in the following agent states:\n- WAITING: The agent has not yet received the message.\n- INFORMED: The agent has received the message but has not yet evaluated whether to act.\n- EVACUATING: The agent is currently evacuating and will not move regardless"
+      }
+    },
+    {
+      "id": "echoswarm_x05",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "tokens",
+        "hop_count",
+        "INFORMED",
+        "WAITING"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent will then wait for the next message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nAvailable choices:\n (a). yes\n (b). no\n(b)."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The agent will be set to the INFORMED state and will be set to the E\n\nQuestion: What is the value of the 'self.hop_count' in the 'receive_message' function?\nAnswer: The value of the 'self.hop_count' in the 'receive_message' function is 0."
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The agent will wait for a message to be sent to it.\n    COMPLAnswer: What does an agent do the first time it receives a message while WAITING?\nAnswer: The agent will wait for a message to be sent to it.\n    COMPLQuestion: What does an agent do the first time it receives"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "An agent does nothing the first time it receives a message while waiting. It will only do something if it is in the ACTIVE state.\n\nQuestion: What does an agent do the first time it receives a message while ACTIVE?\nAnswer: An agent will do whatever it is programmed to do when it receives a message while in the"
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "The agent will evaluate the message and determine whether it needs to take any action or not. If the agent decides to take action, it will transition to the INFORMED state. If the agent decides not to take action, it will remain in the WAITING state.\n\n---\n\n# /Users/ecaterina/Developer/test"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "The agent will evaluate the message and determine whether to act or wait. If the message is relevant to the agent's needs, it will transition to the INFORMED state and begin evaluating whether to evacuate or remain in place. If the message is not relevant, the agent will remain in the WAITING state and continue to"
+      },
+      "kv_first@384": {
+        "grounded": false,
+        "answer": "The agent will evaluate whether to act based on its agent type and the message it received. If the agent is compliant, it will move toward the shelter. If the agent is skeptical, it will evaluate the message and decide whether to move toward the shelter or not. If the agent is panic, it will move toward the"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "It becomes INFORMED. It then evaluates whether to act based on the message it received.\n        \"\"\"\n        self.tokens = tokens\n        self.hop_count = hop_count\n        self.confirmations = 1\n        self._seen_sources.add(source_id)\n        self.state = AgentState.INFORMED"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The agent becomes INFORMED and stores the received message in its tokens attribute. It also increments the hop_count attribute to keep track of the number of hops the message traveled to reach this agent."
+      }
+    },
+    {
+      "id": "echoswarm_x06",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "_seen_sources",
+        "source_id",
+        "distinct"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The Agent will only count a neighbour as a confirmation if it has not been counted as a confirmation in the last 10 seconds.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes\n (2). no\n(2)."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The Agent will not be set to the EVACUATING or S\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is a set of unique source IDs that have relayed the message to this agent. It is used to\n        track"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The agent can use a set data structure to keep track of the neighbours it has already confirmed. When it receives a confirmation from a neighbour, it adds the neighbour to the set. If the agent receives a confirmation from a neighbour that is already in the set, it ignores the confirmation.\n    COMPLQuestion: How does"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "An Agent can stop the same neighbour being counted twice as a confirmation by using a unique identifier or a timestamp to track the interactions with other Agents. This ensures that each interaction is recorded only once, preventing double counting.\nQuestion: How does an Agent determine the best course of action in a given situation?\nAnswer: An Agent"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "An Agent can stop counting the same neighbour twice by keeping track of the neighbours it has already confirmed. When an Agent receives a message from a neighbour, it checks if the neighbour is already in its list of confirmed neighbours. If the neighbour is not in the list, it adds the neighbour to the list and sends a message"
+      },
+      "kv_first@256": {
+        "grounded": false,
+        "answer": "To prevent the same neighbour from being counted twice as a confirmation, the agent can keep track of the neighbours it has already confirmed with. This can be done by maintaining a set of confirmed neighbours. When the agent receives a message from a neighbour, it can check if the neighbour is already in the set of confirmed neighbours."
+      },
+      "kv_first@384": {
+        "grounded": false,
+        "answer": "An Agent stops the same neighbour being counted twice as a confirmation by keeping track of unique source IDs. This is done by using a set called `_seen_sources` to store the IDs of the sources that have relayed the message. When a source confirms the message, the ID is added to the set. If the ID"
+      },
+      "kv_first@512": {
+        "grounded": false,
+        "answer": "The Agent keeps track of the unique source IDs it has seen. If a new source ID is seen, it increments the confirmations count and adds the source ID to the set of seen sources. If the source ID is already in the set, it does not increment the confirmations count or add the source ID to the"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "An Agent stops the same neighbour being counted twice as a confirmation by keeping track of unique source IDs. In the `receive_message` method, the `source_id` parameter is used to check if the source has already been seen. If the source ID is already in the `_seen_sources` set, the method returns False"
+      }
+    },
+    {
+      "id": "echoswarm_x07",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "WAITING",
+        "STRANDED",
+        "SAFE",
+        "None"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "relay_tokens returns None in the following states: 1. The state is not a valid state. 2. The state is not a valid state. 3. The state is not a valid state. 4. The state is not a valid state. 5. The state is not a valid state."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The function is not in any of the states that are not in the function's\n        return value. The function is in the function's return value, so it\n        will not be in any of the states that are not in the function's\n        return value. The function is in the function's return value"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "relay_tokens returns None when the relay is not connected to the network or when the relay is not running. In this case, the relay_tokens function will not be able to broadcast the message to the network.\n\n    COMPLQuestion: What is the purpose of the relay_tokens function?\nAnswer: The relay_tokens function is used"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "relay_tokens returns None instead of broadcasting when the agent is in the \"immobile\" state. This is because the agent is not actively participating in the swarm and is not broadcasting any tokens.\n\nQuestion: What is the purpose of the Agent class in the swarm agents module?\nAnswer: The Agent class in the swarm agents module"
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "In the \"waiting\" state, relay_tokens will return None because the agent has not yet received the message. When the agent receives the message, it will transition to the \"informed\" state, and relay_tokens will return the message for broadcasting.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/ech"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "relay_tokens returns None when the agent is in the \"stranded\" state, as it is not possible for the agent to receive tokens in that state. This is because the agent is immobile and will not move regardless of the message received."
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "relay_tokens returns None instead of broadcasting when the agent's state is \"stranded\". In this state, the agent is immobile and will not move regardless of the message received. Therefore, it does not need to broadcast the message to its neighbors."
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "In the waiting state, relay_tokens returns None because the agent has not yet received the message.\nIn the informed state, relay_tokens returns None because the agent has already received the message and is evaluating whether to act.\nIn the evacuating state, relay_tokens returns None because the agent is already moving toward the shelter and does"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "relay_tokens returns None in the following states:\n\n1. **WAITING**: The agent has not yet received the message.\n2. **STRANDED**: The agent is immobile and will not move regardless.\n3. **SAFE**: The agent has arrived at the shelter and is safe.\n\nIn these states, the agent"
+      }
+    },
+    {
+      "id": "echoswarm_x08",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "one",
+        "random",
+        "SKEPTICAL",
+        "pop"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "A SKEPTICAL agent drops a token before relaying, and the token is chosen from the set of tokens that the agent has not yet dropped. The agent drops a token before relaying if the token is not in the set of tokens that the agent has already dropped. The agent chooses the token to drop based"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "A SKEP\n\nQuestion: What is the function for a SKEP\n    def _skep_relay(self, tokens: fro\n    def _skep_relay(self, tokens: fro\n    def _skep_relay(self, tokens: fro\n    def _ske"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "A SKEPTICAL agent drops tokens based on a set of rules that prioritize the most important information. The agent first drops the most important information, such as the question being asked, and then drops the least important information, such as the agent's name. The agent also drops tokens based on the length of the message"
+      },
+      "kv_first@64": {
+        "grounded": true,
+        "answer": "A SKEPTICAL agent drops 1 token before relaying, and the token is chosen randomly from the pool of tokens available to the agent.\n\nQuestion: How does the PANIC agent behave in the swarm?\nAnswer: A PANIC agent will drop all of its tokens before relaying, and the tokens are chosen"
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "A SKEPTICAL agent drops a random number of tokens between 1 and 3 before relaying the message. The tokens are chosen randomly from the pool of tokens available to the agent.\n    INFORMING = \"informing\"    # relaying message to other agents\n    INFORMED = \"in"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "A SKEPTICAL agent drops 1 token before relaying. The tokens are chosen randomly from the set of all tokens in the system.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass Agent:\n    id: str\n    agent_type:"
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "A SKEPTICAL agent drops one token before relaying. The tokens are chosen randomly from the set of tokens it has. This is done to ensure that the agent is not overly influenced by the message it receives and is more likely to evaluate the message critically.\n\n---\n\n# /Users/ecaterina/Developer/test-re"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "A SKEPTICAL agent drops tokens based on a probability distribution. The probability of dropping a token is determined by the agent's skepticism level, which is a value between 0 and 1. The agent randomly selects a token from the received message and drops it with a probability equal to its skepticism level. The dropped"
+      },
+      "kv_first@768": {
+        "grounded": false,
+        "answer": "A SKEPTICAL agent drops tokens before relaying, and the number of tokens dropped and the selection of tokens are not specified in the given code. The code only mentions that a SKEPTICAL agent will drop tokens before relaying, but it does not provide any details on how many tokens are dropped or how"
+      }
+    },
+    {
+      "id": "echoswarm_x09",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "_seen_sources",
+        "repr",
+        "init"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The internal Agent field that is hidden from the object's printed representation and cannot be set through the constructor is the `agent` field. This field is used to store the agent that is responsible for the object's behavior and actions. It is not accessible through the constructor or the printed representation of the object, making it a"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The _seen_sources field is a set of unique source IDs that the agent has not yet\n        been informed by. It is not a data class field and is not set in the\n        __post_init__ method. It is a private field that is not part of the\n        object's public interface and is"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The \"hidden\" field is a private attribute that is not intended to be accessed or modified directly. It is used internally by the Agent class to store and manage the agent's state and behavior. The \"hidden\" field is not part of the public API and should not be used by external code.\n\n/README.md"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "The internal Agent field that is hidden from the object's printed representation and cannot be set through the constructor is the \"question\" field. This field is used to store the question that the agent is currently working on, but it is not exposed to the user and cannot be set through the constructor."
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The internal Agent field that is hidden from the object's printed representation and cannot be set through the constructor is the `state` field. This field is not explicitly mentioned in the code snippet provided, but it is implied that it is an internal field that is not intended to be accessed or modified directly by the user."
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "The internal Agent field that is hidden from the object's printed representation and cannot be set through the constructor is the `state` field. It is marked as `field(default=AgentState.WAITING)` in the `Agent` class definition, indicating that it is a default value for the `state` attribute. This"
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "The internal field that is hidden from the object's printed representation and cannot be set through the constructor is `_seen_sources`."
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "The internal field _seen_sources is hidden from the object's printed representation and cannot be set through the constructor.\n\"\"\"\n        if self.state == AgentState.STRANDED:\n            return False\n        self.tokens = tokens\n        self.hop_count = hop_count\n        self.confirmations += 1\n        self"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The internal field that is hidden from the object's printed representation and cannot be set through the constructor is `_seen_sources`."
+      }
+    },
+    {
+      "id": "echoswarm_x10",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "route",
+        "node",
+        "path",
+        "shelter"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The route field on an Agent holds the route that the Agent is currently on.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes.\n (B). no. (A)."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The route field on an Agent is a list of strings that represents the pre- 1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0"
+      },
+      "kv_first@32": {
+        "grounded": true,
+        "answer": "The route field on an Agent holds the path that the Agent will follow to reach its destination.\n\n    COMPLQuestion: What does the route field on an Agent hold?\nAnswer: The route field on an Agent holds the path that the Agent will follow to reach its destination.\n\n    COMPLQuestion: What does the route"
+      },
+      "kv_first@64": {
+        "grounded": true,
+        "answer": "The route field on an Agent holds the path that the agent is currently following. It is a list of coordinates that the agent should move to in order to reach its destination. The route is updated as the agent moves through the environment and changes based on the agent's current location and the environment's layout.\n\nWhat does the"
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "The route field on an Agent holds the path or sequence of actions that the agent needs to take to reach its destination or fulfill its task. It represents the sequence of steps or actions that the agent should follow to complete its mission or achieve its goal. The route can be a list of coordinates, directions, or other relevant"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "The route field on an Agent holds the path or sequence of nodes that the agent plans to follow to reach its destination, such as a shelter or a safe location. It represents the route that the agent will take to move from its current location to its destination. The route is determined by the agent's behavior and the environment"
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "The route field on an Agent holds the pre-computed node path to the shelter. It is a list of strings representing the nodes that the agent needs to visit in order to reach the shelter. The route is computed by the agent's route planner and is used to guide the agent's movement towards the shelter.\n\n---\n\n#"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "The route field on an Agent holds the pre-computed node path to the shelter. It is a list of node IDs that the agent will follow to reach the shelter. The route is computed based on the agent's location and the shelter's location, and it is used to determine the agent's next move.\n        \"\"\""
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The route field on an Agent holds the pre-computed node path to the shelter. It is a list of strings representing the nodes along the path.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\n        if self.agent_type == AgentType.SKEPT"
+      }
+    },
+    {
+      "id": "echoswarm_x11",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "received",
+        "evaluating",
+        "yet",
+        "act"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The WAITING state means that the user is waiting for the system to respond to a request. The INFORMED state means that the user has been informed of the system's response.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2)."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The WAITING state is when the agent has not yet received the message, and the INFORMED state is when the agent has received the message and is evaluating whether to act.\n\nQuestion: What is the purpose of the _seen_sources set in the _seen_sources class variable?\nAnswer: The _seen_sources set is"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The WAITING state means that the agent is waiting for a response from the user, while the INFORMED state means that the agent has received a response from the user and is now informed of the user's response.\n    COMPLAnswer: What do the inline comments say the WAITING and INFORMED states mean"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "The WAITING state means that the agent is waiting for a message from the server. The INFORMED state means that the agent has received a message from the server and is now informed about the current state of the swarm.\nQuestion: What is the purpose of the Agent class?\nAnswer: The Agent class is used to"
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "The WAITING state means that the agent has not yet received the message, while the INFORMED state means that the agent has received the message and is evaluating whether to answer the question or not.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "The WAITING state means that the agent has not yet received the message, while the INFORMED state means that the agent has received the message and is evaluating whether to act."
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "The WAITING state means that the agent has not yet received the message, while the INFORMED state means that the agent has received the message and is evaluating whether to act.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass Agent:\n    id"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "The WAITING state means that the agent has not yet received the message, and the INFORMED state means that the agent has received the message and is evaluating whether to act.\n        \"\"\"\n        if self.state == AgentState.WAITING:\n            self.state = AgentState.INFORMED\n            self.tokens = tokens"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The WAITING state means that the agent has not yet received the message, while the INFORMED state means that the agent has received the message and is evaluating whether to act.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\n        if self.agent_type"
+      }
+    },
+    {
+      "id": "echoswarm_x12",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "node_id",
+        "origin_node_id",
+        "route",
+        "route_index"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The fields that record where an agent currently is, where it started, and its planned path are called the agent's state.\nYou are an AI assistant that follows instruction extremely well. Help as much as you can."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The \"informed\" and \"stran\n\nQuestion: What is the purpose of the \"stran\n\nQuestion: What is the purpose of the \"stran\n\nQuestion: What is the purpose of the \"stran\n\nQuestion: What is the purpose of the \"stran\n\nQuestion: What is the purpose"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The agent's current location, starting location, and planned path are recorded in the agent's state. The agent's state is a dictionary that contains the agent's current location, starting location, and planned path. The agent's current location is the location where the agent is currently located. The agent's starting location is the"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "The fields that record where an agent currently is, where it started, and its planned path are:\n- current_position: This field records the current position of the agent.\n- start_position: This field records the starting position of the agent.\n- planned_path: This field records the planned path of the agent.\nThese fields"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The fields that record where an agent currently is, where it started, and its planned path are not explicitly mentioned in the given code snippet. However, based on the context, it can be inferred that these fields are likely to be part of the agent's state or attributes. For example, an agent's current position,"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "The fields that record where an agent currently is, where it started, and its planned path are the node_id, origin_node_id, and path fields, respectively. The node_id field records the current node that the agent is located in, the origin_node_id field records the node that the agent started from, and the"
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "The fields that record where an agent currently is, where it started, and its planned path are:\n\n- `origin_node_id`: This field records the node ID where the agent started.\n- `route`: This field records the pre-computed node path to the shelter.\n- `route_index`: This field records the current"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "The fields that record where an agent currently is, where it started, and its planned path are: state, route, and route_index. The state field records the current state of the agent, such as whether it is waiting, informed, evacuating, safe, or stranded. The route field records the pre-computed"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The fields that record where an agent currently is, where it started, and its planned path are:\n\n- `origin_node_id`: This field records the node ID where the agent started.\n- `node_id`: This field records the current node ID of the agent.\n- `route`: This field records the planned path of"
+      }
+    },
+    {
+      "id": "echoswarm_x13",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "WAITING",
+        "state",
+        "AgentState"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is ACTIVE.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nOptions are:\n (1). yes\n (2). no\n(1)."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is \"informed\" (AgentState.INFORMED).\n\nQuestion: What is the default value of the \"hops\" attribute in the Agent class?\nAnswer: The default value of the \"hops\" attribute in the Agent class is 0"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is ACTIVE.\n    COMPLQuestion: What is the default state of a newly constructed Agent that is not IMMOBILE?\nAnswer: The default state of a newly constructed Agent that is not IMMOBILE is ACTIVE.\n    COMPLQuestion: What"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is COMPLIANT.\n\nQuestion: What is the default state of a newly constructed Agent that is not PANIC?\nAnswer: The default state of a newly constructed Agent that is not PANIC is COMPLIANT.\n\nQuestion: What is the"
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is WAITING. This is because the Agent has not yet received the message and is waiting for it to be sent to it. Once the message is received, the Agent will transition to the INFORMED state and begin evaluating whether it should answer the"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is WAITING."
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is WAITING."
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is WAITING.\nQuestion: What is the default value of the hop_count attribute of a newly constructed Agent that is not IMMOBILE?\nAnswer: The default value of the hop_count attribute of a newly constructed Agent that is not IMMOBILE is"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The default state of a newly constructed Agent that is not IMMOBILE is AgentState.WAITING."
+      }
+    },
+    {
+      "id": "echoswarm_x14",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "True",
+        "confirmation",
+        "new"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "When a message is received from a new source, the receive_message function returns the message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The function is a function that can be used to receive a message from a new source. The function is a function that can be used to receive a message from a new source. The function is a function that can be used to receive a message from a new source. The function is a function that can be used to"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "It returns a message that is a copy of the original message, but with the source field set to the new source.\n    COMPLAnswer: What does receive_message return when it accepts a message from a new source?\nAnswer: It returns a message that is a copy of the original message, but with the source field"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "When an agent receives a message from a new source, it returns a message object that contains the message content and the source of the message. The message object also includes metadata such as the timestamp of the message and the source's identity. This allows the agent to process the message and take appropriate action based on the content and"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "receive_message returns a boolean value indicating whether the message was successfully received and processed. It does not return the message itself.\n    CONFIRMED = \"confirmed\"    # has received and processed the message\n    DISCONFIRMED = \"disconfirmed\" # has received and processed the message, but the message was not"
+      },
+      "kv_first@256": {
+        "grounded": false,
+        "answer": "When an agent receives a message from a new source, it returns a message that contains the agent's ID, the message's ID, and the message's content. This message is used to update the agent's state and to inform other agents about the message's content.\n\n---\n\n# /Users/ecaterina/Developer/test"
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "When an agent receives a message from a new source, the `receive_message` method returns a boolean value indicating whether the message was successfully received and processed. If the message is successfully received, the method returns `True`, and the agent's state is updated accordingly. If the message is not successfully received, the method returns"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "It returns True when it accepts a message from a new source.\n        \"\"\"\n        if self.state == AgentState.STRANDED:\n            return False\n        if self.state == AgentState.WAITING:\n            self.state = AgentState.INFORMED\n            self.tokens = tokens\n            self.hop_count ="
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "receive_message returns True if this was a new confirmation.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\n        if self.agent_type == AgentType.SKEPTICAL:\n            # Randomly drop tokens\n            tokens_list = random.sample(tokens_list, len"
+      }
+    },
+    {
+      "id": "echoswarm_x15",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "total_key_tokens",
+        "can_act"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The method is called by the agent when it begins evacuating.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nChoose your answer from:\n (a). yes\n (b). no\n(b)."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The name of the single parameter accepted by the method that decides whether an agent begins evacuating is \"self\" (the self parameter is a dataclass that is a dataclass, and it is a dataclass that is a dataclass, and it is a dataclass that is a dataclass, and it is a"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "The single parameter accepted by the method that decides whether an agent begins evacuating is the current time.\n    COMPLQuestion: What is the name of the single parameter accepted by the method that decides whether an agent begins evacuating?\nAnswer: The single parameter accepted by the method that decides whether an agent begins evacuating is"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "The single parameter accepted by the method that decides whether an agent begins evacuating is the current time, represented by the variable t.\n\nQuestion: What is the name of the single parameter accepted by the method that decides whether an agent begins evacuating?\nAnswer: The single parameter accepted by the method that decides whether an agent begins"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The single parameter accepted by the method that decides whether an agent begins evacuating is the message received from the swarm leader.\n    EVACUATING = \"evacuating\"  # has received message; evacuating\n    EVACUATED = \"evacuated\"    # has received message; evacuating"
+      },
+      "kv_first@256": {
+        "grounded": false,
+        "answer": "The single parameter accepted by the method that decides whether an agent begins evacuating is the message received by the agent. This message contains information about the current state of the environment and the agent's position. Based on this message, the agent can determine whether it needs to begin evacuating or not."
+      },
+      "kv_first@384": {
+        "grounded": false,
+        "answer": "The single parameter accepted by the method that decides whether an agent begins evacuating is `agent_type`.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm/agents.py\nclass Agent:\n    id: str\n    agent_type: AgentType\n    node_id: str"
+      },
+      "kv_first@512": {
+        "grounded": false,
+        "answer": "The name of the single parameter accepted by the method that decides whether an agent begins evacuating is \"tokens\".\"\"\"\n        if self.state == AgentState.WAITING:\n            self.state = AgentState.INFORMED\n            self.tokens = tokens\n            self.hop_count = hop_count\n            self.ticks_in"
+      },
+      "kv_first@768": {
+        "grounded": false,
+        "answer": "The single parameter accepted by the method that decides whether an agent begins evacuating is the `tokens` parameter. This parameter represents the tokens that the agent has received from other agents, which are used to determine whether the agent should begin evacuating.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echos"
+      }
+    },
+    {
+      "id": "echoswarm_x16",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "INFORMED",
+        "EVACUATING",
+        "can_act"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The can_act function is used to determine whether a process is allowed to perform a certain action.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2). no.\n(1)."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The state transition is from the 'informed' state to the 'evacu\n\nQuestion: What is the function of the 'can_act' function in the 'Agent' class?\nAnswer: The 'can_act' function is a function that is used to determine if an\n        'Agent' can act or"
+      },
+      "kv_first@32": {
+        "grounded": false,
+        "answer": "can_act decides on the state transition based on the current state of the agent and the available actions. It checks if the agent can perform the action and returns True if it can, and False otherwise.\n\n    COMPLQuestion: What is the purpose of the can_act method in the Agent class?\nAnswer: The can_act"
+      },
+      "kv_first@64": {
+        "grounded": false,
+        "answer": "can_act decides which state transition to take based on the current state of the agent and the environment. It takes into account the agent's type, the environment's state, and the agent's history of actions to determine the most appropriate action to take.\n\nQuestion: What is the purpose of the can_act function in the Agent"
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "can_act decides on the state transition from WAITING to INFORMED.\n    ACTING = \"acting\"          # has received message and is acting on it\n    DONE = \"done\"              # has finished acting on message\n    DEAD = \"dead\"              # has finished acting on message and is dead"
+      },
+      "kv_first@256": {
+        "grounded": true,
+        "answer": "can_act decides whether an agent can act based on its current state and the message it has received. If the agent is in the \"waiting\" state and has received a message, it can act. If the agent is in the \"informed\" state, it can act if the message is a \"move\" message"
+      },
+      "kv_first@384": {
+        "grounded": true,
+        "answer": "can_act decides whether an agent can act based on its current state and the number of confirmations it has received. If the agent is in the \"informed\" state and has received at least one confirmation, it can act. If the agent is in the \"evacuating\" state, it can act regardless of"
+      },
+      "kv_first@512": {
+        "grounded": true,
+        "answer": "The state transition is determined by the AgentState enum. The AgentState enum has three possible values: WAITING, INFORMED, and EVACUATING. The can_act method checks the current state of the agent and returns True if the agent is in the EVACUATING state, indicating that the agent is"
+      },
+      "kv_first@768": {
+        "grounded": true,
+        "answer": "The `can_act` method determines whether an agent can act based on its current state and the number of confirmations it has received. It returns `True` if the agent can act, and `False` otherwise. The method checks if the agent is in the `INFORMED` state and has received at least"
+      }
+    }
+  ]
+}
