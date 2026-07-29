@@ -1,0 +1,464 @@
+{
+  "_comment": [
+    "POSITION-STRATIFIED fixture set for bucket 95c8e099 (src/swarm/simulation.py,",
+    "20,013 chars / ~5,003 tokens).",
+    "",
+    "WHY THIS EXISTS. The bc6b90e2 extension set produced an apparently clean",
+    "compression/accuracy curve for kv_first truncation. It was an artifact: the",
+    "scores tracked the count of fixtures whose keywords fall inside the first P",
+    "tokens almost exactly (11 vs 11 at P=256, 9 vs 8 at P=128). Those questions",
+    "clustered early in the file, so a prefix-truncation arm won by construction.",
+    "kv_first cannot know anything about tokens past P \u2014 it is truncation, not",
+    "compression \u2014 and a fixture set that only asks about the head cannot tell the",
+    "two apart.",
+    "",
+    "THE FIX: target facts are sampled across the whole token range, roughly one per",
+    "250 tokens from ~120 to ~4,400. At P=128 of 5,003 tokens only ~2.5% of the file",
+    "is retained, so a truncation baseline should score near zero. Any arm scoring",
+    "materially above the positional-availability ceiling is doing real work.",
+    "",
+    "INDEPENDENCE. A different bucket and a different file (simulation.py, not",
+    "agents.py) from the one the mechanism was developed against. That is partial",
+    "independence, not full: the questions are still mine. The stratification is",
+    "what makes the set diagnostic rather than confirmatory.",
+    "",
+    "Enforced by tests/unit/test_fixture_reachability.py: answerable from the full",
+    "verbatim, routes to 95c8e099, keyword echo cannot reach the threshold, no",
+    "generic type names as load-bearing keywords, and positional spread.",
+    "Every fixture carries an explicit \"bucket\" field. This experiment asks whether a bucket's CACHE carries its content, not whether the router finds the bucket \u2014 routing is measured separately and conflating the two would make a cache result depend on retrieval quality. 14 of the first 20 questions routed elsewhere, because simulation.py is the orchestrator and overlaps semantically with most other buckets."
+  ],
+  "fixtures": [
+    {
+      "id": "echoswarm_y01",
+      "question": "What data structure holds the words excluded from key-token matching, and what is that constant named?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "tokens"
+      ],
+      "answer_keywords": [
+        "frozenset",
+        "_STOP_WORDS"
+      ],
+      "ground_truth_answer": "_STOP_WORDS, a frozenset of short common words.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y02",
+      "question": "What is the default population split across the four agent types?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "agenttype"
+      ],
+      "answer_keywords": [
+        "0.40",
+        "0.30",
+        "0.20",
+        "0.10",
+        "_DEFAULT_DIST"
+      ],
+      "ground_truth_answer": "_DEFAULT_DIST: COMPLIANT 0.40, SKEPTICAL 0.30, PANIC 0.20, IMMOBILE 0.10.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y03",
+      "question": "The graph builder returns two graphs \u2014 what distinguishes them?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "graph"
+      ],
+      "answer_keywords": [
+        "G_passable",
+        "G_full",
+        "passable",
+        "flood"
+      ],
+      "ground_truth_answer": "G_passable has only edges where passable=True; G_full includes flood-blocked edges.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y04",
+      "question": "Which node label and which four properties does the graph loader read out of the database?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "neo4j"
+      ],
+      "answer_keywords": [
+        "Intersection",
+        "lat",
+        "lon",
+        "sector"
+      ],
+      "ground_truth_answer": "MATCH (n:Intersection) returning n.id, n.lat, n.lon and n.sector.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y05",
+      "question": "What is chosen as the evacuation target when the database contains no tagged refuges?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "shelter"
+      ],
+      "answer_keywords": [
+        "degree",
+        "fallback",
+        "highest",
+        "passable"
+      ],
+      "ground_truth_answer": "The highest-degree passable node is used as a fallback target.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y06",
+      "question": "What happens if the graph is empty when the code looks for an evacuation target?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "shelter"
+      ],
+      "answer_keywords": [
+        "ValueError",
+        "no nodes",
+        "cannot"
+      ],
+      "ground_truth_answer": "It raises ValueError('Graph has no nodes; cannot find shelter fallback').",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y07",
+      "question": "Which standard-library call assigns agent types according to the configured proportions?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "spawn"
+      ],
+      "answer_keywords": [
+        "random.choices",
+        "weights",
+        "assigned_types"
+      ],
+      "ground_truth_answer": "random.choices(types, weights=weights, k=n).",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y08",
+      "question": "What format string produces the identifiers given to newly placed agents?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "spawn"
+      ],
+      "answer_keywords": [
+        "agent_",
+        "05d",
+        "enumerate"
+      ],
+      "ground_truth_answer": "f\"agent_{i:05d}\" \u2014 zero-padded to five digits.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y09",
+      "question": "Which five per-state counts are recorded for every simulation step?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "tickresult"
+      ],
+      "answer_keywords": [
+        "n_safe",
+        "n_evacuating",
+        "n_informed",
+        "n_waiting",
+        "n_stranded"
+      ],
+      "ground_truth_answer": "n_safe, n_evacuating, n_informed, n_waiting and n_stranded.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y10",
+      "question": "How many congested roads are reported at the end of a run, and ranked by what?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "bottleneck"
+      ],
+      "answer_keywords": [
+        "top-5",
+        "bottleneck_edges",
+        "crossings",
+        "cumulative"
+      ],
+      "ground_truth_answer": "bottleneck_edges holds the top-5 road names by cumulative agent crossings.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y11",
+      "question": "How many agents at most are tracked for the map animation history?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "replay"
+      ],
+      "answer_keywords": [
+        "200",
+        "_REPLAY_N",
+        "sample"
+      ],
+      "ground_truth_answer": "_REPLAY_N = 200; random.sample takes min(200, len(agents)).",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y12",
+      "question": "What does the accessor for pre-computed routes return the length of?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "routable"
+      ],
+      "answer_keywords": [
+        "_routes",
+        "n_routable_nodes",
+        "shelter"
+      ],
+      "ground_truth_answer": "len(self._routes) \u2014 nodes with a pre-computed passable route to the shelter.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y13",
+      "question": "List, in order, the six sub-steps executed by one simulation step.",
+      "expected_bucket_keywords": [
+        "simulation",
+        "tick"
+      ],
+      "answer_keywords": [
+        "_relay_messages",
+        "_update_evacuation_status",
+        "_move_agents",
+        "_increment_ticks",
+        "_spread_panic",
+        "_compute_tick_metrics"
+      ],
+      "ground_truth_answer": "_relay_messages, _update_evacuation_status, _move_agents, _increment_ticks, _spread_panic, _compute_tick_metrics.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y14",
+      "question": "After how many steps can the loop stop early, and on what condition?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "convergence"
+      ],
+      "answer_keywords": [
+        "5",
+        "Convergence",
+        "prev_informed",
+        "max_ticks"
+      ],
+      "ground_truth_answer": "After tick 5, if curr_informed <= prev_informed it logs Convergence and breaks.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y15",
+      "question": "How are relay operations applied so that ordering within a step does not matter?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "relay"
+      ],
+      "answer_keywords": [
+        "pending",
+        "atomically",
+        "snapshot",
+        "next_hop"
+      ],
+      "ground_truth_answer": "All relays are collected into a pending list and applied atomically afterwards.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y16",
+      "question": "What is reset when an agent is promoted to leave, besides its state?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "evacuation"
+      ],
+      "answer_keywords": [
+        "route",
+        "route_index",
+        "0",
+        "_routes"
+      ],
+      "ground_truth_answer": "agent.route is set from _routes and route_index is reset to 0.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y17",
+      "question": "Which counter is incremented as an agent traverses a road, and keyed by what?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "edge"
+      ],
+      "answer_keywords": [
+        "_edge_usage",
+        "road_name",
+        "unknown"
+      ],
+      "ground_truth_answer": "self._edge_usage[edge_data.get(\"road_name\", \"unknown\")] += 1.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y18",
+      "question": "Which graph do the erratic agents move on, and what do they disregard?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "panic"
+      ],
+      "answer_keywords": [
+        "_G_full",
+        "flood",
+        "random.choice",
+        "blockages"
+      ],
+      "ground_truth_answer": "They take a random step on G_full, ignoring flood blockages.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y19",
+      "question": "Which two configuration values govern social contagion, and when does it run?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "contagion"
+      ],
+      "answer_keywords": [
+        "panic_radius",
+        "panic_spread_prob",
+        "AFTER",
+        "movement"
+      ],
+      "ground_truth_answer": "panic_radius as the cutoff and panic_spread_prob as the probability; it runs after movement.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y20",
+      "question": "What value is used for message preservation when no agents have been reached yet?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "preservation"
+      ],
+      "answer_keywords": [
+        "1.0",
+        "preservation",
+        "informed_pool",
+        "total_tokens"
+      ],
+      "ground_truth_answer": "preservation defaults to 1.0 when informed_pool is empty or total_tokens is 0.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y21",
+      "question": "Which counter advances for agents that have been reached but are not yet safe, and in which helper?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "ticks"
+      ],
+      "answer_keywords": [
+        "ticks_informed",
+        "_increment_ticks"
+      ],
+      "ground_truth_answer": "_increment_ticks advances agent.ticks_informed for INFORMED and EVACUATING agents.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y22",
+      "question": "When an agent relocates, which index is updated and what is done about a stale entry?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "spatial"
+      ],
+      "answer_keywords": [
+        "_node_to_agents",
+        "_move_to",
+        "setdefault",
+        "remove"
+      ],
+      "ground_truth_answer": "_move_to removes the agent from _node_to_agents[old] and appends it under next_node.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y23",
+      "question": "How is the run identifier generated for a finished simulation, and how long is it?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "result"
+      ],
+      "answer_keywords": [
+        "uuid4",
+        "run_id",
+        "8"
+      ],
+      "ground_truth_answer": "run_id=str(uuid.uuid4())[:8] \u2014 the first 8 characters of a uuid4.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y24",
+      "question": "Which call selects the congested roads at the end, and what is the evacuation rate when there are no agents?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "result"
+      ],
+      "answer_keywords": [
+        "most_common",
+        "top_bottlenecks",
+        "0.0"
+      ],
+      "ground_truth_answer": "self._edge_usage.most_common(5); evacuation_rate is 0.0 when total is 0.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y25",
+      "question": "How does the movement step dispatch between the two kinds of mover, and which agents does it skip?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "movement"
+      ],
+      "answer_keywords": [
+        "_move_panic",
+        "_move_along_route",
+        "EVACUATING"
+      ],
+      "ground_truth_answer": "_move_agents skips agents not EVACUATING, sends PANIC to _move_panic and everyone else to _move_along_route.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    },
+    {
+      "id": "echoswarm_y26",
+      "question": "Which graph algorithm finds the neighbours eligible for panic conversion, and where are the converts collected?",
+      "expected_bucket_keywords": [
+        "simulation",
+        "contagion"
+      ],
+      "answer_keywords": [
+        "single_source_shortest_path_length",
+        "to_convert",
+        "reachable"
+      ],
+      "ground_truth_answer": "nx.single_source_shortest_path_length with a cutoff; converts accumulate in to_convert.",
+      "needs_multi_bucket": false,
+      "bucket": "95c8e099"
+    }
+  ]
+}

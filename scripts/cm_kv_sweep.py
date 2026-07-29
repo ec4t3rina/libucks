@@ -79,6 +79,10 @@ def main() -> int:
     ap.add_argument("--tag", default="", help="suffix for the results filename")
     ap.add_argument("--prefix-lens", default="32,64,128,256,384,512,768",
                     help="comma-separated P values for the kv_first arm")
+    ap.add_argument("--verbatim-chars", type=int, default=10 ** 9,
+                    help="bucket text budget. Defaults to UNBOUNDED: raw cache "
+                         "extraction is not limited by the teacher context window "
+                         "that motivated the 4096 cap elsewhere.")
     args = ap.parse_args()
 
     lens = parse_lens(args.prefix_lens)
@@ -98,7 +102,24 @@ def main() -> int:
     bids = list(cent)
     mat = np.stack([cent[b] for b in bids])
 
-    routed = [(f, bids[int((mat @ emb.embed(f["question"])).argmax())]) for f in fixtures]
+    # A fixture may pin its bucket. The stratified set does, because routing is a
+    # separate concern already measured elsewhere: 14 of its 20 questions route
+    # away from simulation.py, which would silently drop them and make a
+    # cache-content result depend on retrieval quality.
+    def _target(f):
+        declared = f.get("bucket")
+        if declared:
+            for b in bids:
+                if b.startswith(declared):
+                    return b
+            sys.exit(f"[cm_kv_sweep] fixture {f['id']} declares unknown bucket {declared!r}")
+        return bids[int((mat @ emb.embed(f["question"])).argmax())]
+
+    routed = [(f, _target(f)) for f in fixtures]
+    n_pinned = sum(1 for f in fixtures if f.get("bucket"))
+    if n_pinned:
+        _log(f"{n_pinned}/{len(fixtures)} fixtures pin their bucket explicitly "
+             f"(routing bypassed by design)")
     if args.buckets:
         want = {b.strip() for b in args.buckets.split(",") if b.strip()}
         routed = [(f, b) for f, b in routed if any(b.startswith(w) for w in want)]
@@ -135,7 +156,12 @@ def main() -> int:
             trained.load(p_file)
             trained.to(device)
         fm, _ = store.read(bid)
-        verbatim = _collect_source_text(fm, max_chars=4096) or ""
+        # FULL bucket text, not the 4096-char cap. That cap existed for the
+        # distillation teacher's context window; raw cache extraction has no such
+        # constraint, and inheriting it silently limited a 20,013-char bucket to
+        # its first 1,021 tokens — defeating the point of choosing a large bucket
+        # and putting most of the stratified fixtures outside the cache entirely.
+        verbatim = _collect_source_text(fm, max_chars=args.verbatim_chars) or ""
         flat = extract_bucket_kv(model, tok, verbatim, max_tokens=max(1024, max(lens)))
         seq = int(flat[kp.layer_keys(flat)[0][0]].shape[2])
         arms = {}
