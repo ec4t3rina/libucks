@@ -23,7 +23,121 @@ finding.
 - CM-B.0e — no-context floor, 3 arms × 3 seeds — ❌ **LATENT CHANNEL INERT AT P=128** 2026-07-28 (**cartridge − floor = +0.67/8 and +0.33/16, i.e. zero at spread ±1. On the non-leaky set the base 3B scores 0.00/8 cold and the cartridge scores 0.67/8. A random prefix is ACTIVELY HARMFUL (2.33 vs floor 4.00), so `cartridge − random` overstates the benefit and must not be quoted**)
 - CM-B.0f — the two surviving objections: best-epoch and P — ⚠️ **P WAS A CONSTRAINT** 2026-07-29 (**P=384 gives c−floor +3/8 and +5/16 vs +0.67 and +0.33 at P=128, and initial KL 5.68→3.63 from capacity alone. The CM-B.0e "inert" verdict was a P=128 artifact — but see 0g/0h: P was not the *binding* constraint**)
 - CM-B.0g — P sweep, 384×3 seeds + 512 + 768 — ⚠️ **KL AND GROUNDING DECOUPLE HARD** 2026-07-29 (**P=768 reaches the best KL ever recorded here (1.093) and scores 2/8 — worse than P=512's 4/8 on a 3× worse KL. Threefold divergence improvement buys nothing. Diagnosis: at high P the cartridge fits the 120 self-study queries, and the fixtures ask different questions**)
-- CM-B.0h — training-free KV-cache selection — ❌ **DISTILLATION DEGRADES ITS OWN WARM START** 2026-07-29 (**`kv_first` — the untrained first-P slice of the real cache, provably identical to `init_from_extracted_kv` — beats the distilled cartridge on 3 of 4 measurements: 13/16 vs 8/16 at P=768, 12/16 vs 9/16 at P=384. 98 minutes of gradient descent makes the cartridge worse than where it started. The latent channel WORKS; context distillation is the wrong mechanism**)
+- CM-B.0h — training-free KV-cache selection — ⚠️ **CONCLUSION RETRACTED by CM-B.0i** 2026-07-29 (**measured `kv_first` 13/16 vs cartridge 8/16 and concluded distillation degrades its own warm start. Both the fixture set and the conclusion were flawed: the bc6b90e2 fixtures cluster in the first quarter of the file, and `kv_first` keeps the FIRST P positions, so it won by construction. On position-stratified fixtures the two are indistinguishable**)
+- CM-B.0i — position-stratified sweep on a second bucket — ✅ **TRUNCATION DOES NOT COMPRESS; UNCOMPRESSED CEILING IS 50%** 2026-07-29 (**full 4,599-token cache scores 13/26 vs floor 0/26. Score is proportional to fraction retained — 2.8%→1/26, 22%→6/26, 100%→13/26 — so no prefix carries information about text it dropped. At matched P=128 cartridge 2/26 ≈ kv_first 1/26. Both CM-B.0h/0i-precursor headlines were artifacts of self-authored, head-clustered fixtures**)
+
+---
+
+## CM-B.0i — position-stratified sweep on 95c8e099 (2026-07-29)
+
+**Status**: ✅ A clean answer, and it retracts two claims made earlier the same day.
+
+**Why a new fixture set.** The bc6b90e2 extension set (16 fixtures, authored by
+reading that bucket's text) produced an apparently clean compression curve. It was
+an artifact — the scores tracked the count of fixtures whose keywords fall inside
+the first P tokens almost exactly:
+
+| P | positional ceiling | actual |
+|---|---|---|
+| 128 | 8/16 | 8/16 |
+| 256 | 11/16 | 11/16 |
+| 384 | 14/16 | 12/16 |
+
+Those questions clustered in the head of the file, and `kv_first` keeps the FIRST P
+positions. A head-clustered set cannot distinguish truncation from compression.
+
+**The new set**: 26 fixtures for `95c8e099` (`simulation.py`, 20,013 chars / 4,599
+tokens) — a different bucket and file from the one the mechanism was developed
+against. Facts spread from token ~115 to ~4,818, with the spread enforced by tests
+(≤35% answerable from the first eighth, ≥25% needing past the midpoint, no gap over
+25% of the document). Routing deliberately bypassed via an explicit `bucket` field:
+14 of the first 20 questions routed elsewhere because simulation.py is the
+orchestrator, and this experiment asks whether a bucket's CACHE carries its
+content, not whether the router finds the bucket.
+
+### Result
+
+| P | compression | score | fraction retained |
+|---|---|---|---|
+| floor (no memory) | — | **0/26** | — |
+| 32 | 143.7× | 0/26 | 0.7% |
+| 64 | 71.9× | 1/26 | 1.4% |
+| 128 | 35.9× | 1/26 | 2.8% |
+| 256 | 18.0× | 2/26 | 5.6% |
+| 512 | 9.0× | 2/26 | 11% |
+| 1024 | 4.5× | 6/26 | 22% |
+| 2048 | 2.25× | 8/26 | 45% |
+| **4,599 (full cache)** | **1.0×** | **13/26** | 100% |
+| distilled cartridge | P=128 | 2/26 | — |
+
+**1. Prefix truncation does not compress.** Score is proportional to fraction
+retained, near-linearly. At 36× compression it sits at the positional ceiling.
+There is no regime in which a small prefix carries information about text it
+dropped — it answers what it literally contains.
+
+**2. The uncompressed ceiling is 13/26 (50%).** With the entire document present as
+KV, unmodified, the 3B answers half these questions and fails the other half. This
+bounds every compression scheme: none can exceed the uncompressed cache. The best
+compressed arm at any real ratio is 6/26 at 4.5×.
+
+**3. Distillation ≈ truncation at matched size.** cartridge@128 2/26 vs
+kv_first@128 1/26 — indistinguishable, both near zero.
+
+### Retractions
+
+**CM-B.0h's conclusion is withdrawn.** "98 minutes of distillation leaves the
+cartridge worse than its own initialisation" (13/16 vs 8/16 at P=768) was an
+artifact: `kv_first@768` covered 76% of `agents.py`, including all the early
+content those fixtures asked about. It won by containing the answers, not by being
+a better mechanism. At matched P on stratified fixtures the cartridge is if
+anything marginally ahead.
+
+**The CM-B.0i-precursor "compression curve" is withdrawn** for the same reason.
+"3.9× retains 85%" was really "11 of my 16 questions are about the first quarter of
+the file."
+
+Both retracted claims came from fixtures written by reading the target bucket. That
+is the third distinct way self-authored fixtures measured the wrong thing this
+session, after the keyword-echo leak (floor 4/16) and the 8-fixture set's total
+lack of resolving power (2/8 at P=32 and 2/8 at P=384).
+
+**Two bugs in the analysis tooling, both mine:** the `min_P` helper used
+`int(len/2)-1` where `grounding_score` needs `ceil(len/2)` hits — off by one for
+odd keyword counts, understating head-availability; and `cm_kv_sweep` inherited
+`max_chars=4096` from the distillation path, capping a 20,013-char bucket at its
+first 1,021 tokens. The second was caught 45 s in from a `seq_len=1021` log line.
+Recomputing the ceiling with the corrected index changes 9→8 at P=128 and 15→14 at
+P=384 — the retraction stands either way.
+
+### What survives from earlier in the day
+
+- P=128 was genuinely too small for distillation (initial KL 5.68 → 3.63 at P=384).
+- KL and grounding decouple: P=768 reached the best KL recorded here (1.093) and
+  scored 2/8. Distillation overfits the 120 self-study queries.
+- Neither historical "pass" reproduces — six modern draws across two configs land
+  at 0–2/8 against single historical draws of 4/8 and 5/8.
+- `CM_SEED` gives only approximate reproducibility; fixed-seed epoch-0 KL varied
+  33% at P=384 from MPS nondeterminism.
+
+### Where this leaves the track
+
+**No compression mechanism has been demonstrated.** Raw cache works but does not
+compress; distillation does not help. That is precisely the gap a *learned*
+compressor addresses — AutoCompressor (arXiv 2305.14788) reaches 40 tokens per
+summary vector by training one compressor over a corpus and encoding each document
+in a single forward pass, and reports the same honest limitation we observe
+independently ("summary vectors ignore some useful information accessible via full
+attention"; their REPLUG top-10 text retrieval beats their own summary vectors).
+
+The 50% uncompressed ceiling is the number to build on, because it bounds
+everything else and is measured on a hostile fixture set. It argues the next
+question is **model scale or an amortised compressor**, not another selection
+heuristic.
+
+**Still unknown**: whether a learned compressor works here; whether any of this
+generalises past one bucket in one repo; multi-bucket composition (CAS reports
+naive concatenation collapses, which is likely what CM-A.2's multi-bucket top-k
+concat hit); and whether 3B is the binding limit.
 
 ---
 
@@ -73,6 +187,13 @@ gradient steps add.
 | P=384 orig8 | 0 | 2/8 | 0 | **3** | 0 | **4/8** | +2 |
 | P=768 ext16 | 0 | **13/16** | 1 | 1 | 1 | 8/16 | **−5** |
 | P=768 orig8 | 0 | **3/8** | 1 | 3 | 0 | 2/8 | **−1** |
+
+> **⚠️ RETRACTED — see CM-B.0i.** The conclusion below does not hold. These
+> fixtures cluster in the first quarter of `agents.py`, and `kv_first` keeps the
+> FIRST P positions, so it won by containing the answers rather than by being a
+> better mechanism. On position-stratified fixtures at matched P the cartridge is
+> if anything marginally ahead (2/26 vs 1/26). The numbers in the table are real;
+> the interpretation was wrong.
 
 **On 3 of 4 measurements, 98 minutes of distillation leaves the cartridge worse
 than its own initialisation.** At P=768 on the 16-item set, 13/16 untrained

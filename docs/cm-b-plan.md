@@ -127,6 +127,22 @@ an 896-dim **0.5B** checkpoint and will not load into a 3B receiver.
 
 ## Stage 1 — the Edit experiment
 
+> **❌ CLOSED 2026-07-29 — the premise no longer holds. Do not build the
+> model-backed `TrialRunner`.**
+>
+> The claim below assumes rebuilding a bucket's memory is expensive (~7,200 s),
+> which is what makes cheap repair a research question. CM-B.0i established that
+> distillation buys nothing over a raw cache slice at matched size (2/26 vs 1/26),
+> and a raw cache is produced by **one forward pass**. When full rebuild costs
+> seconds, "can we repair instead of rebuilding?" has no content — the relative
+> claim would be trivially true and uninteresting.
+>
+> Closed because the problem dissolved, not because the experiment failed. The
+> scaffolding (`cm_make_edits.py`, `cartridge_edit.py`, `cm_edit_experiment.py`,
+> 138 tests) stays in the tree: the edit-generation and staleness-detection halves
+> are reusable if a working compressor ever makes per-bucket artifacts expensive
+> again.
+
 **Claim:** when one chunk changes, a cheap warm-started repair lands close to a full
 re-distill at a fraction of the cost.
 
