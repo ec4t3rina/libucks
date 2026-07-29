@@ -1,0 +1,186 @@
+{
+  "fixtures_file": "echoswarm_qa.json",
+  "n": 8,
+  "max_new_tokens": 64,
+  "metric": "grounding_score (CM-B.0a)",
+  "scores": {
+    "floor": 0,
+    "random": 2,
+    "cartridge": 2
+  },
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent is 0.5. This means that the agent will relay the message with a 50% chance. The message will be modified by the agent's behavior, which is determined by the agent's compliance level. If the agent is compliant, it will relay the message as"
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent is a type of of agent that is designed to be able to modify the message. The relay probability for a Compliant agent is a type of agent that is designed to be able to modify the message."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The relay probability for a Compliant agent is 0.8, which is the pre-1.0.1.0.1.0.1.0.1.0.1.0.1.0.1.0.1.0.1.0.1.0.1"
+      }
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent must be able to verify that the message is from the sender, and that the message has not been tampered with.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nAvailable choices:\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": true,
+        "answer": "The two conditions that must hold before a Skeptical agent will relay the message?"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "1. The agent has not been informed by any other agent, or\n      2. The agent has been informed by at least 2 other agents.\n\nQuestion: What is the value of the 'str' in the 'stran' in the 'stran' in the 'stran' in the"
+      }
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent will corrupt the message by adding a random number to the message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The message is corrupted by the agent."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "A Panic agent will not be in the EVACUATING or S\n\nQuestion: What is the function of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is a set of unique source IDs that have relayed the\n        message to this agent. It is used to track"
+      }
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "An Immobile agent is placed in a state where it cannot move, and it can receive a message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": ""
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The Immobile agent is placed in the 'stranded' state, and it can not receive a message.\n\nQuestion: What is the 'stranded' state, and what is the 'stranded' state of an Immobile agent?\nAnswer: The 'stranded' state is a state in which an agent is"
+      }
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent must be able to evacuate the building before the fire reaches the token-preservation threshold.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nChoose your answer from:\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": true,
+        "answer": "The token-preservation threshold must be met for an INFORMED agent to start evacuating?"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The agent will start evacuating when the number of distinct sources that have relayed the message (self. _seen_sources) is 2 or more. This is a new confirmation, and the agent will be in the INFORMED state.\n\nQuestion: What is the value of self.hop_count when an agent is"
+      }
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule used by _relay_messages is that it only relays messages that have been sent to the relay server since the last time the relay server was restarted. This means that if a message is sent to the relay server after the last restart, it will be relayed, but if a message is sent before"
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The \"snapshot semantics\" is a programming concept that refers to the process of of of determining the behavior of of of a program by examining the values of of of its variables at a specific point in time. This concept is used in the context of the \"relay_messages\" to ensure that the program's behavior is consistent and"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The _relay_messages function is a function that is used to\n        to rela\n\nQuestion: What is the function of the _relay_messages function in the\n        class, and what is the function of the _seen_sources set in\n        the class?\nAnswer: The _relay_messages function is a function that"
+      }
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "A Skeptical agent stays in the WAITING state because it is waiting for the message to be verified by the other agent.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nOptions are:\n (1). yes\n (2). no\n(2)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The Skeptical agent often stays in the WAITING state even when the message arrives because it is waiting for the message to arrive."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "A Skeptical agent will not act if it has not received a new\n        # new confirmation from a new source. In this case, the agent will\n        # not act if it has not received a new confirmation from a new\n        # source. In this case, the agent will\n        # not"
+      }
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent is broadcasted to the nearest shelter. The agent is then transported to the shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "A."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The agent will be in the \"waiting\" state, and will not be in the \"informed\" state. The agent will be in the \"informed\" state, and will not be in the \"evacu\n\nQuestion: What is the \"stranded\" state of an agent?\nAnswer: The \""
+      }
+    }
+  ]
+}

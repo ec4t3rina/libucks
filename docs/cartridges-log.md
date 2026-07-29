@@ -21,7 +21,110 @@ finding.
 - CM-B.0b-repro — CM-A.1-retry reproduction, 3 seeded draws — ❌ DOES NOT REPRODUCE 2026-07-28 (**2/8, 1/8, 1/8 — spread 1, so this is NOT noise**)
 - CM-B.0d — CM-A.2's exact config, 3 seeded draws — ❌ DOES NOT REPRODUCE 2026-07-28 (**0/8, 1/8, 1/8. CM-A.2's 5/8 was a single lucky draw. Six modern draws across two configs all land at 0–2/8 against two historical single draws of 4/8 and 5/8**)
 - CM-B.0e — no-context floor, 3 arms × 3 seeds — ❌ **LATENT CHANNEL INERT AT P=128** 2026-07-28 (**cartridge − floor = +0.67/8 and +0.33/16, i.e. zero at spread ±1. On the non-leaky set the base 3B scores 0.00/8 cold and the cartridge scores 0.67/8. A random prefix is ACTIVELY HARMFUL (2.33 vs floor 4.00), so `cartridge − random` overstates the benefit and must not be quoted**)
-- CM-B.0f — the two surviving objections: best-epoch and P — ⚠️ **P WAS THE BINDING CONSTRAINT** 2026-07-29 (**P=384 gives c−floor +3/8 and +5/16 vs +0.67 and +0.33 at P=128, and initial KL 5.68→3.63 from capacity alone. The CM-B.0e "inert" verdict was a P=128 artifact. n=1 — confirmation running as CM-B.0g**)
+- CM-B.0f — the two surviving objections: best-epoch and P — ⚠️ **P WAS A CONSTRAINT** 2026-07-29 (**P=384 gives c−floor +3/8 and +5/16 vs +0.67 and +0.33 at P=128, and initial KL 5.68→3.63 from capacity alone. The CM-B.0e "inert" verdict was a P=128 artifact — but see 0g/0h: P was not the *binding* constraint**)
+- CM-B.0g — P sweep, 384×3 seeds + 512 + 768 — ⚠️ **KL AND GROUNDING DECOUPLE HARD** 2026-07-29 (**P=768 reaches the best KL ever recorded here (1.093) and scores 2/8 — worse than P=512's 4/8 on a 3× worse KL. Threefold divergence improvement buys nothing. Diagnosis: at high P the cartridge fits the 120 self-study queries, and the fixtures ask different questions**)
+- CM-B.0h — training-free KV-cache selection — ❌ **DISTILLATION DEGRADES ITS OWN WARM START** 2026-07-29 (**`kv_first` — the untrained first-P slice of the real cache, provably identical to `init_from_extracted_kv` — beats the distilled cartridge on 3 of 4 measurements: 13/16 vs 8/16 at P=768, 12/16 vs 9/16 at P=384. 98 minutes of gradient descent makes the cartridge worse than where it started. The latent channel WORKS; context distillation is the wrong mechanism**)
+
+---
+
+## CM-B.0g / CM-B.0h — the P sweep, and what actually carries the content (2026-07-29)
+
+**Status**: ❌ for context distillation, ✅ for the latent channel itself. The
+memory works — the training destroys it.
+
+### 0g — P sweep: KL improves 3×, grounding does not move
+
+Five arms, CM-A.2's config with `CM_KEEP_BEST=1`, floor 0 on both sets in every arm.
+
+| arm | final KL | orig 8 | ext 16 (de-leaked) |
+|---|---|---|---|
+| P=384 s1 | 3.317 | 1 | 5 |
+| P=384 s2 | 3.859 | 4 | 9 |
+| P=384 s3 | 4.034 | 1 | 9 |
+| P=512 s1 | **1.151** | 4 | 7 |
+| P=768 s1 | **1.093** | **2** | 8 |
+
+P=384 across seeds: orig8 mean 2.0 (spread 3), ext16 mean 7.67 (spread 4).
+Comparable back to P=128 on orig8: **0.67 → 2.25 (P≥384)**, so raising P did help.
+
+**But P=768 has the best KL ever recorded in this project (1.093) and scores 2/8** —
+worse than P=512's 4/8 at a 3× worse KL. A threefold reduction in divergence buys
+nothing. This is the KL/grounding decoupling, now unambiguous.
+
+**Diagnosis**: at high P the cartridge fits the 120 self-study queries very well;
+the fixtures ask different questions. It is overfitting the self-study set, not
+learning the document. Capacity was *a* constraint; removing it exposed the real
+one, which is **supervision coverage**.
+
+**Correction**: the CM-B.0b-repro finding that "200 queries vs 120 makes no
+difference" was measured at P=128, where capacity was binding, so it could not
+have shown a query-count effect. That test is void, not negative.
+
+### 0h — the training-free comparison
+
+`kv_first` is the first P positions of the **real** extracted cache. It is provably
+identical to `init_from_extracted_kv` (asserted in
+`test_kv_prune_selectors.py`), so `cartridge − kv_first` is exactly what the
+gradient steps add.
+
+| run | floor | **kv_first** | kv_last | kv_stride | kv_norm | **cartridge** | cart − kv_first |
+|---|---|---|---|---|---|---|---|
+| P=384 ext16 | 0 | **12/16** | 0 | 7 | 0 | 9/16 | **−3** |
+| P=384 orig8 | 0 | 2/8 | 0 | **3** | 0 | **4/8** | +2 |
+| P=768 ext16 | 0 | **13/16** | 1 | 1 | 1 | 8/16 | **−5** |
+| P=768 orig8 | 0 | **3/8** | 1 | 3 | 0 | 2/8 | **−1** |
+
+**On 3 of 4 measurements, 98 minutes of distillation leaves the cartridge worse
+than its own initialisation.** At P=768 on the 16-item set, 13/16 untrained
+against 8/16 distilled.
+
+This retro-explains the whole track: KL improves while grounding does not because
+training overwrites the real activations that were already carrying the answers;
+"structure, not identifiers" because the real cache *has* the identifiers and
+distillation washes them out; more capacity does not help because it is more room
+to overfit; and CM-A.1-retry never reproduced because it was probably never far
+from the warm start.
+
+**The positive result is the larger one**: 13/16 against a 0/16 floor, from a
+single forward pass, no training. The latent channel carries repo content fine.
+Compression degrades gracefully — 12/16 at P=384 (2.6×) vs 13/16 at P=768 (1.3×),
+so halving the budget cost one fixture.
+
+**Mechanism — contiguity**: `kv_first` ≫ `kv_stride` ≫ `kv_norm` ≈ `kv_last`. The
+stride arm at P=768 takes 768 of 1,009 positions with irregular gaps of 1–2, which
+scrambles the relative offsets RoPE encodes, and collapses to 1/16. `kv_last`
+drops the file's opening, where the enum definitions most fixtures ask about live.
+A **contiguous** prefix of the real cache is what works.
+
+**Methodological gain**: the training-free arms have no seed and no optimiser, so
+their only variance is MPS decode noise (~2 answers in 25). They are reproducible
+in a way no cartridge in this project has been — which retires the spread-of-3-to-4
+problem that made every previous number hard to read.
+
+### Caveats
+
+- n=1 per configuration in 0h, and orig8 disagrees at P=384 (cartridge +2). Not
+  unanimous.
+- The ext16 numbers are **not comparable across stages**: the de-leaked fixture
+  set landed mid-sweep (01:13). Within 0g/0h they are consistent; against 0f's
+  9/16 they are not.
+- `CM_SEED` gives only approximate reproducibility. Two runs at identical config
+  and seed produced epoch-0 KL of 3.6252 and 4.8253 — a 33% swing from MPS
+  floating-point nondeterminism, far larger at P=384 than the ~1.2% seen at P=128.
+  Larger P appears to buy capacity at the cost of optimisation stability.
+
+### Consequence for the plan
+
+**Stage 1 (Living Cartridges) is closed — and for a better reason than "it fails".**
+Its premise was that rebuilding a bucket's memory costs ~7,200 s, making cheap
+repair a research question. If memory is a truncated real cache, rebuild is **one
+forward pass**. The problem Stage 1 was designed to solve does not exist. Do not
+build the model-backed `TrialRunner`.
+
+**Next**: CM-B.0i — sweep `kv_first` over P ∈ {32, 64, 128, 256, 384, 512, 768} on
+both fixture sets to map the compression/accuracy curve. Minutes per point instead
+of 98, and deterministic. This is the tradeoff curve the project has been trying to
+locate since Phase 4-C.
 
 ---
 

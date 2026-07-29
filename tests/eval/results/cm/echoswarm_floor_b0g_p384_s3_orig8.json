@@ -1,0 +1,186 @@
+{
+  "fixtures_file": "echoswarm_qa.json",
+  "n": 8,
+  "max_new_tokens": 64,
+  "metric": "grounding_score (CM-B.0a)",
+  "scores": {
+    "floor": 0,
+    "random": 1,
+    "cartridge": 1
+  },
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent is 0.5. This means that the agent will relay the message with a 50% chance. The message will be modified by the agent's behavior, which is determined by the agent's compliance level. If the agent is compliant, it will relay the message as"
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent is a type of of agent that is designed to be able to modify the message. It is a type of of agent that is designed to be able to modify the message. It is a type of agent that is designed to be able to modify the message. It is a type"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent is 0.5, which means that the agent will relay the message with a 50% chance. The message will be modified by the agent by adding a \"compliant\" token to the set of tokens.\n\nQuestion: What is the relay probability for a Skept"
+      }
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent must be able to verify that the message is from the sender, and that the message has not been tampered with.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nAvailable choices:\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": ""
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The agent must have received a message from at least one other agent, and the message must have a\n        valid token (i.e., it is not a \"stranded\" message).\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is used"
+      }
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent will corrupt the message by adding a random number to the message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The agent uses a random number generator to create a random number that is then used to corrupt the message."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "A Panic agent will corrupt the message by adding a random token to the message.\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is used to keep track of the unique source IDs that have relayed the message. It is used to determine if the"
+      }
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "An Immobile agent is placed in a state where it cannot move, and it can receive a message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The initial state of of of an immobile agent cannot receive a message as it is not capable of movement or action. Immobility is a state of in which an agent is unable to change its position or orientation. Therefore, the immobile agent cannot receive a message as it is not capable of receiving or processing any"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "An Immobile agent is placed in the STRANDED state, and it can receive a message.\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class, and how is it used?\nAnswer: The _seen_sources set is used to keep track of the unique source IDs that have relayed"
+      }
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent must be able to evacuate the building before the fire reaches the token-preservation threshold.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nChoose your answer from:\n (1). yes\n (2). no\n(1)."
+      },
+      "random": {
+        "grounded": true,
+        "answer": "The token-preservation threshold must be met for an INFORMED agent to start evacuating."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The token-preservation threshold is 2. The agent will start evacuating if it has received 2 or more distinct tokens from other agents.\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is used to keep track of the unique source IDs that"
+      }
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule used by _relay_messages is that it only relays messages that have been sent to the relay server since the last time the relay server was restarted. This means that if a message is sent to the relay server after the last restart, it will be relayed, but if a message is sent before"
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule is used by _relay_messages to ensure that the messages are delivered to the correct destination. It matters because it guarantees that the messages are delivered to the correct destination."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule is that the _relay_messages function will only\n        relay the message if the agent has not received it from any other\n        source. This is important because it ensures that the message is\n        only relayed once, and that the agent will not receive it from\n        any other source."
+      }
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "A Skeptical agent stays in the WAITING state because it is waiting for the message to be verified by the other agent.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nOptions are:\n (1). yes\n (2). no\n(2)."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "The Skeptical agent is in WAITING state because it is waiting for the message to arrive."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "A Skeptical agent will not act if it has not received a sufficient number of\n        confirmations. In this case, the agent has not received any confirmations,\n        so it will not act and will remain in the WAITING state.\n\nQuestion: What is the purpose of the _seen_sources set in the"
+      }
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent is broadcasted to the nearest shelter. The agent is then transported to the shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter."
+      },
+      "random": {
+        "grounded": false,
+        "answer": "(A). is broadcasted; (B). is sent; (C). is received; (D). is encrypted;\nA: (A). (B). (C). (D). (A). (B). (C). (D). (A). (B). (C). (D). ("
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The agent will be in the \"informed\" state when it receives the message. It will then evaluate the message and decide whether to act. If it decides to act, it will move to the \"evacuating\" state and will start to move towards the shelter. If it is not in the \"evac"
+      }
+    }
+  ]
+}

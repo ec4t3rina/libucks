@@ -1,0 +1,291 @@
+{
+  "fixtures_file": "echoswarm_qa.json",
+  "n": 8,
+  "prefix_len": {
+    "bc6b90e2": 384
+  },
+  "seq_len": {
+    "bc6b90e2": 1009
+  },
+  "max_new_tokens": 64,
+  "metric": "grounding_score (CM-B.0a)",
+  "scores": {
+    "floor": 0,
+    "kv_first": 2,
+    "kv_last": 0,
+    "kv_stride": 3,
+    "kv_norm": 0,
+    "cartridge": 4
+  },
+  "per_question": [
+    {
+      "id": "echoswarm_01",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "80%",
+        "verbatim",
+        "COMPLIANT"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent is 0.5. This means that the agent will relay the message with a 50% chance. The message will be modified by the agent's behavior, which is determined by the agent's compliance level. If the agent is compliant, it will relay the message as"
+      },
+      "kv_first": {
+        "grounded": false,
+        "answer": "The relay probability for a Compliant agent is 1, meaning it will always relay the message to its neighbors. This modification ensures that the message is passed on to all agents in the network, regardless of their individual behaviors.\n\n---\n\n# /Users/ecaterina/Developer/test-repos/echoswarm/src/swarm"
+      },
+      "kv_last": {
+        "grounded": false,
+        "answer": "True when this agent should transition from EVACUATING to ACTING.\nAnswer: True when this agent should transition from ACTING to ACTING.\nAnswer: True when this agent should transition from ACTING to ACTING.\nAnswer: True when this agent should transition from ACTING to ACTING.\nAnswer: True when"
+      },
+      "kv_stride": {
+        "grounded": false,
+        "answer": "A Compliant agent has a 100% relay probability, so it will always relay the message to all neighbors. The message is not modified.\n\n---\n\n# /src/swarm/agents.py\n# /src/swarm/agents.py\n    def __init__(self, tokens: frozenset, tokens"
+      },
+      "kv_norm": {
+        "grounded": false,
+        "answer": ""
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The relay probability for a Compliant agent is 0.8, which means that the agent will relay the message with a 80% probability. The message is not modified by the Compliant agent.\n\nQuestion: What is the relay probability for a Skeptical agent and how does it modify the message?\nAnswer"
+      }
+    },
+    {
+      "id": "echoswarm_02",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "confirmations",
+        "2",
+        "SKEPTICAL"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent must be able to verify that the message is from the sender, and that the message has not been tampered with.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nAvailable choices:\n (1). yes\n (2). no\n(1)."
+      },
+      "kv_first": {
+        "grounded": false,
+        "answer": "A Skeptical agent will relay the message if it has not yet received the message or if it has received the message but has not yet evaluated whether to act."
+      },
+      "kv_last": {
+        "grounded": false,
+        "answer": "1\u20132 tokens garbled\nAnswer: 1\u20132 tokens garbled\nAnswer: 1\u20132 tokens garbled\nAnswer: 1\u20132 tokens garbled\nAnswer: 1\u20132 tokens garbled\nAnswer: 1\u20132 tokens garbled\nAnswer: 1\u20132"
+      },
+      "kv_stride": {
+        "grounded": false,
+        "answer": "A Skeptical agent will relay the message if the message is not empty and the agent has not yet been informed:\n        if the message is not empty and the agent has not yet been informed:\n                if the message is not empty and the agent has not yet been informed:\n        if the message is not empty and"
+      },
+      "kv_norm": {
+        "grounded": false,
+        "answer": "The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer: The message?\nAnswer"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The message must have been received from at least two distinct sources, and the message must have been received at least 20 ticks ago.\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class?\nAnswer: The _seen_sources set is used to keep track of the unique source IDs that have"
+      }
+    },
+    {
+      "id": "echoswarm_03",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "1",
+        "2",
+        "garble",
+        "PANIC"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent will corrupt the message by adding a random number to the message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "kv_first": {
+        "grounded": false,
+        "answer": "A Panic agent corrupts the message by adding a \"panic\" token to the message. This token indicates that the agent is in a panic state and may not be able to provide accurate information or make rational decisions. The panic token is added to the message to signal to other agents that the message may not be reliable or"
+      },
+      "kv_last": {
+        "grounded": false,
+        "answer": "None\n\n\n---\n\n# /Users/echoswarm.py\nAnswer when this agent should transition from INFORMED to EVACUATING.\"\"\"\nif self.agent_type == AgentType.COMPLIANT:\n    return frozenset(self.tokens)\n\nif self.agent_type == AgentType.SKEPTICAL:\n    return frozens"
+      },
+      "kv_stride": {
+        "grounded": true,
+        "answer": "A Panic agent corrupts the message by randomly changing one of the tokens to a random token. This is done to ensure that the message is not corrupted, the agent will not act. If the message is corrupted, the agent will act.\n    def act(self, message: str) -> None:\n        \"\"\"Act on"
+      },
+      "kv_norm": {
+        "grounded": false,
+        "answer": "How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How: How:"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "A Panic agent will corrupt the message by adding a new token to the\n        tokens set. This is done to increase the likelihood of the message\n        being relayed to a different source, which can help to prevent\n        the message from being corrupted by a single source.\n\nQuestion: How does a Sceptical"
+      }
+    },
+    {
+      "id": "echoswarm_04",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "STRANDED",
+        "IMMOBILE",
+        "never"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "An Immobile agent is placed in a state where it cannot move, and it can receive a message.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes\n (2). no\n(1)."
+      },
+      "kv_first": {
+        "grounded": true,
+        "answer": "An Immobile agent is placed in the \"stranded\" state, which means it cannot move. It can receive a message, but it will not act on it since it is immobile."
+      },
+      "kv_last": {
+        "grounded": false,
+        "answer": "80% relay probability; message transmitted verbatim\nn_drop = 1\u20132 random tokens\nAnswer: 80% relay probability; message transmitted verbatim\nn_drop = 1\u20132 random tokens\nAnswer: 80% relay probability; message transmitted verbatim\nn_drop ="
+      },
+      "kv_stride": {
+        "grounded": true,
+        "answer": "An immobile agent is placed in the shelter and cannot receive a message. It will never be informed, and will never act. It will never be informed, and will never act. It will never be informed, and will never act. It will never be informed, and will never act. It will never be informed"
+      },
+      "kv_norm": {
+        "grounded": false,
+        "answer": "Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer:"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "An Immobile agent is placed in the \"stranded\" state, and it can receive a message.\n\nQuestion: What is the purpose of the _seen_sources set in the Agent class, and how is it used?\nAnswer: The _seen_sources set is used to keep track of the unique source IDs that have relay"
+      }
+    },
+    {
+      "id": "echoswarm_05",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "preservation",
+        "0.6",
+        "INFORMED"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent must be able to evacuate the building before the fire reaches the token-preservation threshold.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nChoose your answer from:\n (1). yes\n (2). no\n(1)."
+      },
+      "kv_first": {
+        "grounded": true,
+        "answer": "The token-preservation threshold must be met for an INFORMED agent to start evacuating. This threshold is typically set to a certain number of tokens, and if an INFORMED agent has received enough tokens from different sources, it will start evacuating. The exact threshold can vary depending on the specific implementation and the"
+      },
+      "kv_last": {
+        "grounded": false,
+        "answer": "1\u20132 tokens; drop one random key token before relaying\nAnswer: 1\u20132 tokens; drop one random key token before relaying\nAnswer: 1\u20132 tokens; drop one random key token before relaying\nAnswer: 1\u20132 tokens; drop one random key token before rel"
+      },
+      "kv_stride": {
+        "grounded": true,
+        "answer": "The token-preservation threshold must be met for an INFORMED agent to start evacuating. This means that the agent must have received at least 2 distinct tokens from distinct sources.\n        \"\"\"\n        if self.tokens == self.tokens_preservation_threshold:\n        self.tokens = self.tokens\n        self.tokens_preservation_threshold ="
+      },
+      "kv_norm": {
+        "grounded": false,
+        "answer": ""
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The token-preservation threshold for an INFORMED agent to start evacuating is 2. This is because the agent will start evacuating when it has received at least 2 distinct sources that have relayed the message. In other words, the agent will start evacuating when it has received at least 2 distinct"
+      }
+    },
+    {
+      "id": "echoswarm_07",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "pending",
+        "snapshot",
+        "atomically",
+        "one hop"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule used by _relay_messages is that it only relays messages that have been sent to the relay server since the last time the relay server was restarted. This means that if a message is sent to the relay server after the last restart, it will be relayed, but if a message is sent before"
+      },
+      "kv_first": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule used by `_relay_messages` is that it only considers the current state of the agent and its neighbors at the time the message is received. This means that the message is not affected by any changes that may occur after the message is received. This is important because it ensures that the message is processed correctly"
+      },
+      "kv_last": {
+        "grounded": false,
+        "answer": "It matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it matters because it"
+      },
+      "kv_stride": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule used by _relay_messages is \"last_seen\" (which means that the message is only relayed if the agent has not seen the message before. This is important because it ensures that the message is only relayed once, even if multiple agents see it. This is important because it ensures that the"
+      },
+      "kv_norm": {
+        "grounded": false,
+        "answer": "It does not matter."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The snapshot semantics rule is used to ensure that the message is not relayed to the same source more than once. This is important because it ensures that the message is not relayed to the same source more than once, which can lead to a loop and an infinite loop. The rule is used to ensure that the message"
+      }
+    },
+    {
+      "id": "echoswarm_19",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "confirmations",
+        "2",
+        "distinct",
+        "preservation"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "A Skeptical agent stays in the WAITING state because it is waiting for the message to be verified by the other agent.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nOptions are:\n (1). yes\n (2). no\n(2)."
+      },
+      "kv_first": {
+        "grounded": false,
+        "answer": "A Skeptical agent may stay in the WAITING state even when the message arrives because it is designed to be more cautious and skeptical of the information it receives. It may require more evidence or confirmation from other sources before it decides to act or move towards the shelter. This behavior helps to ensure that the agent makes informed"
+      },
+      "kv_last": {
+        "grounded": false,
+        "answer": "1\u20132 garbled tokens\nAnswer: 1\u20132 garbled tokens\nAnswer: 1\u20132 garbled tokens\nAnswer: 1\u20132 garbled tokens\nAnswer: 1\u20132 garbled tokens\nAnswer: 1\u20132 garbled tokens\nAnswer: 1\u20132"
+      },
+      "kv_stride": {
+        "grounded": false,
+        "answer": "A Skeptical agent may stay in the WAITING state even when the message arrived because it is skeptical, it may not trust the message and may not act on it. It may also be waiting for more messages to arrive before deciding to act.\n    \"\"\"\n        if self.agent_type == AgentType.SKEPTICAL"
+      },
+      "kv_norm": {
+        "grounded": false,
+        "answer": "Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "A Skeptical agent will not act on a message if it has not been relayed by at least 2 distinct sources. In this case, the message has only been relayed by one source, so the agent will not act.\n\nQuestion: Why does a Panic agent often stay in INFORMED state even"
+      }
+    },
+    {
+      "id": "echoswarm_20",
+      "bucket": "bc6b90e2",
+      "kw": [
+        "seed",
+        "INFORMED",
+        "EVACUATING",
+        "SAFE",
+        "route"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent is broadcasted to the nearest shelter. The agent is then transported to the shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter. The agent is then placed in a shelter."
+      },
+      "kv_first": {
+        "grounded": false,
+        "answer": "1. Hermes broadcasts a message to all agents in the swarm.\n2. The message is received by the agents, and they evaluate whether to act based on their agent type.\n3. Compliant agents move toward the shelter, skeptical agents may question the message, and panic agents may move randomly.\n4. The agents"
+      },
+      "kv_last": {
+        "grounded": false,
+        "answer": "80% relay probability; message transmitted verbatim\nn_drop = min(len(tokens_list))\nAnswer:  80% relay probability; message transmitted verbatim\nn_drop = min(len(tokens_list))\nAnswer:  80% relay probability; message transmitted verbatim\nn_drop = min(len"
+      },
+      "kv_stride": {
+        "grounded": false,
+        "answer": "The agent will first receive the message and evaluate it. If the message is valid, the agent will evaluate the message and decide whether to evacuate or not. If the agent decides to evacuate, it will then move toward the shelter. If the agent reaches the shelter, it will be marked as evacuated and will not move again"
+      },
+      "kv_norm": {
+        "grounded": false,
+        "answer": "Answer: Answer: Answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer: answer:"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The agent will be in the \"informed\" state when it receives the message. It will then evaluate the message and decide whether to act or not. If it decides to act, it will move to the \"evacuating\" state and will start moving to the shelter. If it decides not to act, it"
+      }
+    }
+  ]
+}
