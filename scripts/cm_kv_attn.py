@@ -80,6 +80,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_FIXTURES = ROOT / "tests/eval/fixtures/echoswarm_qa.json"
 RESULTS = ROOT / "tests/eval/results/cm"
 RECEIVER_ID = "Qwen/Qwen2.5-3B"
+# Per-budget arms. kv_first/kv_norm are query-AGNOSTIC (positional, magnitude);
+# kv_attn/kv_attn_L are query-aware, global and per-layer.
+SELECTORS = ("kv_first", "kv_norm", "kv_attn", "kv_attn_L")
 
 
 def _log(m: str) -> None:
@@ -111,7 +114,21 @@ def main() -> int:
                     help="cache is built in segments of this size; required because "
                          "eager attention over the whole bucket at once is huge")
     ap.add_argument("--verbatim-chars", type=int, default=10 ** 9)
+    ap.add_argument("--selectors", default=",".join(SELECTORS),
+                    help="which per-budget arms to run. Default is all four. A "
+                         "sweep over many budgets should usually narrow this: "
+                         "arms = 3 + len(selectors) * len(prefix_lens), and every "
+                         "arm costs one generation per fixture, so four selectors "
+                         "over six budgets is 702 generations.")
     args = ap.parse_args()
+
+    sel = [s.strip() for s in args.selectors.split(",") if s.strip()]
+    unknown = [s for s in sel if s not in SELECTORS]
+    if unknown:
+        sys.exit(f"[cm_kv_attn] unknown selector(s) {unknown}; "
+                 f"choose from {list(SELECTORS)}")
+    if not sel:
+        sys.exit("[cm_kv_attn] no selectors given")
 
     lens = _parse_lens(args.prefix_lens)
     fx_path = Path(args.fixtures) if args.fixtures else DEFAULT_FIXTURES
@@ -205,8 +222,9 @@ def main() -> int:
         agnostic = {}
         for P in lens:
             for how in ("kv_first", "kv_norm"):
-                agnostic[(how, P)] = kp.cartridge_from_selection(
-                    flat, kp.select_indices(flat, how, P), tmpl, device)
+                if how in sel:
+                    agnostic[(how, P)] = kp.cartridge_from_selection(
+                        flat, kp.select_indices(flat, how, P), tmpl, device)
         full = kp.cartridge_from_selection(
             flat, list(range(seq)), tmpl, device)
 
@@ -219,8 +237,10 @@ def main() -> int:
     if any(prep[b]["trained"] is not None for b in buckets):
         arms.append("cartridge")
     for P in lens:
-        arms += [f"kv_first@{P}", f"kv_norm@{P}", f"kv_attn@{P}", f"kv_attn_L@{P}"]
+        arms += [f"{s}@{P}" for s in sel]
     scores = dict.fromkeys(arms, 0)
+    _log(f"{len(arms)} arms x {len(routed)} fixtures = "
+         f"{len(arms) * len(routed)} generations; selectors {sel}")
     rows = []
 
     for n, (f, bid) in enumerate(routed, 1):
@@ -233,13 +253,17 @@ def main() -> int:
         if pk["trained"] is not None:
             plan.append(("cartridge", pk["trained"]))
         for P in lens:
-            plan.append((f"kv_first@{P}", pk["agnostic"][("kv_first", P)]))
-            plan.append((f"kv_norm@{P}", pk["agnostic"][("kv_norm", P)]))
-            plan.append((f"kv_attn@{P}", kp.cartridge_from_selection(
-                pk["flat"], kp.select_from_scores(s, P), pk["tmpl"], device)))
-            plan.append((f"kv_attn_L@{P}", kp.cartridge_from_per_layer_selection(
-                pk["flat"], kp.select_from_scores(s, P, per_layer=True),
-                pk["tmpl"], device)))
+            for how in sel:
+                if how in ("kv_first", "kv_norm"):
+                    cart = pk["agnostic"][(how, P)]
+                elif how == "kv_attn":
+                    cart = kp.cartridge_from_selection(
+                        pk["flat"], kp.select_from_scores(s, P), pk["tmpl"], device)
+                else:                                    # kv_attn_L
+                    cart = kp.cartridge_from_per_layer_selection(
+                        pk["flat"], kp.select_from_scores(s, P, per_layer=True),
+                        pk["tmpl"], device)
+                plan.append((f"{how}@{P}", cart))
 
         row = {"id": f["id"], "bucket": bid, "kw": kw}
         for name, cart in plan:
@@ -265,17 +289,25 @@ def main() -> int:
     if "cartridge" in scores:
         _log(f"cartridge   {scores['cartridge']}/{total}")
     _log("-" * 78)
-    _log(f"{'P':>6}{'ratio':>9}{'kv_first':>10}{'kv_norm':>9}"
-         f"{'kv_attn':>9}{'kv_attn_L':>11}{'attn-first':>12}")
+    aware = [s for s in sel if s.startswith("kv_attn")]
+    dumb = [s for s in sel if not s.startswith("kv_attn")]
+    hdr = f"{'P':>6}{'ratio':>9}" + "".join(f"{s:>13}" for s in sel)
+    if aware and dumb:
+        hdr += f"{'aware-dumb':>12}"
+    _log(hdr)
+
+    def _best(names, P):
+        return max((scores[f"{s}@{P}"] for s in names), default=0)
+
     for P in lens:
-        a, aL = scores[f"kv_attn@{P}"], scores[f"kv_attn_L@{P}"]
-        fi, nm = scores[f"kv_first@{P}"], scores[f"kv_norm@{P}"]
-        _log(f"{P:>6}{seq / P:>8.1f}x{fi:>8}/{total}{nm:>6}/{total}"
-             f"{a:>6}/{total}{aL:>8}/{total}{max(a, aL) - fi:>+12}")
+        line = f"{P:>6}{seq / P:>8.1f}x" + "".join(
+            f"{scores[f'{s}@{P}']:>8}/{total}" for s in sel)
+        if aware and dumb:
+            line += f"{_best(aware, P) - _best(dumb, P):>+12}"
+        _log(line)
     _log("-" * 78)
-    best = max(lens, key=lambda P: max(scores[f"kv_attn@{P}"],
-                                       scores[f"kv_attn_L@{P}"]))
-    bv = max(scores[f"kv_attn@{best}"], scores[f"kv_attn_L@{best}"])
+    best = max(lens, key=lambda P: _best(aware or sel, P))
+    bv = _best(aware or sel, best)
     ceil = scores["full_cache"]
     _log(f"best query-aware: P={best} at {bv}/{total} = "
          f"{(100 * bv / ceil) if ceil else 0:.0f}% of the {ceil}/{total} ceiling "
