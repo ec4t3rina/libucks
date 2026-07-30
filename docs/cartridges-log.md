@@ -26,14 +26,97 @@ finding.
 - CM-B.0h — training-free KV-cache selection — ⚠️ **CONCLUSION RETRACTED by CM-B.0i** 2026-07-29 (**measured `kv_first` 13/16 vs cartridge 8/16 and concluded distillation degrades its own warm start. Both the fixture set and the conclusion were flawed: the bc6b90e2 fixtures cluster in the first quarter of the file, and `kv_first` keeps the FIRST P positions, so it won by construction. On position-stratified fixtures the two are indistinguishable**)
 - CM-B.0i — position-stratified sweep on a second bucket — ✅ **TRUNCATION DOES NOT COMPRESS; UNCOMPRESSED CEILING IS 50%** 2026-07-29 (**full 4,599-token cache scores 13/26 vs floor 0/26. Score is proportional to fraction retained — 2.8%→1/26, 22%→6/26, 100%→13/26 — so no prefix carries information about text it dropped. At matched P=128 cartridge 2/26 ≈ kv_first 1/26. Both CM-B.0h/0i-precursor headlines were artifacts of self-authored, head-clustered fixtures**)
 - CM-B.0j — text-in-prompt ceiling control + MPS memory profile — ✅ **THE 0i CEILING IS REAL, NOT A HARNESS ARTIFACT** 2026-07-30 (**same text as prompt tokens read with full attention scores 14/26 vs the serialised full cache's 13/26. The +1 is decode noise, not a lossy cache path: the 5 disagreements are BIDIRECTIONAL (3 text-wins, 2 cache-wins). 0i reproduces exactly — 13/26 and cartridge 2/26 — on different code paths. So `1/26 at 36×` is 8% of a REAL ceiling and the negative result stands. Also: `generate_answer` truncated silently at 3,500 tokens and would have produced a FALSE confirmation; the same cap means every cartridge here was distilled from a teacher that saw only 76% of its bucket. MPS profile: no leak of any kind, but one 4,599-token prefill permanently caches 4.5 GB that `empty_cache()` will not return**)
-- CM-B.0k — query-aware KV selection (SnapKV family) — ⚠️ **BEST LEAD IN THIS TRACK, NOT ESTABLISHED** 2026-07-30 (**at P=128 / 35.9×: query-aware per-layer selection 5/26 vs `kv_first` 1/26, `kv_norm` 0/26 and the 98-minute distilled cartridge 2/26, against a 13/26 ceiling. 5× the positional selector and +3 over training, with ZERO training — but exact McNemar on the 6 discordant pairs gives p = 0.219, so NOT significant. A bit-identical repeat (0/182 verdicts and 0/182 answer texts differ) proves the pipeline is deterministic and therefore CANNOT add evidence for the effect. Also 38.5% of ceiling where the literature reports 97–99%, and it buys attention-COMPUTE not STORAGE compression. Needs ~8–1 or 6–0 discordant to clear p<0.05: more fixtures, a P sweep, or per-head+pooling**)
+- CM-B.0k — query-aware KV selection (SnapKV family) — ❌ **SUPERSEDED by CM-B.0l: the +4 is the maximum of six noisy budgets, flanked by −1 at 18×** 2026-07-30 (**at P=128 / 35.9×: query-aware per-layer selection 5/26 vs `kv_first` 1/26, `kv_norm` 0/26 and the 98-minute distilled cartridge 2/26, against a 13/26 ceiling. 5× the positional selector and +3 over training, with ZERO training — but exact McNemar on the 6 discordant pairs gives p = 0.219, so NOT significant. A bit-identical repeat (0/182 verdicts and 0/182 answer texts differ) proves the pipeline is deterministic and therefore CANNOT add evidence for the effect. Also 38.5% of ceiling where the literature reports 97–99%, and it buys attention-COMPUTE not STORAGE compression. Needs ~8–1 or 6–0 discordant to clear p<0.05: more fixtures, a P sweep, or per-head+pooling**)
+- CM-B.0l — query-aware selection across 6 budgets — ❌ **NO COMPRESSION MECHANISM; CM-B.0i's NEGATIVE SURVIVES ITS STRONGEST TEST** 2026-07-31 (**deltas vs `kv_first` across P = 32/64/128/256/512/1024 are +1, +2, +4, −1, +3, −1 — NOT monotone, and no budget is significant (best p = 0.219 at P=128). Query-aware never exceeds 38.5% of the 13/26 ceiling at ANY budget including 4.5×, and FALLS at P=1024 where positional overtakes it 5 vs 4. No knee, so no compression curve. CM-B.0k's +4 is the maximum of six noisy comparisons, flanked by −1 at 18×; a real mechanism would be smooth in P. The literature's own method reaches 38% here where it reports 97–99% elsewhere**)
 
 ---
 
-## CM-B.0k — query-aware KV selection (2026-07-30)
+## CM-B.0l — the P sweep: query-aware selection has no knee (2026-07-31)
 
-**Status**: ⚠️ The best lead this track has produced, and **not established**. The
-effect size is large in ratio terms; the significance is not there. Both facts below.
+**Status**: ❌ Closes the selection line. CM-B.0k's promising point does not survive
+being surrounded by its neighbours.
+
+**What CM-B.0k left open.** Query-aware per-layer selection scored 5/26 at P=128
+against `kv_first`'s 1/26 — 5×, and +3 over a 98-minute distill. Exact McNemar gave
+p = 0.219, so it was logged as a lead rather than a finding. Two arguments were
+supposed to settle it: pooling paired comparisons across budgets for power, and a
+*monotone* advantage across budgets, which is much harder to obtain by chance than
+one point. Both were pre-registered in the 0k entry. Neither survived.
+
+### Result — 6 budgets, n=26, ceiling 13/26, seq 4,599
+
+| P | ratio | `kv_first` | `kv_attn_L` | Δ | w/l | exact McNemar p | % of ceiling |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 32 | 143.7× | 0/26 | 1/26 | +1 | 1/0 | 1.000 | 7.7% |
+| 64 | 71.9× | 1/26 | 3/26 | +2 | 3/1 | 0.625 | 23.1% |
+| **128** | **35.9×** | 1/26 | **5/26** | **+4** | 5/1 | **0.219** | **38.5%** |
+| 256 | 18.0× | 3/26 | 2/26 | **−1** | 1/2 | 1.000 | 15.4% |
+| 512 | 9.0× | 2/26 | 5/26 | +3 | 4/1 | 0.375 | 38.5% |
+| 1024 | 4.5× | 5/26 | **4/26** | **−1** | 1/2 | 1.000 | 30.8% |
+
+**1. No budget is significant.** P=128 stays the best at p = 0.219; everything else is
+worse. Pooled across budgets is 15w/7l, p = 0.134 — but the same 26 fixtures re-tested
+at six budgets are not independent, so that is descriptive and not inference.
+
+**2. Not monotone, and that is evidence AGAINST rather than merely absent support.**
+The deltas run +1, +2, +4, −1, +3, −1. A real mechanism is smooth in P: if informed
+selection genuinely works at 36×, then 18× — twice the budget — should be at least as
+good. Getting +4 at 36× flanked by −1 at 18× is a random walk. CM-B.0k's headline is
+the **maximum of six comparisons**. In its defence P=128 was chosen a priori, matching
+the cartridge budget and 0i's measurement point rather than picked after the fact —
+but its neighbours now say what it is.
+
+**3. No knee, which was the physically meaningful test.** Query-aware never exceeds
+**38.5% of ceiling at any budget**, including 4.5× compression, and *declines* at
+P=1024. A compression curve approaches the ceiling as budget grows. This one plateaus
+around a third of it and then drops.
+
+**4. Positional overtakes it at large budgets.** At P=1024 `kv_first` scores 5/26 to
+query-aware's 4/26: a contiguous 22% block beats 1,024 scattered positions. That is
+the fragmentation cost SnapKV's pooling step exists to address, and it is the one
+remaining untested variant — though given there is no knee at *any* budget, expect it
+to move 38% toward perhaps 50%, not toward 97%.
+
+### Incidental finding worth keeping
+
+On y20 the full cache scores 0 while `kv_attn_L@128` and `@512` score 1 — **a focused
+prefix beat full context.** Attention dilution across 4,599 positions is real, so the
+13/26 "ceiling" is an aggregate reference and not a strict per-fixture upper bound.
+Does not change the aggregate picture.
+
+### What this closes, and what it strengthens
+
+**CM-B.0i's negative survives its strongest available test.** The claim is no longer
+"positional selection fails to compress" — it is now: *cartridge distillation,
+positional/magnitude selection, and query-aware per-layer selection (the SnapKV
+family, which reports 97–99% of full-cache accuracy at 3–19% budget) all fail to
+compress this content at 3B.* Four independent mechanisms, one verified ceiling.
+That is a stronger and more general result than what was in hand a day ago.
+
+### The reframe this forces
+
+**Compression was never the binding constraint.** With the ENTIRE bucket in cache and
+full attention, the 3B answers **13/26 — half**. Every compression number is a
+fraction of that, so selection research optimises the delivery of information the
+reader cannot exploit anyway. The ceiling, not the channel, is the limit.
+
+### Next
+
+1. **Move the ceiling, or prove it cannot move.** A 7–8B eval-only sweep on rented
+   compute, one to two hours, under $10. If the full-cache ceiling rises from 50% to
+   ~80%, compression becomes worth revisiting and every number here is re-scoped. If
+   it stays near 50%, the limit is the fixtures or the metric — a different problem,
+   and one worth knowing about before any further method work.
+2. **Per-head selection + pooling** — the last untested variant, low expected value
+   for the reason in (4) above. Cheap, so worth doing only if (1) says the ceiling can
+   move.
+3. **Stop treating the latent channel as the headline.** See docs/cm-b-plan.md.
+
+**Status**: ❌ **SUPERSEDED by CM-B.0l.** The numbers below are correct; the reading is
+not. The P sweep put the five neighbouring budgets around this one and found the
+advantage non-monotone (+1, +2, +4, −1, +3, −1) with no knee at any budget — so the
++4 recorded here is the maximum of six noisy comparisons, not a budget-specific
+effect. Read this entry for the method and the two defects it found, not for a result.
 
 **The gap this closes.** CM-B.0i concluded no compression mechanism exists, from a
 sweep in which *every selector was query-agnostic*: `kv_first`/`kv_last`/`kv_stride`
