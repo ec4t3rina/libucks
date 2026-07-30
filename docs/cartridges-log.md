@@ -26,14 +26,14 @@ finding.
 - CM-B.0h — training-free KV-cache selection — ⚠️ **CONCLUSION RETRACTED by CM-B.0i** 2026-07-29 (**measured `kv_first` 13/16 vs cartridge 8/16 and concluded distillation degrades its own warm start. Both the fixture set and the conclusion were flawed: the bc6b90e2 fixtures cluster in the first quarter of the file, and `kv_first` keeps the FIRST P positions, so it won by construction. On position-stratified fixtures the two are indistinguishable**)
 - CM-B.0i — position-stratified sweep on a second bucket — ✅ **TRUNCATION DOES NOT COMPRESS; UNCOMPRESSED CEILING IS 50%** 2026-07-29 (**full 4,599-token cache scores 13/26 vs floor 0/26. Score is proportional to fraction retained — 2.8%→1/26, 22%→6/26, 100%→13/26 — so no prefix carries information about text it dropped. At matched P=128 cartridge 2/26 ≈ kv_first 1/26. Both CM-B.0h/0i-precursor headlines were artifacts of self-authored, head-clustered fixtures**)
 - CM-B.0j — text-in-prompt ceiling control + MPS memory profile — ✅ **THE 0i CEILING IS REAL, NOT A HARNESS ARTIFACT** 2026-07-30 (**same text as prompt tokens read with full attention scores 14/26 vs the serialised full cache's 13/26. The +1 is decode noise, not a lossy cache path: the 5 disagreements are BIDIRECTIONAL (3 text-wins, 2 cache-wins). 0i reproduces exactly — 13/26 and cartridge 2/26 — on different code paths. So `1/26 at 36×` is 8% of a REAL ceiling and the negative result stands. Also: `generate_answer` truncated silently at 3,500 tokens and would have produced a FALSE confirmation; the same cap means every cartridge here was distilled from a teacher that saw only 76% of its bucket. MPS profile: no leak of any kind, but one 4,599-token prefill permanently caches 4.5 GB that `empty_cache()` will not return**)
-- CM-B.0k — query-aware KV selection (SnapKV family) — ✅ **FIRST POSITIVE MECHANISM IN THIS TRACK** 2026-07-30 (**at P=128 / 35.9×: query-aware per-layer selection 5/26 vs `kv_first` 1/26, `kv_norm` 0/26 and the 98-minute distilled cartridge 2/26, against a 13/26 ceiling. 5× the positional selector and +3 over training, with ZERO training. Believed real because the per-fixture wins are ASYMMETRIC 5–1, unlike CM-B.0j's 3–2 bidirectional noise; and because per-layer beats global 5 vs 3, independently corroborating SnapKV's design. BUT 38.5% of ceiling where the literature reports 97–99%, it buys attention-COMPUTE not STORAGE compression, and it is one run at n=26 where decode noise is ±2 — treat +4 as provisional until repeated**)
+- CM-B.0k — query-aware KV selection (SnapKV family) — ⚠️ **BEST LEAD IN THIS TRACK, NOT ESTABLISHED** 2026-07-30 (**at P=128 / 35.9×: query-aware per-layer selection 5/26 vs `kv_first` 1/26, `kv_norm` 0/26 and the 98-minute distilled cartridge 2/26, against a 13/26 ceiling. 5× the positional selector and +3 over training, with ZERO training — but exact McNemar on the 6 discordant pairs gives p = 0.219, so NOT significant. A bit-identical repeat (0/182 verdicts and 0/182 answer texts differ) proves the pipeline is deterministic and therefore CANNOT add evidence for the effect. Also 38.5% of ceiling where the literature reports 97–99%, and it buys attention-COMPUTE not STORAGE compression. Needs ~8–1 or 6–0 discordant to clear p<0.05: more fixtures, a P sweep, or per-head+pooling**)
 
 ---
 
 ## CM-B.0k — query-aware KV selection (2026-07-30)
 
-**Status**: ✅ The first mechanism in this track that does something, and the first
-result here I want to be *more* sceptical of than usual precisely because I like it.
+**Status**: ⚠️ The best lead this track has produced, and **not established**. The
+effect size is large in ratio terms; the significance is not there. Both facts below.
 
 **The gap this closes.** CM-B.0i concluded no compression mechanism exists, from a
 sweep in which *every selector was query-agnostic*: `kv_first`/`kv_last`/`kv_stride`
@@ -58,19 +58,49 @@ it was a statement about the selector, and that was never tested.
 `+4` over `kv_first`, `+5` over `kv_norm`, `+3` over the cartridge — with **no
 training at all**, against 98 minutes of distillation.
 
-### Why this is believed to be signal
+### Significance — the part that does not hold up
 
-**The wins are asymmetric.** Query-aware wins y01, y04, y19, y20, y23 where
-`kv_first` fails, and loses only y06 where it succeeds — 5–1 directional. Contrast
-CM-B.0j, where text-vs-cache was 3–2 *bidirectional* and was correctly read as decode
-noise. Direction is the discriminator, not the totals.
+The first draft of this entry argued the result was signal because the per-fixture
+wins are *asymmetric*: query-aware takes y01, y04, y19, y20, y23 where `kv_first`
+fails and loses only y06, i.e. 5–1 directional, versus CM-B.0j's 3–2 bidirectional
+split that was correctly dismissed as noise. Direction genuinely is the right
+discriminator for paired binary outcomes. **But the correct test was never run, and
+it does not pass:**
 
-**Per-layer beats global, 5 vs 3.** SnapKV selects per-layer because layers attend to
-different things. That ordering reproduced here without anything being tuned toward
-it, which is independent corroboration rather than a free parameter.
+| comparison | wins–losses | discordant | exact two-sided McNemar |
+|---|---|---|---|
+| `kv_attn_L` vs `kv_first` | 5–1 | 6 | **p = 0.219** |
+| `kv_attn` (global) vs `kv_first` | 3–1 | 4 | p = 0.625 |
+| `kv_attn_L` vs cartridge | 3–0 | 3 | p = 0.250 |
 
-**The yardstick held for the third time.** Full cache 13/26 and cartridge 2/26 are
-now identical across CM-B.0i, 0j and 0k, on three different code paths.
+Six discordant pairs splitting 5–1 is well inside what a fair coin produces. The 5×
+ratio and the +4 absolute are real numbers, but they do not clear a significance bar,
+and "believed to be signal" was the wrong claim to write down.
+
+**The repeat cannot help, and this is the useful part of running it.** A second run is
+**bit-identical**: 0/182 grounded verdicts and 0/182 generated answer texts differ,
+with the setup memory line matching byte-for-byte. Cache building, scoring and top-p
+are deterministic and the decode is greedy, so there is no seed here to vary. The
+pipeline is reproducible — which rules out flakiness and is worth having — but a
+deterministic experiment re-run adds exactly zero independent evidence about effect
+size. (This also contradicts the ±2 MPS nondeterminism recorded from earlier work;
+for this code path there is none. Possibly eager attention is more stable than SDPA.)
+
+**What would actually clear p < 0.05**, given the exact test: 6–0 (p = 0.031), 8–1
+(p = 0.035) or 9–1 (p = 0.020). From 5–1 that is roughly **three more net wins** —
+reachable only by more fixtures, more budgets, or a stronger selector, never by
+repetition.
+
+**Two things that do hold.** Per-layer beats global 5 vs 3, matching SnapKV's stated
+reason for selecting per layer — weak evidence, but consistent with a prior rather
+than tuned toward. And the yardstick held for the third time: full cache 13/26 and
+cartridge 2/26 are identical across CM-B.0i, 0j and 0k on three different code paths.
+
+**Process note, second occurrence tonight.** Earlier in the same session I reported
+"11/11 agreement, zero disagreements" at a partial tally that finished at 21/26, and
+here I called 5–1 signal before testing it. Both times the pattern was read as
+stronger than the data supported, and both times the direction of the error favoured
+the hypothesis I was hoping for. Compute the test before writing the verdict.
 
 ### What it does NOT say
 
@@ -84,9 +114,9 @@ clusters; `attn_scores` sums over heads and selects isolated positions.
 resident, so this is not a precomputable per-bucket cartridge — a different claim
 from where this track started. Stated before the run, not after.
 
-**One run at n=26 with ±2 decode noise.** `+4` clears that, and the 5–1 asymmetry
-supports it, but this is provisional until repeated. Nothing about tonight's history
-of retracted headlines earns this result an exemption.
+**Not statistically established** — p = 0.219, see the significance section above.
+Nothing about tonight's history of retracted headlines earns this result an exemption
+just because it is the one we wanted.
 
 Using the query to select is **not** leakage: the query is available at inference and
 only the question is used, never the answer.
@@ -117,16 +147,25 @@ was flat across all 26 fixtures (`cur` 6,808 MB, `driver` 9,349–9,379 MB), con
 
 ### Next
 
-1. **Repeat this run.** Selection and cache-building are deterministic and the decode
-   is greedy, so a repeat varies *only* MPS floating-point nondeterminism — which is
-   exactly the quantity `+4` needs to clear. It is a determinism check, not a seed
-   sweep; there is no seed here to vary.
-2. **Per-head selection + SnapKV pooling** — the two named gaps to the literature,
-   both small changes to `attn_scores`.
-3. **P sweep.** The dumb selector reached 6/26 at P=1024. If query-aware hits the
-   13/26 ceiling well before that, the compression curve finally has a knee — which
-   is what "compression works" actually looks like, and what CM-B.0i showed the
-   positional selectors never produce.
+~~1. Repeat this run.~~ **DONE, and it was the wrong instrument** — bit-identical, so
+it proves determinism and contributes nothing to significance. Recorded because the
+reasoning error is reusable: repetition tests flakiness, not effect size, and a
+deterministic pipeline makes that distinction absolute.
+
+1. **P sweep** — the highest-value next step, and it buys power two ways. Each budget
+   is another paired comparison, and a *monotone* trend across P is far harder to
+   obtain by chance than one point. CM-B.0i's positional selectors reached 6/26 only
+   at P=1024 (4.5×); if query-aware hits the 13/26 ceiling well before that, the
+   compression curve finally has a knee — which is what "compression works" looks
+   like, and what 0i showed positional selection never produces.
+2. **Per-head selection + SnapKV pooling** — the two named gaps to the literature.
+   SnapKV selects per HEAD and pools so kept positions form contiguous clusters;
+   `attn_scores` sums over heads and picks isolated positions. If these lift 5/26
+   toward the published range, the effect size becomes its own evidence and the
+   significance problem dissolves.
+3. **A second fixture set or bucket** — the only route to more discordant pairs at
+   fixed method strength, and it also tests whether any of this generalises past one
+   bucket in one repo, which nothing in this track has yet established.
 
 ---
 

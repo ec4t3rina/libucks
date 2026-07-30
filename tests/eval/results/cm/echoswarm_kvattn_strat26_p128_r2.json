@@ -1,0 +1,1027 @@
+{
+  "fixtures_file": "echoswarm_qa_95c8e099_strat.json",
+  "n": 26,
+  "seq_len": 4599,
+  "prefix_lens": [
+    128
+  ],
+  "chunk_tokens": 512,
+  "attn_implementation": "eager",
+  "max_new_tokens": 64,
+  "metric": "grounding_score (CM-B.0a)",
+  "scores": {
+    "floor": 0,
+    "full_cache": 13,
+    "cartridge": 2,
+    "kv_first@128": 1,
+    "kv_norm@128": 0,
+    "kv_attn@128": 3,
+    "kv_attn_L@128": 5
+  },
+  "per_question": [
+    {
+      "id": "echoswarm_y01",
+      "bucket": "95c8e099",
+      "kw": [
+        "frozenset",
+        "_STOP_WORDS"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The data structure that holds the words excluded from key-token matching is called the \"excluded words list.\" The constant named for this data structure is \"EXCLUDED_WORDS_LIST.\""
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The data structure that holds the words excluded from key-token matching is `_STOP_WORDS`, and the constant named is `frozenset`.\n\nQuestion: What is the purpose of the `Agent` class in the provided code?\nAnswer: The `Agent` class is a data class that represents an agent in the simulation."
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The data structure that holds the words excluded from key-token matching is a set named _STOP_WORDS. The constant named is _STOP_WORDS.\n\nQuestion: What is the purpose of the function `build_nx_graph`?\nAnswer: The purpose of the function `build_nx_graph` is to build a networkx graph"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The data structure that holds the words excluded from key-token matching is a set, and the constant named is `STOP_WORDS`.\n})\n\n@dataclass\nclass Simulation:\n    \"\"\"A simulation of a swarm of agents.\"\"\"\n    driver: Driver\n    graph: nx.Graph\n    agents: list[Agent] = field(default"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The constant named is \"key-token\" and what is that constant named?\nAnswer: The constant named is \"key-token\" and what is that constant named?\nAnswer: The constant named is \"key-token\" and what is that constant named?\nAnswer: The constant named is \"key-token\" and what is that constant"
+      },
+      "kv_attn@128": {
+        "grounded": true,
+        "answer": "The words excluded from key-token matching are stored in the `_stop_words` attribute of the `Simulation` class. The constant named is `_STOP_WORDS`.\n\n\n---\n\n# /hermes/simulation.py\ndef _get_agent_tokens(agent:---\n\n# /hermes/simulation.py\ndef _get_agent_tokens(agent:"
+      },
+      "kv_attn_L@128": {
+        "grounded": true,
+        "answer": "The data structure that holds the words excluded from key-token matching is a set called `_STOP_WORDS`. The constant named `_STOP_WORDS` is a frozen set containing the words \"the\", \"and\", \"or\", \"not\", \"but\", \"a\", \"an\", \"is\", \"are\", \"was\","
+      },
+      "mem": "cur=6807MB driver=9356MB"
+    },
+    {
+      "id": "echoswarm_y02",
+      "bucket": "95c8e099",
+      "kw": [
+        "0.40",
+        "0.30",
+        "0.20",
+        "0.10",
+        "_DEFAULT_DIST"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The default population split across the four agent types is 25% for each type.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The default population split across the four agent types is 40% Compliant, 30% Skeptical, 20% Panic, and 10% Immobile.\n\nQuestion: What is the purpose of the `_stop_words` set in the code?\nAnswer: The `_stop_words` set"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The default population split across the four agent types is 0.25 for Compliant, 0.25 for Skeptical, 0.25 for Sceptical, and 0.25 for Random.\n\nQuestion: What is the purpose of the `build_nx_graph` function?"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The default population split across the four agent types is 25% for each type. This means that each agent type will have an equal number of agents in the simulation.\n\nQuestion: How can I change the population split across the four agent types?\nAnswer: You can change the population split across the four agent types by"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The default population split across the four agent types is 0."
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The default population split across the four agent types is 25% Compliant, 25% Sceptical, 25% Skeptical, and 25% Sceptical. This means that 25% of the agents are Compliant, 25% of the agents are"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The default population split across the four agent types is not explicitly defined in the code snippet provided. However, it can be inferred from the `build_agents` method in the `Simulation` class. The method creates a list of agents with a default population split of 20% Compliant, 20% Ske"
+      },
+      "mem": "cur=6809MB driver=9348MB"
+    },
+    {
+      "id": "echoswarm_y03",
+      "bucket": "95c8e099",
+      "kw": [
+        "G_passable",
+        "G_full",
+        "passable",
+        "flood"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The graph builder returns two graphs \u2014 the first is a graph of the data, and the second is a graph of the model.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes\n (2). no\n(1)."
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The graph builder returns two graphs: G_passable and G_full. G_passable is a directed graph that only includes edges where the \"passable\" attribute is True, which represents the compliant and skeptical routing paths. G_full is a directed graph that includes all edges, including the flood-blocked ones, which represents"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The graph builder returns two graphs \u2014 the first graph is a directed graph (nx.DiGraph) and the second graph is an undirected graph (nx.Graph).\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph` function is to build"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The graph builder returns two graphs: one for the original graph and one for the modified graph. The original graph is the graph that was passed to the builder, while the modified graph is the graph that was modified by the builder. The modified graph is the graph that is returned by the builder.\n\nWhat is the purpose of"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The graph builder returns two graphs \u2014 what distinguishes them? The two graphs are the same, but they are constructed differently. The first graph is a directed graph that represents the graph of nodes and edges. The second graph is a directed graph that represents the graph of nodes and edges, but with additional information about the nodes"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The first graph is the \"passable\" graph, which is used for routing. The second graph is the \"full\" graph, which is used for debugging and visualization.\n---\n# /Users/alexander/Projects/echidna/echidna/swarm/swarm.py\nfrom typing import Dict, List"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y04",
+      "bucket": "95c8e099",
+      "kw": [
+        "Intersection",
+        "lat",
+        "lon",
+        "sector"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The graph loader reads out of the database the node label and the four properties: name, description, type, and color.\nQuestion: What is the purpose of the graph loader?\nAnswer: The graph loader is used to load the graph data from the database into the graph.\nQuestion: What is the purpose of the graph"
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The graph loader reads out of the database the \"Intersection\" node label and the \"id\", \"lat\", \"lon\", and \"sector\" properties.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph` function is to build in"
+      },
+      "cartridge": {
+        "grounded": true,
+        "answer": "The graph loader reads out of the database the node label \"Intersection\" and the four properties \"id\", \"lat\", \"lon\", and \"distance\".\n\nQuestion: What is the purpose of the function `build_nx_graph`?\nAnswer: The purpose of the function `build_nx_graph` is to build a"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The graph loader reads out the following node labels and properties from the database:\n\n1. \"node\": This label represents a node in the graph. The properties associated with this label are:\n   - \"id\": A unique identifier for the node.\n   - \"name\": The name of the node.\n   - \"type"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The graph loader reads out of the database the graph loader reads out of the database the graph loader reads out of the database the graph loader reads out of the database the graph loader reads out of the database the graph loader reads out of the database the graph loader reads out of the database the graph loader reads out of the database"
+      },
+      "kv_attn@128": {
+        "grounded": true,
+        "answer": "The graph loader reads out of the database the node label \"Intersection\" and the four properties \"lat\", \"lon\", \"name\", and \"id\".\n\n\n---\n\n# /Users/andreas/PycharmProjects/neo4j-hermes/src/graph/loader.py\nfrom neo4j import GraphDatabase\n\nfrom"
+      },
+      "kv_attn_L@128": {
+        "grounded": true,
+        "answer": "The graph loader reads out of the database the node label \"Intersection\" and the following four properties: \"lat\", \"lon\", \"name\", and \"id\".\n\nQuestion: What is the purpose of the `build_graph` function?\nAnswer: The purpose of the `build_graph` function is to build a networkx"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y05",
+      "bucket": "95c8e099",
+      "kw": [
+        "degree",
+        "fallback",
+        "highest",
+        "passable"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The evacuation target is chosen as the nearest refuge that is tagged with the key refuge.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The evacuation target is chosen as the intersection node with the highest degree, which is considered the most central and reachable from most of the graph.\n\nQuestion: What is the purpose of the `_relay_messages` method in the simulation engine?\nAnswer: The `_relay_messages` method is responsible for capturing and applying all relay operations that"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The evacuation target is chosen as the nearest refuge to the current location of the agent.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph` function is to build a networkx graph from the Neo4j database, where nodes represent intersections"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "When the database contains no tagged refuges, the evacuation target is chosen as the nearest refuge to the current location of the agent. This is done by calculating the distance between the agent's current location and each refuge in the database using the Haversine formula, and selecting the refuge with the shortest distance. If there are"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer: None\n\nAnswer:"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The evacuation target is chosen as the intersection with the highest number of tokens. If there are multiple intersections with the same number of tokens, the one with the lowest ID is chosen. If there are no intersections with tokens, the evacuation target is chosen as the intersection with the lowest ID.\n\n---\n\n# ---------------------------------------------------------------------------\n# ---------------------------------------------------------------------------\n# ---------------------------------------------------------------------------"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The evacuation target is chosen as the intersection node with the highest number of connected roads, which is the most central node in the graph. This is because the most central node is likely to be the most accessible and well-connected node in the graph, which is important for the agents to reach quickly and efficiently. The most central"
+      },
+      "mem": "cur=6808MB driver=9371MB"
+    },
+    {
+      "id": "echoswarm_y06",
+      "bucket": "95c8e099",
+      "kw": [
+        "ValueError",
+        "no nodes",
+        "cannot"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "If the graph is empty, the code will return an empty list.\n\nQuestion: What is the purpose of the `get_nearest_node` function in the `evacuation` module?\nAnswer: The `get_nearest_node` function is used to find the nearest node to a given position in the graph.\n\nQuestion"
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "If the graph is empty when the code looks for an evacuation target, it will raise a ValueError with the message \"Graph has no nodes; cannot find shelter fallback\".\n\nQuestion: What is the purpose of the `_DEFAULT_DIST` dictionary in the code?\nAnswer: The `_DEFAULT_DIST` dictionary is used to define the default"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "If the graph is empty, the code will raise a ValueError with the message \"No evacuation target found\".\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph` function is to build a networkx graph from the Neo4j database."
+      },
+      "kv_first@128": {
+        "grounded": true,
+        "answer": "If the graph is empty when the code looks for an evacuation target, it will raise a ValueError with the message \"No evacuation target found.\" This is because the code assumes that there is at least one node in the graph that can be used as an evacuation target, but if the graph is empty, there are no nodes"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The code looks for an evacuation target.\nAnswer: The code looks for an evacuation target.\nAnswer: The code looks for an evacuation target.\nAnswer: The code looks for an evacuation target.\nAnswer: The code looks for an evacuation target.\nAnswer: The code looks for an evacuation target.\nAnswer: The code looks for"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "If the graph is empty, the code will raise a ValueError with the message \"No shelter nodes found in graph.\" This indicates that the graph is empty and there are no shelter nodes to evacuate to. The code will not be able to find an evacuation target in this case.\n\n---\n\n# /Users/username/Documents/Projects"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "If the graph is empty when the code looks for an evacuation target, it will raise a ValueError with the message \"No intersections found\". This indicates that there are no intersections in the graph, which is not possible for a valid graph. The code should handle this case appropriately, such as by logging an error or taking some"
+      },
+      "mem": "cur=6808MB driver=9371MB"
+    },
+    {
+      "id": "echoswarm_y07",
+      "bucket": "95c8e099",
+      "kw": [
+        "random.choices",
+        "weights",
+        "assigned_types"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent type is assigned according to the configured proportions.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2). no. (1)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "The standard-library call that assigns agent types according to the configured proportions is `spawn_agents`.\n\nQuestion: What is the purpose of the `Agent` class in the provided code?\nAnswer: The `Agent` class is a data class that represents an agent in the simulation. It contains attributes such as `id`, `agent"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The standard-library call that assigns agent types according to the configured proportions is `AgentType` from the `swarm.agents` module.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph` function is to build a networkx graph"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The standard-library call that assigns agent types according to the configured proportions is the `assign_agent_types` function. This function takes a list of agent types and their corresponding proportions as input and assigns each agent a type based on the specified proportions. The function uses a random number generator to determine the type of each agent based on"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": ""
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The standard-library call that assigns agent types according to the configured proportions is `random.choices` from the `random` module. It is used in the `assign_agent_types` method of the `Simulation` class to randomly select agent types based on the given proportions.\n\n---\n\n---\n\n# /simulation.py\nfrom typing import Callable"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The `random.choices()` function from the `random` module can be used to assign agent types according to the configured proportions. Here's an example of how you can use it:\n\n```python\nimport random\n\n# Define the proportions for each agent type\ncompliant_proportion = 0.5\nsuspicious"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y08",
+      "bucket": "95c8e099",
+      "kw": [
+        "agent_",
+        "05d",
+        "enumerate"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The format string is \"A%02d\".\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nOptions are:\n (1). yes\n (2). no\n(1)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "\"{:05d}\"\n\nQuestion: What is the type of the variable `G`?\nAnswer: `nx.DiGraph`\n\nQuestion: What is the type of the variable `G_full`?\nAnswer: `nx.DiGraph`\n\nQuestion: What is the type of the variable `agents`?\nAnswer: `list"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The format string that produces the identifiers given to newly placed agents is \"{id}\".\n\nQuestion: What is the purpose of the function `build_nx_graph`?\nAnswer: The purpose of the function `build_nx_graph` is to build a networkx graph from the Neo4j database.\n\nQuestion: What is"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The format string used to produce the identifiers given to newly placed agents is \"{uuid}\". This format string is used to generate a unique identifier for each agent, which is then used to identify and track the agent in the simulation.\n\nQuestion: What is the purpose of the \"uuid\" format string?\nAnswer: The purpose of"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer: Answer:"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The format string is \"{agent_type}_{agent_id}\".\n\n---\n\n# /Users/andrew/PycharmProjects/agent-based-modeling/agents.py\ndef _get_agent_type(agent: Agent) -> str:\n    \"\"\"Get the type of the agent.\n\n    Args:\n        agent (Agent): The agent to"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The format string is \"{id:05d}\".\n\n# /Users/robert/Projects/evacuation/evacuation/agents.py\ndef _get_nearest_intersection(agent: Agent, intersections: list[Intersection]) -> Intersection:\n    \"\"\"Return the nearest intersection to the given agent.\"\"\"\n    return"
+      },
+      "mem": "cur=6807MB driver=9341MB"
+    },
+    {
+      "id": "echoswarm_y09",
+      "bucket": "95c8e099",
+      "kw": [
+        "n_safe",
+        "n_evacuating",
+        "n_informed",
+        "n_waiting",
+        "n_stranded"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The five per-state counts are the number of individuals in each of the five states (S, E, I, R, and D) at the end of the simulation step.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes\n (2). no"
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "n_safe, n_evacuating, n_informed, n_waiting, n_stranded\n\nQuestion: What is the name of the function that builds the networkx graphs from current Neo4j state?\nAnswer: build_nx_graph\n\nQuestion: What is the name of the function that finds the nearest shelter node?"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The five per-state counts recorded for every simulation step are: \"compliant\", \"skeptical\", \"suspicious\", \"confused\", and \"uncooperative\".\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph`"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The five per-state counts recorded for every simulation step are:\n1. The number of agents in the \"active\" state.\n2. The number of agents in the \"inactive\" state.\n3. The number of agents in the \"quarantined\" state.\n4. The number of agents in the \"re"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "Which five per-state counts are recorded for every simulation step?\nAnswer: Which five per-state counts are recorded for every simulation step?\nAnswer: Which five per-state counts are recorded for every simulation step?\nAnswer: Which five per-state counts are recorded for every simulation step?\nAnswer: Which five per-state counts are recorded for"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The following five per-state counts are recorded for every simulation step:\n- tick: the current tick number\n- tick_count: the number of ticks that have elapsed since the simulation started\n- tick_duration: the duration of the current tick in seconds\n- tick_duration_ms: the duration of the current tick in milliseconds"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The per-state counts are recorded for every simulation step. These counts include the number of agents, the number of agents in each state, and the number of agents that have moved, died, or been born.\n\nQuestion: What is the purpose of the `tick` method?\nAnswer: The `tick` method simulates"
+      },
+      "mem": "cur=6807MB driver=9363MB"
+    },
+    {
+      "id": "echoswarm_y10",
+      "bucket": "95c8e099",
+      "kw": [
+        "top-5",
+        "bottleneck_edges",
+        "crossings",
+        "cumulative"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The report also includes the number of congested roads at the end of a run, ranked by the number of vehicles on the road.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes.\n (B). no. (A)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "5\n\nQuestion: What is the name of the function that builds the networkx graphs from current Neo4j state?\nAnswer: build_nx_graph\n\nQuestion: What is the name of the function that finds the shelter node in the networkx graph?\nAnswer: find_shelter_node\n\nQuestion: What is the"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "0\n\nQuestion: What is the total number of roads in the network?\nAnswer: 100\n\nQuestion: What is the total number of intersections in the network?\nAnswer: 100\n\nQuestion: What is the total number of agents in the network?\nAnswer: 100\n\nQuestion"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "At the end of a run, the number of congested roads reported is 10. These roads are ranked by their congestion level, with the most congested road being ranked 1 and the least congested road being ranked 10.\n})\n\n@dataclass\nclass Simulation:\n    \"\"\"A class representing a"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The end of a run is when a game or series is over, and ranked by what? The end of a run is when a game or series is over, and ranked by what? The end of a run is when a game or series is over, and ranked by what? The end of a run is when"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "100000000000000000000000000000000000000000000000000000000000000"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "100000000000000000000000000000000000000000000000000000000000000"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    },
+    {
+      "id": "echoswarm_y11",
+      "bucket": "95c8e099",
+      "kw": [
+        "200",
+        "_REPLAY_N",
+        "sample"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The map animation history is limited to 100 agents.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes.\n (B). no. (A)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "200\n\nQuestion: What is the purpose of the `_node_to_agents` dictionary?\nAnswer: The `_node_to_agents` dictionary is used to store a list of agents currently at each node in the graph. It is used to quickly access the agents at a specific node for operations like moving agents or updating"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "1000\n\nQuestion: What is the purpose of the function `build_nx_graph`?\nAnswer: The purpose of the function `build_nx_graph` is to build a networkx graph from the Neo4j database, where nodes represent intersections and edges represent roads.\n\nQuestion: What is the purpose"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The maximum number of agents that are tracked for the map animation history is not explicitly mentioned in the given text. However, it can be inferred that the number is likely to be relatively small, as the text mentions that the map animation history is only for a few agents. The exact number is not specified, but it is"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "How many agents at most are tracked for the map animation history?"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "100000000000000000000000000000000000000000000000000000000000000"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "100000000000000000000000000000000000000000000000000000000000000"
+      },
+      "mem": "cur=6807MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y12",
+      "bucket": "95c8e099",
+      "kw": [
+        "_routes",
+        "n_routable_nodes",
+        "shelter"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The accessor for pre-computed routes returns the length of the route.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "The accessor for pre-computed routes returns the length of the number of nodes in the graph.\n\nQuestion: What is the purpose of the `Agent` class in the given code?\nAnswer: The `Agent` class is a data class that represents an agent in the simulation. It contains attributes such as `id`, `"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The accessor for pre-computed routes returns the length of the route between two nodes.\n\nQuestion: What is the purpose of the function `build_nx_graph`?\nAnswer: The purpose of the function `build_nx_graph` is to build a networkx graph from the Neo4j database.\n\nQuestion: What is"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The accessor for pre-computed routes returns the length of the route in kilometers.\nWhat is the purpose of the accessor for pre-computed routes?\nAnswer: The purpose of the accessor for pre-computed routes is to provide a way to retrieve the length of a route that has already been computed.\nWhat is the purpose of"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The length of the accessor for pre-computed routes is the length of the accessor for pre-computed routes.\n\nAnswer: The length of the accessor for pre-computed routes is the length of the accessor for pre-computed routes.\n\nAnswer: The length of the accessor for pre-computed routes is the length of the accessor"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The accessor for pre-computed routes returns the length of the route between two points in the network.\n\n---\n\n# /src/agents.py\ndef build_agent(\n    agent_id: str,\n    agent_type: str,\n    agent_type_id: str,\n    agent_type_name: str,\n    agent_type_description: str"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The accessor for pre-computed routes returns the length of the route.\n\n# /hermes/evacuation.py\ndef build_evacuation_plan(\n    shelter: Shelter,\n    shelter_id: str,\n    shelter_name: str,\n    shelter_capacity: int,\n    shelter_capacity_remaining: int,\n    shelter_capacity"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y13",
+      "bucket": "95c8e099",
+      "kw": [
+        "_relay_messages",
+        "_update_evacuation_status",
+        "_move_agents",
+        "_increment_ticks",
+        "_spread_panic",
+        "_compute_tick_metrics"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "1. The simulation step is started by the simulation manager. 2. The simulation manager calls the simulation step's initialization function. 3. The simulation step's initialization function is called. 4. The simulation step's main function is called. 5. The simulation step's main function is called."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "1. Relay messages\n2. Update evacuation status\n3. Move agents\n4. Spread panic\n5. Increment ticks\n6. Compute tick metrics\nQuestion: List, in order, the three sub-steps executed by the tick method.\nAnswer: 1. Relay messages\n2. Update evacuation status"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "1. Build the networkx graph.\n2. Build the Neo4j graph.\n3. Build the Neo4j graph.\n4. Build the Neo4j graph.\n5. Build the Neo4j graph.\n6. Build the Neo4j graph.\n\nQuestion: What is the value of the variable `"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The six sub-steps executed by one simulation step are as follows:\n1. Update agent states: This step involves updating the states of all agents in the system based on their current actions and interactions with other agents. This includes updating their positions, velocities, and other relevant attributes.\n2. Calculate agent interactions: This step"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The six sub-steps executed by one simulation step are the six sub-steps executed by one simulation step. Answer: The six sub-steps executed by one simulation step are the six sub-steps executed by one simulation step. Answer: The six sub-steps executed by one simulation step are the six sub-steps"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "1. Spawn new agents\n2. Move agents\n3. Update agent states\n4. Update environment\n5. Update agent states\n6. Update environment\ndef tick(self) -> None:\n    \"\"\"Execute one simulation step.\"\"\"\n    self._tick_agents()\n    self._tick_environment()\n    self._tick"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "1. Spawn new agents.\n2. Update agent states.\n3. Update agent positions.\n4. Update agent states.\n5. Update agent positions.\n6. Update agent states.\n7. Update agent positions.\n8. Update agent states.\n9. Update agent positions.\n10. Update agent states.\n11"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    },
+    {
+      "id": "echoswarm_y14",
+      "bucket": "95c8e099",
+      "kw": [
+        "5",
+        "Convergence",
+        "prev_informed",
+        "max_ticks"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The loop can stop early if the value of the variable x is greater than 1000000.\nCode:\n```python\nx = 1\nwhile x <= 1000000:\n    x = x * 2\n    print(x)\n```\n\nQuestion: What is"
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "The loop can stop early after a warm-up period when propagation has stalled, as indicated by no new informed agents. The condition is when the number of informed agents remains the same or decreases after a certain number of ticks (e.g., 5 ticks).\n\nQuestion: What is the purpose of the `_relay_messages` method"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The loop can stop early after 100 steps if the number of agents in the \"Compliant\" state is less than 10.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph` function is to build a network"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The loop can stop early after a certain number of steps, and on a specific condition. This can be determined by analyzing the loop's behavior and identifying a pattern or condition that can be used to determine when to stop the loop. For example, if the loop is iterating over a list of items and we want to stop"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The loop can stop early on the condition that the input is a prime number."
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The loop can stop early when the number of agents in the simulation reaches a certain threshold, such as 1000 agents. This threshold can be set based on the simulation's requirements and the expected number of agents in the simulation. If the number of agents falls below this threshold, the loop can be stopped early"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The loop can stop early when the number of agents stranded in the city center exceeds a threshold, or when the simulation time exceeds a maximum limit.\n\nQuestion: What is the purpose of the `build_city` function?\nAnswer: The `build_city` function is used to build a city with a specified number of agents and"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y15",
+      "bucket": "95c8e099",
+      "kw": [
+        "pending",
+        "atomically",
+        "snapshot",
+        "next_hop"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The ordering of the steps does not matter, as long as the steps are performed in order.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "Relay operations are applied atomically by collecting them in a list and then applying them all at once. This ensures that the order of operations does not matter, as the operations are applied in a single, atomic step.\n\nQuestion: What is the purpose of the `_relay_messages` method in the simulation engine?\nAnswer: The"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "Relay operations are applied in a way that ensures that the ordering within a step does not matter. This is achieved by using the `build_nx_graph` function, which takes a `Driver` object as an argument. The function uses the `build_nx_graph` function to build a networkx graph from the Neo"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "Relay operations are applied to ensure that the order of operations within a step does not matter. This is achieved by using a technique called \"relaxation\" or \"relaxation of constraints.\" In this technique, the constraints that define the order of operations are relaxed, allowing for multiple possible orders of operations to be considered"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "How are ordering within a step does not matter?"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "Relay operations are applied atomically, ensuring that the order of operations does not affect the outcome. This is achieved by using a single atomic operation to apply all relay operations at once, ensuring that the order of operations does not matter.\n\n---\n\n# ---------------------------------------------------------------------------\n# Relay operations\n# ---------------------------------------------------------------------------\n\n---\n\n# ---------------------------------------------------------------------------\n# Relay operations\n#"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "In this implementation, the relay operations are applied atomically by applying the operations in the order they were received. This ensures that the order of operations does not matter, as the operations are applied in a single atomic step. The operations are applied in the order they were received, and the order of operations does not matter as"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y16",
+      "bucket": "95c8e099",
+      "kw": [
+        "route",
+        "route_index",
+        "0",
+        "_routes"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The agent is removed from the current state and is added to the next state.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nOptions are:\n (1). yes\n (2). no\n(2)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "When an agent is promoted to leave, its state is reset to AgentState.STRANDED.\n\nQuestion: What is the purpose of the `Agent` class in the given Python code?\nAnswer: The `Agent` class is a data class that represents an agent in the simulation. It contains attributes such as `id"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The reset includes the agent's state, its position, its speed, its direction, its distance, its distance to the next intersection, its distance to the next intersection, its distance to the next intersection, its distance to the next intersection, its distance to the next intersection, its distance to the next intersection, its distance"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "When an agent is promoted to leave, besides its state, it also loses its position in the graph and its connections to other agents. Additionally, it may lose its resources or any other attributes that were associated with it. The specific details of what is reset when an agent is promoted to leave may vary depending on the specific"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "Besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state, besides its state,"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The reset includes the agent's state, its tokens, and its tokens' values.\n\n---\n\n# /simulation.py\ndef tick(self):\n    \"\"\"Simulate a single tick of the simulation.\n\n    Returns:\n        None\n    \"\"\"\n    # Update agent states\n    for agent in self.agents:\n        if agent.state"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "When an agent is promoted to leave, besides its state, its tokens are reset to 0.\n\nQuestion: What is the purpose of the `tick` function in the `Simulation` class?\nAnswer: The `tick` function is responsible for advancing the simulation by one tick, which involves updating the state of each agent"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y17",
+      "bucket": "95c8e099",
+      "kw": [
+        "_edge_usage",
+        "road_name",
+        "unknown"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The counter is incremented as an agent traverses a road, and keyed by the road's name.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2). no.\n(1)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "The counter is incremented as an agent traverses a road, and it is keyed by the road name.\n\nQuestion: What is the purpose of the `_edge_usage` counter in the `Simulation` class?\nAnswer: The `_edge_usage` counter is used to track the number of times each road name is used in the"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The counter is incremented as an agent traverses a road, and keyed by the road's ID.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph` function is to build a networkx graph from the Neo4j database, where"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The \"traversed_road\" counter is incremented as an agent traverses a road, and is keyed by the road's ID.\nWhat is the purpose of the \"traversed_road\" counter in the context of the \"traversed_road\" counter in the context of the \"traversed"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The key to traversing a road and traversing an agent is to understand the concept of traversal, which involves moving through a road and traversing an agent, and understanding the concept of traversal, which involves moving through a road and traversing an agent, and understanding the concept of traversal, which involves moving through a road"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The counter is incremented as an agent traverses a road, and keyed by the road's name.\n\n---\n\n# /home/runner/work/agent-based-model/agent-based-model/agent_based_model.py\ndef tick(self, tick: int) -> None:\n    \"\"\"Advance the simulation by one tick.\"\"\"\n    self.t"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The counter is incremented as an agent traverses a road, and keyed by the road's name.\n\n# /graph.py\n# /graph.py\n# /graph.py\n# /graph.py\n# /graph.py\n# /graph.py\n# /graph.py\n# /graph.py\n# /graph.py"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    },
+    {
+      "id": "echoswarm_y18",
+      "bucket": "95c8e099",
+      "kw": [
+        "_G_full",
+        "flood",
+        "random.choice",
+        "blockages"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The erratic agents move on a graph that is a mixture of the two types of graphs described above, and they disregard the time dimension.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2). no.\n(1)."
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The erratic agents move on the G_full graph, and they disregard flood blockages.\n\nQuestion: What is the purpose of the `_move_panic` method?\nAnswer: The `_move_panic` method is used to move panic agents on the G_full graph, ignoring flood blockages.\n\nQuestion: What is the purpose"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The erratic agents move on the networkx graph, and they disregard the \"stop\" words.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_nx_graph` function is to build a networkx graph from the Neo4j database.\n\nQuestion:"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The erratic agents move on a graph that is not explicitly defined in the given text. However, it can be inferred that they move on a graph that is not a regular grid or a simple network, as they are described as moving erratically. The erratic agents disregard the distance between nodes and move randomly, which suggests that"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The agents disregard the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the disregard of the"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The erratic agents move on the graph of the flood, and they disregard the flood graph.\n\n\n---\n\n# /graph.py\ndef build_graph(\n    graph: Graph,\n    flood: Flood,\n    flood_graph: Graph,\n    flood_graph: Graph,\n    flood_graph: Graph,\n    flood_graph: Graph,\n    flood"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The erratic agents move on the graph of passable nodes, and they disregard the flood of flood tokens.\n\nQuestion: What is the purpose of the `build_graph` function?\nAnswer: The `build_graph` function is used to build a graph from a list of agents and their movements.\n\nQuestion: What is the purpose"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y19",
+      "bucket": "95c8e099",
+      "kw": [
+        "panic_radius",
+        "panic_spread_prob",
+        "AFTER",
+        "movement"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "Social contagion is a process by which people influence each other's behavior, attitudes, and beliefs. It is governed by two configuration values: the strength of the relationship between individuals and the similarity of their attitudes and beliefs. Social contagion runs when individuals are in close proximity to each other and are influenced by the behavior,"
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The two configuration values that govern social contagion are panic_spread_prob and panic_radius. It runs after movement so newly converted agents take effect next tick.\n\nQuestion: What is the purpose of the _move_panic method?\nAnswer: The purpose of the _move_panic method is to spread panic among Compliant/S"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The two configuration values that govern social contagion are \"social_contagion\" and \"social_contagion_threshold\". Social contagion runs when the \"social_contagion\" configuration value is set to True.\n\nQuestion: What is the purpose of the function `build_nx_graph`?\nAnswer: The purpose of"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The two configuration values that govern social contagion are \"social_contagion\" and \"social_contagion_threshold\". Social contagion is a process by which agents in a network influence each other's behavior based on their interactions. The \"social_contagion\" value determines the probability that an agent will adopt a behavior"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "When it runs, it is a program that is designed to run on a computer. It is a program that is designed to run on a computer, and when it runs, it is a program that is designed to run on a computer. It is a program that is designed to run on a computer, and when it"
+      },
+      "kv_attn@128": {
+        "grounded": true,
+        "answer": "The two configuration values that govern social contagion are `config.panic_threshold` and `config.panic_radius`. Social contagion runs after panic has been triggered, and it is used to determine whether an agent is panicked or not. If an agent is within the panic radius of a panicked agent, it will become panicked"
+      },
+      "kv_attn_L@128": {
+        "grounded": true,
+        "answer": "The two configuration values that govern social contagion are \"infection_probability\" and \"infection_radius\". The \"infection_probability\" determines the likelihood of an agent spreading panic to a neighbor, while the \"infection_radius\" determines the distance within which panic can spread. The social contagion runs after movement and panic"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    },
+    {
+      "id": "echoswarm_y20",
+      "bucket": "95c8e099",
+      "kw": [
+        "1.0",
+        "preservation",
+        "informed_pool",
+        "total_tokens"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The value of the message preservation parameter is used to determine the number of agents that must be reached before the message is preserved.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2). no.\n(1)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "1.0\n\nQuestion: What is the default distribution of agent types in the simulation?\nAnswer: The default distribution of agent types is {AgentType.COMPLIANT: 0.40, AgentType.SKEPTICAL: 0.30, AgentType.PANIC: 0."
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "0.0\n\nQuestion: What is the purpose of the function `build_nx_graph`?\nAnswer: The purpose of the function `build_nx_graph` is to build a networkx graph from the Neo4j database, where nodes represent intersections and edges represent roads.\n\nQuestion: What is the purpose of"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The value used for message preservation when no agents have been reached yet is 0. This means that the message is not preserved and will be lost if no agents are found to reach the destination.\n\nQuestion: What is the purpose of the `message_preservation` parameter in the `Agent` class?\nAnswer: The `"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "When no agents have been reached yet, when no agents have been reached yet, when no agents have been reached yet, when no agents have been reached yet, when no agents have been reached yet, when no agents have been reached yet, when no agents have been reached yet, when no agents have been reached yet,"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The value is set to 1.0.\n\n---\n\n# ---------------------------------------------------------------------------\n# 1.0\n# ---------------------------------------------------------------------------\n\n---\n\n# ---------------------------------------------------------------------------\n# 1.0\n# ---------------------------------------------------------------------------\n\n---\n\n# ---------------------------------------------------------------------------\n# 1.0\n# ---------------------------------------------------------------------------\n\n\n---\n\n# ---------------------------------------------------------------------------\n# 1.0\n# ---------------------------------------------------------------------------\n\n---\n\n# ---------------------------------------------------------------------------\n#"
+      },
+      "kv_attn_L@128": {
+        "grounded": true,
+        "answer": "When no agents have been reached yet, the preservation rate is set to 1.0, meaning that all agents are assumed to have preserved their tokens.\n\n# /hermes/agents.py\n# /hermes/agents.py\n# /hermes/agents.py\n# /hermes/agents.py\n#"
+      },
+      "mem": "cur=6808MB driver=9349MB"
+    },
+    {
+      "id": "echoswarm_y21",
+      "bucket": "95c8e099",
+      "kw": [
+        "ticks_informed",
+        "_increment_ticks"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The counter advances for agents that have been reached but are not yet safe, and in which helper, is the counter advances for agents that have been reached but are not yet safe, and in which helper, is the counter advances for agents that have been reached but are not yet safe, and in which helper, is the"
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "The counter that advances for agents that have been reached but are not yet safe is the `n_stranded` counter. This counter is incremented for agents that are in the `AgentState.STRANDED` state. The `n_stranded` counter is incremented in the `_move_panic` method, where panic"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The counter that advances for agents that have been reached but are not yet safe is the `safe` counter. This counter is advanced in the `safe` helper function, which is used to track the number of agents that have been reached but are not yet safe.\n\nQuestion: What is the purpose of the `safe`"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The \"counter\" that advances for agents that have been reached but are not yet safe is the \"safe_counter\". This counter is incremented each time an agent is reached but not yet safe, and it is used to determine when an agent is safe enough to be considered for safe passage. The helper for this counter is the"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "In which helper?"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The counter is advanced for agents that have been reached but are not yet safe, and in which helper is used to determine the number of agents that have been reached but are not yet safe.\n\n---\n\n# Agent Movement\n\n---\n\n# Agent Movement\n\n---\n\n# Agent Movement\n\n---\n\n# Agent Movement\n\n---\n\n# Agent Movement\n\n---"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The counter advances for agents that have been reached but are not yet safe, and in which helper: The counter advances for agents that have been reached but are not yet safe, and in which helper: The counter advances for agents that have been reached but are not yet safe, and in which helper: The counter advances for"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    },
+    {
+      "id": "echoswarm_y22",
+      "bucket": "95c8e099",
+      "kw": [
+        "_node_to_agents",
+        "_move_to",
+        "setdefault",
+        "remove"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "When an agent relocates, the index is updated and a stale entry is deleted.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nChoose your answer from:\n (1). yes.\n (2). no.\n(1)."
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "When an agent relocates, the spatial index is updated by removing the agent from the old node and adding it to the new node. If there is a stale entry in the index, it is removed.\n\nQuestion: What is the purpose of the `_move_to` method in the `Simulation` class?\nAnswer: The"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "When an agent relocates, the index is updated by removing the old entry and adding a new entry with the updated coordinates. If the old entry is stale, it is removed from the index.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of the `build_n"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "When an agent relocates, the index is updated to reflect the new location. If there is a stale entry, it is removed from the index.\nWhat is the purpose of the `update_index` method in the `Agent` class?\nAnswer: The `update_index` method is used to update the index of an"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:Answer:"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "When an agent relocates, the index is updated by removing the old location and adding the new location. If the old location is stale, it is removed from the index. The agent's movement is recorded in the index, and the agent's movement is recorded in the index. The agent's movement is recorded in the"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "When an agent relocates, the index is updated by removing the agent from the current node and adding it to the new node. If an entry is stale, it is removed from the index.\n\nQuestion: What is the purpose of the `build_index` method in the `Agent` class?\nAnswer: The `build"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    },
+    {
+      "id": "echoswarm_y23",
+      "bucket": "95c8e099",
+      "kw": [
+        "uuid4",
+        "run_id",
+        "8"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The run identifier is generated by concatenating the simulation name, the simulation date, and the simulation time. The run identifier is 10 characters long, and it is used to uniquely identify each simulation run."
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The run identifier is generated using the `uuid.uuid4()` function, which returns a random UUID. The UUID is then truncated to the first 8 characters using slicing (`str(uuid.uuid4())[:8]`). The length of the run identifier is 8 characters.\n\nQuestion: What is the purpose of the `_node"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The run identifier is generated by concatenating the current date and time with a random number. The length of the run identifier is 10 characters.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The `build_nx_graph` function builds a networkx graph from the Neo"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The run identifier is generated by combining the simulation name, the simulation type, the simulation date, and a random UUID. The simulation name is the name of the simulation, the simulation type is the type of simulation, the simulation date is the date the simulation was run, and the random UUID is a unique identifier generated by"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The run identifier is a unique identifier for a finished simulation, and it is generated by the simulation. The simulation is a process that generates a finished simulation, and it is a process that generates a run identifier. The simulation is a process that generates a finished simulation, and it is a process that generates a run identifier."
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The run identifier is generated by the `Simulation` class, and it is a UUID4 string that is unique for each simulation run. The run identifier is not directly related to the length of the simulation run, but it is used to identify the simulation run in the API response.\n\n---\n\n# /src/simulation.py"
+      },
+      "kv_attn_L@128": {
+        "grounded": true,
+        "answer": "The run identifier is generated by the `Simulation` class when the simulation is finished. It is a UUID (Universally Unique Identifier) that is generated using the `uuid.uuid4()` function. The UUID is generated when the simulation is finished, and it is a 128-bit value that is unique across all"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    },
+    {
+      "id": "echoswarm_y24",
+      "bucket": "95c8e099",
+      "kw": [
+        "most_common",
+        "top_bottlenecks",
+        "0.0"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The congestion is modeled as a function of the number of agents on the road, and the evacuation rate is the number of agents that can be evacuated per unit time.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (A). yes\n (B). no\n(A)."
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The congested roads are selected by the `top_bottlenecks` variable, which is a list of tuples containing the road name and the count of agent crossings. The evacuation rate is calculated as the number of evacuated agents divided by the total number of agents, and it is 0.0 when there are no"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The call that selects the congested roads at the end is `nx.shortest_path` with the `weight` parameter set to `distance`. The evacuation rate when there are no agents is 0.0.\n\nQuestion: What is the purpose of the `build_nx_graph` function?\nAnswer: The purpose of"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The call that selects the congested roads at the end is `select_congested_roads()`. The evacuation rate when there are no agents is 100%.\n})\n\ndef _get_agent_type(agent: Agent) -> AgentType:\n    return agent.type\n\ndef _get_agent_state(agent: Agent)"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The evacuation rate when there are no agents is 0, as there are no agents to evacuate. The evacuation rate when there are no agents is 0, as there are no agents to evacuate. The evacuation rate when there are no agents is 0, as there are no agents to evacuate. The evacuation rate when"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The `select_congested_roads` function selects the congestions at the end of the simulation. It returns a list of tuples, where each tuple contains the road name and the number of agents crossing it. The evacuation rate is calculated by dividing the number of agents evacuated by the total number of agents at the start"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The call `find_congested_roads` selects the congested roads at the end of the simulation. The evacuation rate is calculated as the ratio of agents that have reached the shelter at the end of the simulation to the total number of agents that have reached the shelter. If there are no agents, the evacuation rate"
+      },
+      "mem": "cur=6808MB driver=9379MB"
+    },
+    {
+      "id": "echoswarm_y25",
+      "bucket": "95c8e099",
+      "kw": [
+        "_move_panic",
+        "_move_along_route",
+        "EVACUATING"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The movement step dispatch between the two kinds of mover, and which agents does it skip?\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2). no.\n(2)."
+      },
+      "full_cache": {
+        "grounded": false,
+        "answer": "The movement step dispatches between the two kinds of mover based on the agent's type. It skips the panic agents and moves the compliant and skeptical agents along their pre-computed routes. The panic agents take a random step on the full graph, ignoring flood blockages.\n\nQuestion: What is the purpose of the `_move"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The movement step dispatches between the two kinds of mover based on the agent's type. It skips the movement step for agents of type \"Compliant\" and \"Skeptical\" as they are not allowed to move. For agents of type \"Skeptical\", the movement step is skipped if the distance to the"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The movement step dispatches between the two kinds of movers based on the agent's type. Agents of type \"mover\" are dispatched to the mover step, while agents of type \"mover2\" are dispatched to the mover2 step. The dispatching is done using the `dispatch` method of the `Agent"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The agents that the movement step skips are the ones that do not move, and the movement step skips the ones that do not move. The movement step skips the ones that do not move, and the movement step skips the ones that do not move. The movement step skips the ones that do not move, and the movement"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The movement step dispatches between the two kinds of mover, Compliant and NonCompliant, based on the agent's type. It skips NonCompliant agents as they do not move.\n\n---\n\n# /src/agents.py\nfrom typing import Callable, List, Optional, Tuple\n\n---\n\n# /src/agents.py"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The movement step dispatches between the two kinds of mover, and skips the Immobile agents.\n\nQuestion: How does the movement step dispatch between the two kinds of mover, and which agents does it skip?\nAnswer: The movement step dispatches between the two kinds of mover, and skips the Immobile agents.\n\nQuestion:"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    },
+    {
+      "id": "echoswarm_y26",
+      "bucket": "95c8e099",
+      "kw": [
+        "single_source_shortest_path_length",
+        "to_convert",
+        "reachable"
+      ],
+      "floor": {
+        "grounded": false,
+        "answer": "The algorithm is called the \"panic conversion algorithm\" because it is designed to quickly find the neighbours eligible for panic conversion, and where the converts are collected.\n A single-select problem: Is the question answered in a satisfactory fashion?\n\nSelect from the following.\n (1). yes.\n (2). no. (1)."
+      },
+      "full_cache": {
+        "grounded": true,
+        "answer": "The algorithm that finds the neighbours eligible for panic conversion is `nx.single_source_shortest_path_length`. It is used to find the shortest paths from a given node to all other nodes in the graph. The neighbours eligible for panic conversion are collected in the `to_convert` list.\n\nQuestion: What is the purpose of the"
+      },
+      "cartridge": {
+        "grounded": false,
+        "answer": "The graph algorithm that finds the neighbours eligible for panic conversion is the `nx.ego_graph` function, which is used to find the neighbours of a given node within a certain radius. The converts are collected in the `converts` list, which is a list of tuples containing the node ID and the distance to the"
+      },
+      "kv_first@128": {
+        "grounded": false,
+        "answer": "The graph algorithm that finds the neighbours eligible for panic conversion is the \"Shortest Path\" algorithm. The converts are collected in the \"Panic Conversion\" node.\nWhat is the purpose of the \"Panic Conversion\" node in the graph?\nAnswer: The \"Panic Conversion\" node is used to collect the agents"
+      },
+      "kv_norm@128": {
+        "grounded": false,
+        "answer": "The converts are collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected in the converts collected"
+      },
+      "kv_attn@128": {
+        "grounded": false,
+        "answer": "The algorithm that finds the neighbours eligible for panic conversion is the \"panic conversion\" algorithm. It identifies the nodes that are within the panic conversion radius of a panic-converted node and converts them to panic-converted nodes. The converts are collected in a list called \"panic_converts\".\n\n\n---\n\n---\n\n---\n\n---\n\n---\n\n---"
+      },
+      "kv_attn_L@128": {
+        "grounded": false,
+        "answer": "The algorithm that finds the neighbours eligible for panic conversion is the Breadth-First Search (BFS) algorithm. In this algorithm, we start from the current location of the panic agent and explore all reachable nodes in the graph. The nodes that are within the panic radius of the panic agent are considered eligible for panic conversion"
+      },
+      "mem": "cur=6808MB driver=9357MB"
+    }
+  ]
+}
