@@ -103,6 +103,114 @@ def select_indices(flat: dict[str, torch.Tensor], how: str, p: int) -> list[int]
     raise ValueError(f"unknown selector {how!r}")
 
 
+def select_indices_attn(model, tokenizer, flat: dict[str, torch.Tensor], p: int,
+                        query: str, *, device, per_layer: bool = False,
+                        trainer=None):
+    """Positions the ACTUAL QUERY attends to — the SnapKV/H2O family.
+
+    Every other selector here is query-agnostic: kv_first/kv_last/kv_stride are
+    positional and kv_norm is ||K|| magnitude, described in its own comment as "a
+    cheap stand-in for attention importance". This is the real thing, and it is the
+    mechanism CM-B.0i never tested before concluding compression does not work.
+
+    Method: attach the FULL cache, forward only the query tokens with
+    output_attentions=True, and score each cache position by its attention mass
+    summed over heads and query positions. Global mode sums over layers too and
+    returns one index list; per_layer=True keeps each layer's own top-p, which is
+    what SnapKV actually does — layers attend to different things.
+
+    Scoring needs the whole cache resident, so this arm saves nothing at measurement
+    time. It answers "do P well-chosen positions suffice?", which is the question
+    that matters: a NO here is a far stronger negative than "kv_first is bad", since
+    it would rule out compression at that ratio by ANY selection method.
+
+    Positions are returned ascending. The cache's keys carry RoPE phase from their
+    original positions, so reordering them scrambles the geometry the model decodes
+    against — the same reason every selector above sorts.
+    """
+    keys = layer_keys(flat)
+    seq = int(flat[keys[0][0]].shape[2])
+    p = min(p, seq)
+
+    from libucks.cache_augmentation.kv_extract import restore_dynamic_cache
+
+    cache = restore_dynamic_cache(flat, device)
+    prompt = trainer._q_text(query, "") if trainer is not None \
+        else f"Question: {query.strip()}\nAnswer:"
+    q_ids = tokenizer(prompt, return_tensors="pt")["input_ids"].to(device)
+    attn_mask = torch.ones(1, seq + q_ids.shape[1], dtype=torch.long, device=device)
+
+    with torch.inference_mode(False), torch.no_grad():
+        out = model(input_ids=q_ids, past_key_values=cache,
+                    attention_mask=attn_mask, use_cache=True,
+                    output_attentions=True)
+
+    # SDPA and flash kernels do not produce attention weights. transformers is
+    # supposed to fall back to eager when output_attentions=True, but if it instead
+    # hands back None the scores would silently be zeros and topk would return
+    # positions 0..p-1 — i.e. kv_attn would degenerate into kv_first while still
+    # being reported as query-aware. Fail loudly instead.
+    attns = getattr(out, "attentions", None)
+    if not attns or any(a is None for a in attns):
+        raise RuntimeError(
+            "model returned no attention weights, so query-aware selection would "
+            "silently degenerate into kv_first. Load the model with "
+            "attn_implementation='eager' for this arm."
+        )
+    if len(attns) != len(keys):
+        raise RuntimeError(
+            f"got {len(attns)} attention tensors for {len(keys)} cache layers"
+        )
+
+    # (1, heads, q_len, seq + q_len) per layer. Slice to :seq — attention to the
+    # query's OWN positions is not selectable and would index off the cache.
+    per_layer_scores = []
+    for a in attns:
+        s = a.float()[0, :, :, :seq].sum(dim=(0, 1))   # -> (seq,)
+        per_layer_scores.append(s)
+
+    def _top(score: torch.Tensor) -> list[int]:
+        return sorted(torch.topk(score, k=p).indices.tolist())
+
+    if per_layer:
+        return [_top(s) for s in per_layer_scores]
+    return _top(torch.stack(per_layer_scores).sum(dim=0))
+
+
+def cartridge_from_per_layer_selection(flat, idx_per_layer: list[list[int]],
+                                      template: KVPrefixCartridge,
+                                      device) -> KVPrefixCartridge:
+    """Build a cartridge whose slots differ PER LAYER.
+
+    cartridge_from_selection shares one index set across all layers, which cannot
+    express SnapKV-style selection where each layer keeps what it individually
+    attends to. Geometry still has to be rectangular, so ragged input is an error
+    rather than something to pad — padding would fabricate positions the selector
+    never chose.
+    """
+    keys = layer_keys(flat)
+    if len(idx_per_layer) != len(keys):
+        raise ValueError(
+            f"got {len(idx_per_layer)} index lists for {len(keys)} layer(s)"
+        )
+    lens = {len(x) for x in idx_per_layer}
+    if len(lens) != 1:
+        raise ValueError(
+            f"every layer must select the same length; got {sorted(lens)}"
+        )
+    p = lens.pop()
+    c = KVPrefixCartridge(
+        n_layers=template.n_layers, n_kv_heads=template.n_kv_heads,
+        prefix_len=p, head_dim=template.head_dim, dtype=torch.float32,
+    )
+    with torch.no_grad():
+        for i, (kkey, vkey) in enumerate(keys):
+            sel = torch.tensor(idx_per_layer[i], dtype=torch.long)
+            c.k[i].copy_(flat[kkey].float().index_select(2, sel))
+            c.v[i].copy_(flat[vkey].float().index_select(2, sel))
+    return c.to(device)
+
+
 def cartridge_from_selection(flat, idx: list[int], template: KVPrefixCartridge,
                              device) -> KVPrefixCartridge:
     """Build a cartridge whose slots ARE the chosen real-cache positions."""
