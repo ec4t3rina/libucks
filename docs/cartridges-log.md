@@ -26,6 +26,107 @@ finding.
 - CM-B.0h — training-free KV-cache selection — ⚠️ **CONCLUSION RETRACTED by CM-B.0i** 2026-07-29 (**measured `kv_first` 13/16 vs cartridge 8/16 and concluded distillation degrades its own warm start. Both the fixture set and the conclusion were flawed: the bc6b90e2 fixtures cluster in the first quarter of the file, and `kv_first` keeps the FIRST P positions, so it won by construction. On position-stratified fixtures the two are indistinguishable**)
 - CM-B.0i — position-stratified sweep on a second bucket — ✅ **TRUNCATION DOES NOT COMPRESS; UNCOMPRESSED CEILING IS 50%** 2026-07-29 (**full 4,599-token cache scores 13/26 vs floor 0/26. Score is proportional to fraction retained — 2.8%→1/26, 22%→6/26, 100%→13/26 — so no prefix carries information about text it dropped. At matched P=128 cartridge 2/26 ≈ kv_first 1/26. Both CM-B.0h/0i-precursor headlines were artifacts of self-authored, head-clustered fixtures**)
 - CM-B.0j — text-in-prompt ceiling control + MPS memory profile — ✅ **THE 0i CEILING IS REAL, NOT A HARNESS ARTIFACT** 2026-07-30 (**same text as prompt tokens read with full attention scores 14/26 vs the serialised full cache's 13/26. The +1 is decode noise, not a lossy cache path: the 5 disagreements are BIDIRECTIONAL (3 text-wins, 2 cache-wins). 0i reproduces exactly — 13/26 and cartridge 2/26 — on different code paths. So `1/26 at 36×` is 8% of a REAL ceiling and the negative result stands. Also: `generate_answer` truncated silently at 3,500 tokens and would have produced a FALSE confirmation; the same cap means every cartridge here was distilled from a teacher that saw only 76% of its bucket. MPS profile: no leak of any kind, but one 4,599-token prefill permanently caches 4.5 GB that `empty_cache()` will not return**)
+- CM-B.0k — query-aware KV selection (SnapKV family) — ✅ **FIRST POSITIVE MECHANISM IN THIS TRACK** 2026-07-30 (**at P=128 / 35.9×: query-aware per-layer selection 5/26 vs `kv_first` 1/26, `kv_norm` 0/26 and the 98-minute distilled cartridge 2/26, against a 13/26 ceiling. 5× the positional selector and +3 over training, with ZERO training. Believed real because the per-fixture wins are ASYMMETRIC 5–1, unlike CM-B.0j's 3–2 bidirectional noise; and because per-layer beats global 5 vs 3, independently corroborating SnapKV's design. BUT 38.5% of ceiling where the literature reports 97–99%, it buys attention-COMPUTE not STORAGE compression, and it is one run at n=26 where decode noise is ±2 — treat +4 as provisional until repeated**)
+
+---
+
+## CM-B.0k — query-aware KV selection (2026-07-30)
+
+**Status**: ✅ The first mechanism in this track that does something, and the first
+result here I want to be *more* sceptical of than usual precisely because I like it.
+
+**The gap this closes.** CM-B.0i concluded no compression mechanism exists, from a
+sweep in which *every selector was query-agnostic*: `kv_first`/`kv_last`/`kv_stride`
+are positional and `kv_norm` ranks by ‖K‖ — described in its own source comment as
+"a cheap stand-in for attention importance that needs no second forward pass." The
+literature does not use a stand-in. SnapKV / H2O / CompressKV keep the positions the
+ACTUAL QUERY attends to. So 0i's negative was never a statement about the content;
+it was a statement about the selector, and that was never tested.
+
+### Result — P=128, 35.9× compression, n=26, ceiling 13/26
+
+| arm | score | % of ceiling | |
+|---|---|---|---|
+| floor | 0/26 | 0% | |
+| `kv_norm@128` | 0/26 | 0% | query-agnostic, magnitude |
+| `kv_first@128` | 1/26 | 7.7% | query-agnostic, positional |
+| distilled cartridge | 2/26 | 15.4% | 98 minutes of training |
+| `kv_attn@128` | 3/26 | 23.1% | **query-aware, global** |
+| **`kv_attn_L@128`** | **5/26** | **38.5%** | **query-aware, per-layer** |
+| full cache | 13/26 | 100% | the ceiling, 1.0× |
+
+`+4` over `kv_first`, `+5` over `kv_norm`, `+3` over the cartridge — with **no
+training at all**, against 98 minutes of distillation.
+
+### Why this is believed to be signal
+
+**The wins are asymmetric.** Query-aware wins y01, y04, y19, y20, y23 where
+`kv_first` fails, and loses only y06 where it succeeds — 5–1 directional. Contrast
+CM-B.0j, where text-vs-cache was 3–2 *bidirectional* and was correctly read as decode
+noise. Direction is the discriminator, not the totals.
+
+**Per-layer beats global, 5 vs 3.** SnapKV selects per-layer because layers attend to
+different things. That ordering reproduced here without anything being tuned toward
+it, which is independent corroboration rather than a free parameter.
+
+**The yardstick held for the third time.** Full cache 13/26 and cartridge 2/26 are
+now identical across CM-B.0i, 0j and 0k, on three different code paths.
+
+### What it does NOT say
+
+**38.5% of ceiling, where the literature reports 97–99%** at comparable budgets. The
+mechanism exists here but is far weaker than published, and that gap is the finding
+to chase, not a footnote. Two concrete suspects in this implementation: SnapKV
+selects **per head** and applies a **pooling** step so kept positions form contiguous
+clusters; `attn_scores` sums over heads and selects isolated positions.
+
+**Compute compression, not storage compression.** Scoring requires the full cache
+resident, so this is not a precomputable per-bucket cartridge — a different claim
+from where this track started. Stated before the run, not after.
+
+**One run at n=26 with ±2 decode noise.** `+4` clears that, and the 5–1 asymmetry
+supports it, but this is provisional until repeated. Nothing about tonight's history
+of retracted headlines earns this result an exemption.
+
+Using the query to select is **not** leakage: the query is available at inference and
+only the question is used, never the answer.
+
+### Two defects found building it, both of which would have produced a wrong answer
+
+**1. `transformers` 5.4.0 + SDPA returns `attentions=()`** — an empty tuple — and does
+**not** fall back to eager. Verified directly against gpt2. Unguarded, every score
+would be zero, `topk` would return positions 0..p−1, and **kv_attn would silently BE
+`kv_first`** while being reported as query-aware. It would have manufactured exactly
+the null result it exists to test for. `select_indices_attn` now raises and names the
+fix. Loading with `attn_implementation="eager"` is mandatory for this arm.
+
+**2. A 1-token continuation forward SIGBUSes GPT-2** on this stack. Isolated to a
+minimal repro with no libucks code: `cache=199 + piece=1` dies, while 198+2, 196+4 and
+150+50 all pass in separate processes — shape-specific, not the memory pressure first
+suspected. `extract_bucket_kv` folds a 1-token tail into the previous segment.
+
+### Chunked extraction, measured
+
+CM-B.0j predicted chunking would cut the 4.5 GB permanently-cached prefill transient.
+It did: `driver` fell from **11,653 MB → 9,471 MB** and the cur/driver gap from
+4,651 MB → 2,683 MB. That understates the effect, because this run *also* switched to
+**eager** attention, which is more memory-hungry than 0j's SDPA — so the pure chunking
+win is larger than the 2.2 GB visible here, with eager eating part of it back. Memory
+was flat across all 26 fixtures (`cur` 6,808 MB, `driver` 9,349–9,379 MB), confirming
+0j's no-leak finding on a second code path.
+
+### Next
+
+1. **Repeat this run.** Selection and cache-building are deterministic and the decode
+   is greedy, so a repeat varies *only* MPS floating-point nondeterminism — which is
+   exactly the quantity `+4` needs to clear. It is a determinism check, not a seed
+   sweep; there is no seed here to vary.
+2. **Per-head selection + SnapKV pooling** — the two named gaps to the literature,
+   both small changes to `attn_scores`.
+3. **P sweep.** The dumb selector reached 6/26 at P=1024. If query-aware hits the
+   13/26 ceiling well before that, the compression curve finally has a knee — which
+   is what "compression works" actually looks like, and what CM-B.0i showed the
+   positional selectors never produce.
 
 ---
 
