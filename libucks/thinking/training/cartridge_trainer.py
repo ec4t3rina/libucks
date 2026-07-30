@@ -40,6 +40,19 @@ from libucks.thinking.training.losses import distillation_loss
 # thread stacks to stderr every interval instead of hanging silently for hours.
 _STALL_DUMP_SECS = 300
 
+# Prompt token budget. Was a bare `3500` literal at three sites in this file
+# (plus decode.py, cache_aug_trainer.py and test_latent_vs_baseline.py — those
+# still carry the literal and should be folded in separately).
+#
+# The teacher paths below truncate at this budget, which means every cartridge
+# distilled so far was supervised by a teacher that saw only the first 3500
+# tokens of its bucket. For the 4,599-token stratified bucket that is the first
+# 76%. Recorded here because it bounds the CM-B cartridge numbers; not changed,
+# because changing it would silently re-scope every prior run.
+#
+# `generate_answer` does NOT truncate — it raises. See test_prompt_budget.py.
+MAX_PROMPT_TOKENS = 3500
+
 
 def _log(msg: str) -> None:
     print(f"[libucks:cartridge_train] {msg}", file=sys.stderr, flush=True)
@@ -87,7 +100,8 @@ class CartridgeTrainer:
         with torch.inference_mode(False), torch.no_grad():
             ctx = self._q_text(query, verbatim[: self.max_verbatim_chars])
             enc = self.tokenizer(
-                ctx, return_tensors="pt", truncation=True, max_length=3500
+                ctx, return_tensors="pt", truncation=True,
+                max_length=MAX_PROMPT_TOKENS,
             ).to(self.device)
             out = self.model(
                 input_ids=enc["input_ids"],
@@ -131,7 +145,8 @@ class CartridgeTrainer:
         with torch.inference_mode(False), torch.no_grad():
             ctx = self._q_text(query, verbatim[: self.max_verbatim_chars])
             ctx_ids = self.tokenizer(
-                ctx, return_tensors="pt", truncation=True, max_length=3500
+                ctx, return_tensors="pt", truncation=True,
+                max_length=MAX_PROMPT_TOKENS,
             )["input_ids"].to(self.device)
             fed = torch.cat([ctx_ids, answer_ids.view(1, -1)], dim=1)
             out = self.model(input_ids=fed, use_cache=False)
@@ -389,6 +404,8 @@ class CartridgeTrainer:
     def generate_answer(
         self, cartridge: KVPrefixCartridge | None, query: str,
         *, max_new_tokens: int = 64, verbatim: str = "",
+        max_prompt_tokens: int = MAX_PROMPT_TOKENS,
+        prefix_factory: Any = None,
     ) -> str:
         """Greedy-decode an answer from the cartridge prefix (latent-alone when
         verbatim=""). Used for the CM-A.1 proof and eval.
@@ -401,11 +418,48 @@ class CartridgeTrainer:
         cartridge-minus-floor delta cannot be an artefact of two decoders
         disagreeing. CM-B.0d made this the load-bearing number: 4.33/16 means
         nothing until the floor is known.
+
+        A non-empty `verbatim` makes this the text-in-prompt CEILING CONTROL, and
+        that arm is only valid uncut: this method therefore RAISES on a prompt
+        over `max_prompt_tokens` rather than truncating to it. Qwen truncates
+        right, so a silent cut would drop the tail of the bucket — precisely
+        where the positionally-stratified fixtures put their target facts — and
+        the crippled control would agree with the cache arm and be misread as
+        confirming the ceiling. Widen the budget explicitly instead.
+
+        `prefix_factory` is the cheap form of that control: a zero-argument
+        callable returning `(prefix_cache, prefix_len)`. The bucket text is
+        prefilled ONCE into a live cache by the caller and each query forwards
+        only its own tail against a COPY — 26 fixtures cost one large forward
+        instead of 26, which is what the naive version could not survive (16 GB
+        plus 20 GB of swap exhausted, wedged after 2 of 26).
+
+        It is a FACTORY and not a cache on purpose. DynamicCache is mutated in
+        place by the loop below, so a reused object would append fixture N's
+        decoded answer to fixture N+1's prefix — silent cross-contamination of
+        every fixture after the first. Being handed a factory makes freshness
+        structural rather than a caller convention. See
+        tests/unit/test_text_prefill_control.py.
         """
+        if prefix_factory is not None and cartridge is not None:
+            raise ValueError(
+                "pass either cartridge or prefix_factory, not both — both attach "
+                "a prefix and the second would silently win"
+            )
+        if prefix_factory is not None and verbatim:
+            raise ValueError(
+                "prefix_factory with a non-empty verbatim would count the context "
+                "twice, once as cache and once as prompt text"
+            )
         with torch.inference_mode(False), torch.no_grad():
             prefix_cache = None
             prefix_len = 0
-            if cartridge is not None:
+            if prefix_factory is not None:
+                # Called per generation, never cached on self — see the freshness
+                # tests. The caller owns the copy; we only consume it.
+                prefix_cache, prefix_len = prefix_factory()
+                prefix_len = int(prefix_len)
+            elif cartridge is not None:
                 cartridge.eval()
                 prefix_cache = cartridge.to_dynamic_cache(
                     self.device, dtype=self.receiver_dtype
@@ -413,8 +467,16 @@ class CartridgeTrainer:
                 prefix_len = cartridge.prefix_len
             q_ids = self.tokenizer(
                 self._q_text(query, verbatim), return_tensors="pt",
-                truncation=True, max_length=3500,
-            )["input_ids"].to(self.device)
+            )["input_ids"]
+            n_prompt = int(q_ids.shape[1])
+            if n_prompt > max_prompt_tokens:
+                raise ValueError(
+                    f"prompt is {n_prompt} tokens, over max_prompt_tokens="
+                    f"{max_prompt_tokens}. Raise the budget or shorten the "
+                    f"context deliberately — this truncated silently until "
+                    f"2026-07-30, which is how three earlier results went wrong."
+                )
+            q_ids = q_ids.to(self.device)
             cur_len = prefix_len + q_ids.shape[1]
             attn = torch.ones(1, cur_len, dtype=torch.long, device=self.device)
             out = self.model(

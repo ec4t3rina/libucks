@@ -25,6 +25,130 @@ finding.
 - CM-B.0g — P sweep, 384×3 seeds + 512 + 768 — ⚠️ **KL AND GROUNDING DECOUPLE HARD** 2026-07-29 (**P=768 reaches the best KL ever recorded here (1.093) and scores 2/8 — worse than P=512's 4/8 on a 3× worse KL. Threefold divergence improvement buys nothing. Diagnosis: at high P the cartridge fits the 120 self-study queries, and the fixtures ask different questions**)
 - CM-B.0h — training-free KV-cache selection — ⚠️ **CONCLUSION RETRACTED by CM-B.0i** 2026-07-29 (**measured `kv_first` 13/16 vs cartridge 8/16 and concluded distillation degrades its own warm start. Both the fixture set and the conclusion were flawed: the bc6b90e2 fixtures cluster in the first quarter of the file, and `kv_first` keeps the FIRST P positions, so it won by construction. On position-stratified fixtures the two are indistinguishable**)
 - CM-B.0i — position-stratified sweep on a second bucket — ✅ **TRUNCATION DOES NOT COMPRESS; UNCOMPRESSED CEILING IS 50%** 2026-07-29 (**full 4,599-token cache scores 13/26 vs floor 0/26. Score is proportional to fraction retained — 2.8%→1/26, 22%→6/26, 100%→13/26 — so no prefix carries information about text it dropped. At matched P=128 cartridge 2/26 ≈ kv_first 1/26. Both CM-B.0h/0i-precursor headlines were artifacts of self-authored, head-clustered fixtures**)
+- CM-B.0j — text-in-prompt ceiling control + MPS memory profile — ✅ **THE 0i CEILING IS REAL, NOT A HARNESS ARTIFACT** 2026-07-30 (**same text as prompt tokens read with full attention scores 14/26 vs the serialised full cache's 13/26. The +1 is decode noise, not a lossy cache path: the 5 disagreements are BIDIRECTIONAL (3 text-wins, 2 cache-wins). 0i reproduces exactly — 13/26 and cartridge 2/26 — on different code paths. So `1/26 at 36×` is 8% of a REAL ceiling and the negative result stands. Also: `generate_answer` truncated silently at 3,500 tokens and would have produced a FALSE confirmation; the same cap means every cartridge here was distilled from a teacher that saw only 76% of its bucket. MPS profile: no leak of any kind, but one 4,599-token prefill permanently caches 4.5 GB that `empty_cache()` will not return**)
+
+---
+
+## CM-B.0j — text-in-prompt ceiling control, and the MPS memory profile (2026-07-30)
+
+**Status**: ✅ The CM-B.0i ceiling survives its own control, and 0i reproduces exactly.
+
+**Why this experiment.** CM-B.0i's ceiling was 13/26 — barely half, with the ENTIRE
+bucket in cache. Every compression number in this log is a fraction of that number,
+so if the ceiling were itself an artifact — a lossy cache path, a too-strict metric,
+a too-weak model — the whole log would be measured against a bent ruler. The control
+feeds the same bucket text as prompt tokens the model reads with full attention.
+Causal attention makes that **mathematically identical** to a full-cache prefix, so
+any gap localises a bug rather than merely suggesting one.
+
+### Result
+
+| arm | score | how the prefix arrived |
+|---|---|---|
+| floor (no memory) | **0/26** | nothing attached |
+| **text in prompt** | **14/26** | live prefill, never serialised |
+| **whole cache (P=5100)** | **13/26** | bf16 → CPU → float32 → `index_select` → bf16 |
+| distilled cartridge | 2/26 | 98 min of distillation at P=128 |
+
+`text − whole cache = +1`. **The ceiling is real** — model- and fixture-bound, not
+harness-bound.
+
+**The load-bearing evidence is the direction of the disagreements, not the totals.**
+The two arms agree on 21/26 fixtures. Of the 5 that differ, text wins y15, y17, y22
+and **cache wins y18, y24**. A lossy round-trip would lose *one-directionally*; a
+symmetric ±5 scatter netting +1 is decode nondeterminism, already measured on this
+hardware at ~2/25 answers. (An earlier progress note in this session claimed
+"11/11, zero disagreements" at the 11-fixture mark — true then, but it did not hold
+for the full run, and the weaker-but-correct argument is the directional one.)
+
+**Consequence: the negative result stands.** `1/26 at 35.9× compression` is 8% of a
+ceiling that has now been independently checked, not an artifact of a broken one.
+
+**CM-B.0i reproduced exactly.** Whole cache 13/26 and cartridge 2/26, identical to
+0i despite a different code path (the text arm routes through a new `prefix_factory`,
+and `generate_answer` now raises rather than truncates) and a machine deep in swap.
+
+### Three defects found building the control
+
+**1. Silent truncation — third occurrence in this project.** `generate_answer`
+tokenised with `truncation=True, max_length=3500`, and Qwen's `truncation_side` is
+`right`. The longest control prompt is 4,626 tokens, so **1,126 tokens (24%) would
+have been dropped from the TAIL** — exactly where the stratified set deliberately
+places a quarter of its answers. The crippled control would have scored low, matched
+the cache arm, and *confirmed* the ceiling for entirely the wrong reason. This fails
+toward a **false positive**, which is worse than a crash. `generate_answer` now
+raises on overflow; see `tests/unit/test_prompt_budget.py`.
+
+**2. The distillation teacher shares that cap.** Naming the constant exposed that
+both teacher paths use it, so **every cartridge distilled against this bucket was
+supervised by a teacher that saw only the first 3,500 of 4,599 tokens — 76%.** On a
+set where roughly a quarter of the questions target the last 24%, the cartridge could
+not have learned those answers however well distillation works. Deliberately NOT
+changed, because changing it silently re-scopes every prior run. But it means the
+2/26 cartridge figure is **not a clean measurement of distillation capacity**:
+handicapped teacher, not merely weak student. 2/26 against a floor of 0/26 is still
+near-floor, so this does not overturn anything — it bounds the claim.
+
+**3. A reuse hazard in the fix itself.** `DynamicCache` is mutated in place by the
+decode loop. Handing the same object to successive fixtures would append fixture N's
+question and answer to fixture N+1's prefix — silent cross-contamination of all 25
+later fixtures, scores drifting upward, looking exactly like a result. The API
+therefore takes a **factory, not a cache**, so freshness is structural rather than a
+caller convention.
+
+**Also verified rather than assumed:** prefilling `verbatim + "\n\n"` and forwarding
+only `"Question: …\nAnswer:"` equals a single-shot prompt *only* if tokenisation is
+split-invariant at the junction, and BPE is not in general. Checked token-exact on
+all 26 fixtures; the script exits naming the offender if any disagrees.
+
+### MPS memory profile — useful well beyond this experiment
+
+| | measured over 26 fixtures |
+|---|---|
+| tensors (`current_allocated_memory`) | **7,002 MB, range 0 MB** |
+| taken from OS (`driver_allocated_memory`) | **11,247–12,271 MB, range 1,024 MB, not climbing** |
+
+- **No tensor leak** — `cur` pinned to the byte across the whole run.
+- **No allocator leak** — `driver` plateaued after a single 610 MB warm-up fixture
+  (fixture 2 added 8 MB) and then oscillated without trend.
+- The **4.5 GB gap** between the two is the transient attention workspace of the
+  single 4,599-token prefill, cached and **not released by
+  `torch.mps.empty_cache()`** — the reading above is taken *after* an explicit call.
+  With `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0` (mandatory here) nothing forces it back.
+- **So the real requirement is 12.3 GB**, not the 7.0 GB the tensors imply. On a
+  16 GB machine that is why four attempts were needed.
+- **Fix worth doing regardless**: chunk long prefills into ~512-token segments —
+  identical under causal attention — which should cut peak demand to ~7.5 GB.
+  `extract_bucket_kv` performs the same single long forward and needs the same
+  treatment. This plausibly explains MPS memory trouble in CM-A and Phase 4-C.
+
+**Process note, recorded because it cost four launches.** After three failures I
+diagnosed a per-fixture leak *by inference* and proposed chunking the run across
+processes. That was wrong: two of the three failures had launched with 3–4 GB
+available against a 7.2 GB requirement, and the third ran a different design. Five
+lines of instrumentation settled in two fixtures what three runs of reasoning had got
+backwards. **Measure allocator behaviour; never infer it.**
+
+### Next
+
+The ceiling is trustworthy and it is ~50%, which bounds every compression scheme on
+this bucket. The mechanism this project has **never tested** is *informed* selection:
+every selector in `cm_kv_prune.py` is query-agnostic — `kv_first`/`kv_last`/
+`kv_stride` are positional, `kv_norm` is ‖K‖ magnitude, and its own comment concedes
+it is "a cheap stand-in for attention importance." The literature does not use a
+stand-in. SnapKV / H2O / [CompressKV](https://arxiv.org/html/2606.24467v1) select the
+positions the **actual query** attends to and report 97–99% of full-cache accuracy at
+3–19% budget; [CodeComp](https://arxiv.org/abs/2604.10235) (Apr 2026, agentic coding —
+the closest prior work to libucks) selects by code-property-graph structure instead.
+We measured 8% of ceiling at 3% budget with a dumb selector and concluded the
+mechanism does not exist. `kv_attn` is ~30 lines against the existing
+`select_indices(flat, how, p)` interface.
+
+**Caveat to state up front**: query-aware selection needs the full cache resident at
+query time to select from, so it buys **attention-compute** compression, not
+**storage** compression. That is a different product claim from "small per-bucket
+cartridge" — but it is the correct test of whether a compression mechanism exists
+here at all, and it is the only apples-to-apples comparison with those papers.
 
 ---
 
