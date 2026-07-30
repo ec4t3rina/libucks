@@ -58,6 +58,7 @@ import importlib.util
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 os.environ.setdefault("PYTORCH_MPS_HIGH_WATERMARK_RATIO", "0.0")
@@ -247,7 +248,10 @@ def main() -> int:
         kw, q = f["answer_keywords"], f["question"]
         pk = prep[bid]
         # ONE scoring forward per fixture, reused for every budget and both modes.
+        t0 = time.perf_counter()
         s = kp.attn_scores(model, tok, pk["flat"], q, device=device, trainer=trainer)
+        _log(f"  [{n:2}/{len(routed)}] {f['id']} scored in "
+             f"{time.perf_counter() - t0:.1f}s  {_mem()}")
 
         plan = [("floor", None), ("full_cache", pk["full"])]
         if pk["trained"] is not None:
@@ -267,12 +271,20 @@ def main() -> int:
 
         row = {"id": f["id"], "bucket": bid, "kw": kw}
         for name, cart in plan:
+            t0 = time.perf_counter()
             ans = trainer.generate_answer(cart, q,
                                           max_new_tokens=EVAL_MAX_NEW_TOKENS,
                                           verbatim="")
             g = grounding_score(ans, kw)
             scores[name] += int(g)
             row[name] = {"grounded": g, "answer": ans}
+            # Per-ARM heartbeat, not per-fixture. A 15-arm fixture can run many
+            # minutes, and with only a per-fixture line a healthy-but-slow run is
+            # indistinguishable from a wedged one — a stall watchdog killed a
+            # perfectly good sweep for exactly that reason. Emitting here makes the
+            # log grow steadily and yields per-arm timings for future estimates.
+            _log(f"    {f['id']} {name:16} g={int(g)} "
+                 f"{time.perf_counter() - t0:5.1f}s")
         row["mem"] = _mem()
         rows.append(row)
         _log(f"[{n:2}/{len(routed)}] {f['id']:14} "
