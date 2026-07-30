@@ -90,6 +90,39 @@ def _log(m: str) -> None:
     print(f"[cm_kv_attn] {m}", file=sys.stderr, flush=True)
 
 
+def _out_path(args) -> Path:
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    return RESULTS / f"echoswarm_kvattn{('_' + args.tag) if args.tag else ''}.json"
+
+
+def _dump(out: Path, fx_path: Path, rows: list, scores: dict, lens: list,
+          sel: list, *, seq_all: int, chunk: int, complete: bool) -> None:
+    """Write results. Called after EVERY fixture so a mid-run kill keeps its data.
+
+    Three sweeps have now degraded under memory pressure, and writing only at the
+    end meant a kill at fixture 20 discarded 20 fixtures of paired data — which is
+    most of the statistical power this experiment exists to buy.
+
+    Temp-file-and-rename, because being killed *during* the write would otherwise
+    leave truncated JSON where a partial-but-valid file should be, turning "some
+    data" into "no data" — exactly the failure this is meant to prevent.
+
+    `complete` tells a reader whether the totals are final or the file is a
+    snapshot whose per-question rows are trustworthy but whose scores are partial.
+    """
+    tmp = out.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps({
+        "fixtures_file": fx_path.name, "n": len(rows), "seq_len": seq_all,
+        "prefix_lens": lens, "selectors": sel, "chunk_tokens": chunk,
+        "attn_implementation": "eager",
+        "max_new_tokens": EVAL_MAX_NEW_TOKENS,
+        "metric": "grounding_score (CM-B.0a)",
+        "complete": complete,
+        "scores": scores, "per_question": rows,
+    }, indent=2))
+    tmp.replace(out)
+
+
 def _parse_lens(s: str) -> list[int]:
     out = set()
     for part in s.split(","):
@@ -287,6 +320,8 @@ def main() -> int:
                  f"{time.perf_counter() - t0:5.1f}s")
         row["mem"] = _mem()
         rows.append(row)
+        _dump(_out_path(args), fx_path, rows, scores, lens, sel,
+              seq_all=pk["seq"], chunk=args.chunk_tokens, complete=False)
         _log(f"[{n:2}/{len(routed)}] {f['id']:14} "
              + " ".join(f"{k}={int(row[k]['grounded'])}" for k, _ in plan)
              + f"  {row['mem']}")
@@ -327,17 +362,9 @@ def main() -> int:
     _log("CM-B.0i's dumb selector reached 8% of ceiling at 35.9x. Above that is a "
          "mechanism; level with it is a much stronger negative.")
 
-    RESULTS.mkdir(parents=True, exist_ok=True)
-    out = RESULTS / f"echoswarm_kvattn{('_' + args.tag) if args.tag else ''}.json"
-    out.write_text(json.dumps({
-        "fixtures_file": fx_path.name, "n": total, "seq_len": seq,
-        "prefix_lens": lens, "chunk_tokens": args.chunk_tokens,
-        "attn_implementation": "eager",
-        "max_new_tokens": EVAL_MAX_NEW_TOKENS,
-        "metric": "grounding_score (CM-B.0a)",
-        "scores": scores, "per_question": rows,
-    }, indent=2))
-    _log(f"wrote {out}")
+    _dump(_out_path(args), fx_path, rows, scores, lens, sel, seq_all=seq,
+          chunk=args.chunk_tokens, complete=True)
+    _log(f"wrote {_out_path(args)}")
     return 0
 
 
