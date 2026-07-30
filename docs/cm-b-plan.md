@@ -4,6 +4,68 @@
 > `docs/cartridges-log.md`, newest first — deliberately NOT a separate log file, so the
 > CM track stays readable end to end.
 
+---
+
+## ⛔ TRACK STATUS 2026-07-31 — THE COMPRESSION LINE IS CLOSED
+
+**Everything below this banner is historical.** Stages 1 and 2 are closed and the
+premise of the whole plan — that a compact latent prefix can carry a bucket's content —
+has been tested to destruction. Read `docs/cartridges-log.md` CM-B.0i → 0l first;
+this file is kept for the reasoning trail, not as a work list.
+
+**Four independent mechanisms failed to make a latent channel carry code facts:**
+
+| mechanism | result |
+|---|---|
+| Phase 4-C cache augmentation | inert — 2/25, below no-context |
+| CM-A cartridge distillation | 6 modern draws at 0–2/8; historical 4/8 and 5/8 never reproduce |
+| positional / magnitude selection (CM-B.0i) | score ∝ fraction retained; no compression |
+| query-aware selection, SnapKV family (CM-B.0k/0l) | 38% of ceiling at best, non-monotone, no knee |
+
+**And the reframe that matters more than any of them:** with the **entire** bucket in
+cache and full attention, the 3B answers **13/26 — half**. That ceiling is verified
+three ways (CM-B.0j text-in-prompt control) and reproduces four times. Every
+compression number is a fraction of it, so this track was optimising the delivery of
+information the reader cannot exploit once it arrives. **The ceiling, not the channel,
+is the binding constraint.**
+
+### The one gate that decides whether any of this is worth resuming
+
+**Does the ceiling move with model scale?** Nothing else should be attempted first.
+
+- Run floor + full-cache on the same 26 stratified fixtures at **0.5B, 1.5B, 3B** —
+  all three are in the local HF cache, same family and tokenizer, so it is a clean
+  comparison and costs nothing but time.
+- **Ceiling climbs steeply** → the reader was the limit, compression becomes worth
+  revisiting, and every number in the log is re-scoped upward. Then rent a GPU for
+  7–8B knowing what to expect.
+- **Ceiling flat near 45–50% across a 6× parameter range** → scale is not the lever,
+  the limit is the fixtures or the metric, and no further method work is justified
+  until that is understood. This is the outcome to expect given how little P mattered.
+
+7–8B is **not runnable locally**: 15.2 GB of bf16 weights against 16 GB of unified
+memory, before any cache or transient. Quantising confounds the measurement.
+
+### What is NOT closed, and is where the value actually is
+
+- Routing 1/15 → 14/15 (Phase 1); in-bucket chunk rerank 10 → 16/30 (Phase 3-B);
+  **hybrid 19.5 ± 1.7/30** (Phase 4-A, 3-run mean) — the real headline.
+- **Raw KV prefill cache**: 13/26 vs a 0/26 floor, ONE forward pass, ~170 MB/bucket.
+  Not compression and not a research contribution, but a working feature.
+- The self-evolving substrate: mitosis, merge, git-hook updates, novelty-gated spawn.
+- **The measurement apparatus**, which is itself an asset: floor harness, position-
+  stratified fixtures with enforced anti-bias invariants, the text-in-prompt ceiling
+  control, loud-truncation guards. It caught five false positives that would otherwise
+  be in a writeup.
+
+### Positioning consequence, stated plainly
+
+Leading with "latent communication" is an overclaim this evidence will not support —
+four failed mechanisms, zero surviving positive results, and the literature's own
+method reaching 38% where it reports 97–99%. The defensible pillars are the
+**self-evolving code memory with measured retrieval gains**, and the **rigorous
+negative** on cartridge compression for code QA against a verified ceiling.
+
 ## The gap
 
 libucks has two halves that don't compose:
@@ -180,6 +242,11 @@ react to edits, that is *insensitivity*, not a mechanism. Publish it as such.
 ---
 
 ## Stage 2 — split and merge (contingent)
+
+> **❌ CLOSED 2026-07-31.** Was contingent on Stage 1, which closed 2026-07-29; and the
+> compression premise underneath both is now closed by CM-B.0l. Cartridge split/merge
+> only matters if a cartridge carries content worth preserving across a mitosis, and it
+> does not — 2/26 against a 0/26 floor and a 13/26 ceiling. Do not build this.
 
 Only if Stage 1 clears. Can a cartridge split when mitosis splits its bucket? Can two
 compose when buckets merge? Merge is the hard one — CAS shows naive concatenation
