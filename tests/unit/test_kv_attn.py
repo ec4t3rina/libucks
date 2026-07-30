@@ -198,6 +198,44 @@ class TestUsesTheCacheAndAsksForAttention:
         assert m.saw_past and m.saw_past[0] is True
 
 
+class TestScoresAreReusableAcrossBudgets:
+    """Scoring costs a full-cache forward and does not depend on p. A sweep over
+    several budgets, or wanting both global and per-layer selection, must be able
+    to pay for that forward once."""
+
+    def test_scores_shape_is_layers_by_seq(self):
+        kp = _kp()
+        s = kp.attn_scores(_AttnModel([1, 2, 3]), _Tok(), _flat(), "q?",
+                           device=torch.device("cpu"))
+        assert tuple(s.shape) == (N_LAYERS, SEQ)
+
+    def test_scores_exclude_query_positions(self):
+        """seq columns only — the stub gives the query's own positions weight."""
+        kp = _kp()
+        s = kp.attn_scores(_AttnModel([1, 2, 3]), _Tok(), _flat(), "q?",
+                           device=torch.device("cpu"))
+        assert s.shape[1] == SEQ
+
+    def test_one_forward_serves_every_budget(self):
+        kp = _kp()
+        m = _AttnModel([9, 9, 9])
+        s = kp.attn_scores(m, _Tok(), _flat(), "q?", device=torch.device("cpu"))
+        calls = len(m.saw_past)
+        for p in (1, 2, 5):
+            assert len(kp.select_from_scores(s, p)) == p
+        assert len(m.saw_past) == calls, "selection must not re-run the model"
+
+    def test_select_from_scores_matches_the_one_shot_helper(self):
+        kp = _kp()
+        flat, hot = _flat(), [7, 3, 5]
+        s = kp.attn_scores(_AttnModel(hot), _Tok(), flat, "q?",
+                           device=torch.device("cpu"))
+        for per in (False, True):
+            assert kp.select_from_scores(s, 2, per_layer=per) == \
+                kp.select_indices_attn(_AttnModel(hot), _Tok(), flat, 2, "q?",
+                                       device=torch.device("cpu"), per_layer=per)
+
+
 class TestSilentDegenerationIsImpossible:
     """SDPA and flash kernels do not produce attention weights. If transformers
     hands back None instead of falling back to eager, every score is zero and

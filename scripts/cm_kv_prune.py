@@ -103,6 +103,28 @@ def select_indices(flat: dict[str, torch.Tensor], how: str, p: int) -> list[int]
     raise ValueError(f"unknown selector {how!r}")
 
 
+def attn_scores(model, tokenizer, flat: dict[str, torch.Tensor], query: str, *,
+                device, trainer=None) -> torch.Tensor:
+    """(n_layers, seq) attention mass per cache position, from ONE forward.
+
+    Split out from select_indices_attn so a caller sweeping several budgets, or
+    wanting both global and per-layer selection, pays for the expensive full-cache
+    forward once instead of once per variant. The scores do not depend on p.
+    """
+    return _attn_scores_impl(model, tokenizer, flat, query, device=device,
+                             trainer=trainer)
+
+
+def select_from_scores(scores: torch.Tensor, p: int, *, per_layer: bool = False):
+    """Top-p positions from precomputed scores, ascending. See select_indices_attn
+    for why order matters (RoPE phase) and why per_layer exists (SnapKV)."""
+    seq = int(scores.shape[1])
+    p = min(p, seq)
+    if per_layer:
+        return [sorted(torch.topk(s, k=p).indices.tolist()) for s in scores]
+    return sorted(torch.topk(scores.sum(dim=0), k=p).indices.tolist())
+
+
 def select_indices_attn(model, tokenizer, flat: dict[str, torch.Tensor], p: int,
                         query: str, *, device, per_layer: bool = False,
                         trainer=None):
@@ -128,9 +150,14 @@ def select_indices_attn(model, tokenizer, flat: dict[str, torch.Tensor], p: int,
     original positions, so reordering them scrambles the geometry the model decodes
     against — the same reason every selector above sorts.
     """
+    scores = _attn_scores_impl(model, tokenizer, flat, query, device=device,
+                               trainer=trainer)
+    return select_from_scores(scores, p, per_layer=per_layer)
+
+
+def _attn_scores_impl(model, tokenizer, flat, query, *, device, trainer=None):
     keys = layer_keys(flat)
     seq = int(flat[keys[0][0]].shape[2])
-    p = min(p, seq)
 
     from libucks.cache_augmentation.kv_extract import restore_dynamic_cache
 
@@ -169,12 +196,7 @@ def select_indices_attn(model, tokenizer, flat: dict[str, torch.Tensor], p: int,
         s = a.float()[0, :, :, :seq].sum(dim=(0, 1))   # -> (seq,)
         per_layer_scores.append(s)
 
-    def _top(score: torch.Tensor) -> list[int]:
-        return sorted(torch.topk(score, k=p).indices.tolist())
-
-    if per_layer:
-        return [_top(s) for s in per_layer_scores]
-    return _top(torch.stack(per_layer_scores).sum(dim=0))
+    return torch.stack(per_layer_scores)          # (n_layers, seq)
 
 
 def cartridge_from_per_layer_selection(flat, idx_per_layer: list[list[int]],
